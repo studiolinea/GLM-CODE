@@ -166,7 +166,7 @@ if (-not $python) {
     Write-Err "Aucun Python 3.11+ trouve. Installez-le depuis https://python.org"
     exit 1
 }
-Write-Ok "Python retenu : $python ($($python --version 2>&1))"
+Write-Ok "Python retenu : $python ($(& $python --version 2>&1))"
 
 # ------------------------------------------------------------
 # 5. Installer les dependances

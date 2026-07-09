@@ -11,7 +11,8 @@
 #    irm "https://raw.githubusercontent.com/studiolinea/GLM-CODE/main/install/uninstall.ps1" | iex
 # ============================================================
 
-$ErrorActionPreference = "Stop"
+# On continue meme si une etape (ex. pip d'un paquet absent) renvoie un avertissement.
+$ErrorActionPreference = "Continue"
 
 function Write-Step { param($m) Write-Host "==> $m" -ForegroundColor Cyan }
 function Write-Ok   { param($m) Write-Host "    $m" -ForegroundColor Green }
@@ -65,8 +66,8 @@ if ($pythons.Count -eq 0) {
 # ------------------------------------------------------------
 Write-Step "Désinstallation de glmcode (tous les Python)"
 foreach ($py in $pythons) {
-    & $py -m pip uninstall glmcode -y 2>$null | Out-Null
-    & $py -m pip uninstall glm -y 2>$null | Out-Null
+    & $py -m pip uninstall glmcode -y 2>&1 | Out-Null
+    & $py -m pip uninstall glm -y 2>&1 | Out-Null
 }
 Write-Ok "Paquets glmcode/glm désinstalllés"
 
