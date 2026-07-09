@@ -8,7 +8,7 @@
 #    4. Supprime la configuration
 #
 #  USAGE :
-#    irm "https://raw.githubusercontent.com/Marreouu/GLM-C0deur/main/install/uninstall.ps1" | iex
+#    irm "https://raw.githubusercontent.com/studiolinea/GLM-CODE/main/install/uninstall.ps1" | iex
 # ============================================================
 
 $ErrorActionPreference = "Stop"

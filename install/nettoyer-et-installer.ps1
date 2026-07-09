@@ -8,7 +8,7 @@
 #    3. Telecharge et reinstalle proprement glm depuis GitHub
 #
 #  USAGE :
-#    irm "https://raw.githubusercontent.com/Marreouu/GLM-C0deur/main/install/nettoyer-et-installer.ps1" | iex
+#    irm "https://raw.githubusercontent.com/studiolinea/GLM-CODE/main/install/nettoyer-et-installer.ps1" | iex
 # ============================================================
 
 # On continue meme si une etape de nettoyage echoue
@@ -20,7 +20,7 @@ function Write-Warn { param($m) Write-Host "    $m" -ForegroundColor Yellow }
 function Write-Err  { param($m) Write-Host "    $m" -ForegroundColor Red }
 
 # --- Configuration ---
-$RepoUrl = "https://github.com/Marreouu/GLM-C0deur"
+$RepoUrl = "https://github.com/studiolinea/GLM-CODE"
 $InstallDir = Join-Path $env:LOCALAPPDATA "glm-code"
 $TempDir = Join-Path $env:TEMP "glm-install"
 

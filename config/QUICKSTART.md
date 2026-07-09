@@ -7,8 +7,8 @@ Ce guide vous aide à configurer et à utiliser rapidement GLM Codeur.
 1. **Cloner le dépôt :**
    :**
    ```bash
-   git clone https://github.com/Marreouu/GLM-C0deur.git
-   cd GLM-C0deur
+   git clone https://github.com/studiolinea/GLM-CODE.git
+   cd GLM-CODE
    ```
 
 2. **Copier la configuration :**

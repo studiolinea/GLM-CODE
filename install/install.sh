@@ -9,13 +9,13 @@
 #    4. Configuration post-installation
 #
 #  USAGE :
-#    curl -sSL https://raw.githubusercontent.com/Marreouu/GLM-C0deur/main/install/install.sh | bash
+#    curl -sSL https://raw.githubusercontent.com/studiolinea/GLM-CODE/main/install/install.sh | bash
 # ============================================================
 
 set -e
 
 # --- Configuration ---
-REPO_URL="https://github.com/Marreouu/GLM-C0deur"
+REPO_URL="https://github.com/studiolinea/GLM-CODE"
 INSTALL_DIR="$HOME/.glm-code"
 TEMP_DIR="/tmp/glm-install-$(date +%s)"
 LOG_FILE="/tmp/glm-install.log"

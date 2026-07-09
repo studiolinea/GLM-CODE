@@ -9,7 +9,7 @@
 #    4. Supprime la configuration
 #
 #  USAGE :
-#    curl -sSL https://raw.githubusercontent.com/Marreouu/GLM-C0deur/main/install/uninstall.sh | bash
+#    curl -sSL https://raw.githubusercontent.com/studiolinea/GLM-CODE/main/install/uninstall.sh | bash
 # ============================================================
 
 set -e

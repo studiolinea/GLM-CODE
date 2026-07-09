@@ -9,7 +9,7 @@
 #    3. Telecharge et reinstalle proprement glm depuis GitHub
 #
 #  USAGE :
-#    curl -sSL https://raw.githubusercontent.com/Marreouu/GLM-C0deur/main/install/nettoyer-et-installer.sh | bash
+#    curl -sSL https://raw.githubusercontent.com/studiolinea/GLM-CODE/main/install/nettoyer-et-installer.sh | bash
 # ============================================================
 
 set -e
@@ -21,7 +21,7 @@ write_warn() { echo -e "    \e[33m$1\e[0m"; }
 write_err()  { echo -e "    \e[31m$1\e[0m"; }
 
 # --- Configuration ---
-REPO_URL="https://github.com/Marreouu/GLM-C0deur"
+REPO_URL="https://github.com/studiolinea/GLM-CODE"
 INSTALL_DIR="$HOME/.glm-code"
 TEMP_DIR="/tmp/glm-install"
 

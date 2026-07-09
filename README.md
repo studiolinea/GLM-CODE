@@ -35,8 +35,8 @@ niveaux **cerveau + codeur** qui délègue le code technique à un second modèl
 ### Depuis le dépôt cloné
 
 ```bash
-git clone https://github.com/Marreouu/GLM-C0deur.git
-cd GLM-C0deur
+git clone https://github.com/studiolinea/GLM-CODE.git
+cd GLM-CODE
 ```
 
 **Windows** — double‑cliquez sur `install/install.bat`, ou en PowerShell :
