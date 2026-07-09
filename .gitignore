@@ -1,0 +1,39 @@
+# ─── Secrets : ne JAMAIS commiter les cles API ───────────────────────────
+config.toml
+*.key
+.env
+
+# ─── Python ──────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.egg
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# ─── Environnements virtuels ─────────────────────────────────────────────
+.venv/
+venv/
+env/
+
+# ─── Caches d'outils ─────────────────────────────────────────────────────
+.cache/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ─── Donnees d'execution / dev (memoire de l'agent qui a construit l'appli)
+.remember/
+
+# ─── Reglages locaux de l'editeur / IDE ──────────────────────────────────
+.claude/settings.local.json
+.idea/
+.vscode/
+
+# ─── Fichiers systeme ────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ─── Captures d'ecran ────────────────────────────────────────────────────
+*.png

@@ -1,0 +1,41 @@
+[zai]
+api_key = "VOTRE_CLE_API_ZAI"
+base_url = "https://api.z.ai/api/paas/v4"
+# Cerveau : glm-4.5-flash (gratuit et fiable).
+model = "glm-4.5-flash"
+max_retries = 3
+
+temperature = 0.3
+max_tokens = 8192
+auto_approve = false
+
+# ─── Orchestrateur : cerveau (Z.ai ci-dessus) + codeur API OpenRouter ───
+[coder]
+enabled = true
+base_url = "https://openrouter.ai/api/v1"
+model = "qwen/qwen3-coder:free"   # Qwen3-Coder 480B, gratuit sur OpenRouter ( switch auto si pas dispo)
+api_key = "VOTRE_CLE_API_OPENROUTER"
+
+# ─── Skills ───────────────────────────────────────────────────────────
+[skills]
+# Charge les skills de Claude Code s'ils sont presents (sinon ignore).
+include_claude = true
+# Dossiers supplementaires de skills (.md ou <nom>/SKILL.md).
+dirs = []
+
+# ─── Surveillance de fichiers (reveil automatique de l'agent) ─────────────
+[runtime]
+# Surveillance du dossier courant : reveille l'agent automatiquement quand un
+# fichier change en dehors de l'assistant (edition manuelle, outil externe...).
+enabled = true
+file_watch_delay = 2.0   # secondes entre deux verifications du dossier
+# Nota : seuls `enabled` et `file_watch_delay` sont lus. Les anciennes cles
+# (shell_history_size, git_watch_delay, background_workers, cache_*) n'etaient
+# branchees nulle part et ont ete retirees.
+
+# ─── Mises a jour automatiques ────────────────────────────────────────────
+[auto_update]
+enabled = true
+check_on_start = true
+interval = 24  # heures
+channel = "stable"
