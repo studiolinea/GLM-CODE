@@ -205,18 +205,19 @@ def build_session(
         cycle_mode()
         event.app.invalidate()
 
-    def bottom_toolbar():
+    # Le mode s'affiche a DROITE de la ligne de saisie (rprompt) : il se met a
+    # jour en direct avec Shift+Tab et ne laisse aucune trace dans le
+    # defilement (contrairement a bottom_toolbar, qui se dupliquait a chaque
+    # tour de boucle).
+    def rprompt():
         mode = get_mode()
         color, label = _MODE_STYLE.get(mode, (FG, mode.upper()))
-        chip = f"<style bg='{color}' fg='{BG}'><b>  {label}  </b></style>"
-        mid = f"  <style fg='{BLUE}'>{subtitle}</style>" if subtitle else ""
-        hint = f"   <style fg='{DIM2}'>⇧⇥ mode · @ fichier · /help</style>"
-        return HTML(chip + mid + hint)
+        return HTML(f"<style bg='{color}' fg='{BG}'><b> {label} </b></style>")
 
     try:
         return PromptSession(
             key_bindings=kb,
-            bottom_toolbar=bottom_toolbar,
+            rprompt=rprompt,
             style=_PT_STYLE,
             completer=FileMentionCompleter(base_dir),
             complete_while_typing=True,
