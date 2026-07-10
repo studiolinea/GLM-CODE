@@ -351,9 +351,13 @@ def run(resume: str | None = None) -> int:
     else:
         subtitle = cfg.model
 
-    # Interface plein ecran (barre epinglee en bas) par defaut ; repli sur la
-    # boucle ligne-a-ligne si le terminal ne la supporte pas.
-    if os.environ.get("GLMCODE_SIMPLE") not in ("1", "true"):
+    # Interface : la boucle ligne-a-ligne (mode simple) est le defaut — fiable
+    # sur tous les terminaux et affiche proprement le flux (texte au fil de
+    # l'eau). L'interface a barre epinglee (TUI) reste disponible en option via
+    # GLMCODE_TUI=1 ; elle peut mal s'afficher selon le terminal (Windows).
+    want_tui = os.environ.get("GLMCODE_TUI", "").lower() in ("1", "true", "yes", "on")
+    want_simple = os.environ.get("GLMCODE_SIMPLE", "").lower() in ("1", "true", "yes", "on")
+    if want_tui and not want_simple:
         try:
             from .tui import TUI
 
