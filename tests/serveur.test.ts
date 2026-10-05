@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { chiffrer, dechiffrer } from '../src/serveur/chiffrement';
 import { commandesVersVentes, type CommandeLemonSqueezy } from '../src/serveur/lemonsqueezy';
 import { traiterApi, type Env } from '../src/serveur/worker';
@@ -296,5 +296,52 @@ describe('serveur : boutique Stripe', () => {
     const f = fauxStripe();
     const r = await traiterApi(appel('/api/comptes/inconnue/relier', { cle: 'x'.repeat(30) }), env, f.recuperer);
     expect(r.status).toBe(404);
+  });
+
+  it('marche dans le vrai serveur : fetch est toujours appelé seul, comme l’exige Cloudflare', async () => {
+    const f = fauxStripe();
+    // Comme sur Cloudflare : fetch appelé depuis un autre objet (objet.fetch(…)) lève « Illegal invocation ».
+    vi.stubGlobal('fetch', function (this: unknown, entree: RequestInfo | URL, init?: RequestInit) {
+      if (this !== undefined && this !== globalThis) throw new TypeError('Illegal invocation');
+      return f.recuperer(entree, init);
+    });
+    try {
+      const worker = (await import('../src/serveur/worker')).default;
+      const r = await worker.fetch(appel('/api/comptes/stripe/relier', { cle: 'rk_test_bonne_cle_0123456789' }), env);
+      expect(r.status).toBe(200);
+      expect(await r.json()).toEqual({ libelle: 'Stripe (mode test)' });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('base pas à jour (Stripe pas encore permis) : dit quel texte SQL lancer', async () => {
+    const f = fauxStripe();
+    const recuperer = (async (entree: RequestInfo | URL, init?: RequestInit) => {
+      if (new URL(String(entree)).pathname === '/rest/v1/comptes_relies' && init?.method === 'POST') {
+        return new Response(JSON.stringify({ code: '23514', message: 'violates check constraint "comptes_relies_source_check"' }), { status: 400 });
+      }
+      return f.recuperer(entree, init);
+    }) as typeof fetch;
+    const r = await traiterApi(appel('/api/comptes/stripe/relier', { cle: 'rk_test_bonne_cle_0123456789' }), env, recuperer);
+    expect(r.status).toBe(502);
+    expect(((await r.json()) as { erreur: string }).erreur).toContain('03-boutique-stripe.sql');
+  });
+
+  it('une panne pendant l’enregistrement donne un message clair, sans faire tomber le serveur', async () => {
+    const f = fauxStripe();
+    const recuperer = (async (entree: RequestInfo | URL, init?: RequestInit) => {
+      if (new URL(String(entree)).pathname === '/rest/v1/comptes_relies') throw new TypeError('fetch failed');
+      return f.recuperer(entree, init);
+    }) as typeof fetch;
+    const journal = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    try {
+      const r = await traiterApi(appel('/api/comptes/stripe/relier', { cle: 'rk_test_bonne_cle_0123456789' }), env, recuperer);
+      expect(r.status).toBe(500);
+      expect(((await r.json()) as { erreur: string }).erreur).toContain('Réessaie');
+      expect(journal).toHaveBeenCalled();
+    } finally {
+      journal.mockRestore();
+    }
   });
 });
