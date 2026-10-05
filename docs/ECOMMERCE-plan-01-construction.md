@@ -143,6 +143,13 @@ Règle : `calculs/` et `alertes/` ne dépendent de rien d'autre. Ils se testent 
 
 À côté de l'appli (pas dans ce plan) : écrire le guide detailing, ouvrir la boutique, publier les vidéos.
 
+## Idées pour plus tard (hors de ce plan)
+
+- **Reprendre des éléments de l'appli dashboard du projet Inicia** (projet Supabase mis en pause le 5 octobre
+  pour libérer une place) : en particulier la **météo interactive en fond**. À analyser avant de décider.
+
 ## Paroles de Kévin (5 octobre)
 
 > Aller go
+
+> Il y a des choses intéressantes dans l'application d'Inicia qu'on pourra analyser plus tard et peut-être implémenter dedans. Parce qu'on avait fait une météo interactive en fond, ça pourrait être sympa.
