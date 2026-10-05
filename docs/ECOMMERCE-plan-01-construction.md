@@ -119,8 +119,9 @@ Règle : `calculs/` et `alertes/` ne dépendent de rien d'autre. Ils se testent 
 - **Fini quand :** Kévin ouvre l'adresse sur son Mac, installe l'appli sur son téléphone et se connecte des deux côtés.
 
 ### Étape 7 — Lire le vrai fichier de la boutique
-- **Avant :** Kévin choisit la plateforme gratuite (Payhip, Gumroad ou autre). On compare d'abord
-  leurs commissions et leurs exports, avec des informations vérifiées le jour même.
+- **Choix fait le 5 octobre : Lemon Squeezy.** Comparée à Payhip et Gumroad : 5 % + 0,50 $ par vente,
+  TVA et factures gérées par la plateforme (« merchant of record »), API et alertes de vente pour le
+  branchement automatique (étape 9). Le mode test de Lemon Squeezy permet de tout essayer avant l'ouverture.
 - Écrire le lecteur de cette plateforme dans `ventes/adaptateurs/`, à partir d'un vrai export (même vide)
   ou de l'exemple officiel de la plateforme. Les noms et e-mails clients sont ignorés à la lecture.
 - **Fini quand :** un export réel se charge sans erreur, et un fichier d'une autre plateforme est refusé proprement.

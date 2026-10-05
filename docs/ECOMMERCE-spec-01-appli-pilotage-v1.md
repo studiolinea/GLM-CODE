@@ -154,8 +154,9 @@ Choix de Kévin (5 octobre) : **sur le Mac surtout, et aussi sur le téléphone*
 
 ## Ce qui reste à décider avant de construire
 
-1. **La plateforme gratuite de la boutique** (Payhip, Gumroad ou autre). L'appli lira d'abord le
-   fichier de celle-là. Commissions à vérifier au moment du choix.
+1. ~~La plateforme gratuite de la boutique~~ → **Lemon Squeezy**, choisie par Kévin le 5 octobre
+   (5 % + 0,50 $ par vente, TVA et factures gérées par la plateforme, branchement automatique possible).
+   Frais à revérifier sur leur site avant l'ouverture.
 2. À côté de l'appli : écrire le guide detailing et ouvrir la boutique.
 
 ## Prochaine étape
