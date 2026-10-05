@@ -27,5 +27,6 @@ describe('lireMontant', () => {
 describe('formatEuros', () => {
   it('écrit des euros à la française', () => {
     expect(formatEuros(1990).replace(/\s/g, ' ')).toBe('19,90 €');
+    expect(formatEuros(123450)).not.toContain('\u202f');
   });
 });

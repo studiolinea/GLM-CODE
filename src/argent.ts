@@ -31,5 +31,15 @@ const FORMAT_EUROS = new Intl.NumberFormat('fr-FR', { style: 'currency', currenc
 
 /** 1990 → "19,90 €". */
 export function formatEuros(centimes: number): string {
-  return FORMAT_EUROS.format(centimes / 100);
+  return espacesInsecables(FORMAT_EUROS.format(centimes / 100));
+}
+
+/** 1840 → "1 840". */
+export function formatNombre(n: number): string {
+  return espacesInsecables(n.toLocaleString('fr-FR'));
+}
+
+// Intl met une espace fine (U+202F) entre les milliers ; certaines polices ne l'affichent pas.
+function espacesInsecables(texte: string): string {
+  return texte.replace(/\u202f/g, '\u00a0');
 }

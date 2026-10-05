@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { alertesVisibles, calculerAlertes, type Action } from './alertes/alertes';
 import { calculerResume, type Periode } from './calculs/resume';
+import { rythmeSemaine } from './calculs/rythme';
 import {
   changerReglages,
   enregistrerVideo,
@@ -48,6 +49,10 @@ export function App() {
 
   const aujourdhui = dateParis(maintenant);
   const resume = useMemo(() => calculerResume(donnees.ventes, periode, maintenant), [donnees.ventes, periode, maintenant]);
+  const rythme = useMemo(
+    () => rythmeSemaine(donnees.videos, donnees.reglages.objectifParJour, maintenant),
+    [donnees.videos, donnees.reglages.objectifParJour, maintenant],
+  );
   const alertes = useMemo(
     () => alertesVisibles(calculerAlertes({ ...donnees, maintenant }), donnees.etatsAlertes, aujourdhui),
     [donnees, maintenant, aujourdhui],
@@ -107,6 +112,7 @@ export function App() {
         couverture={donnees.couverture}
         periode={periode}
         resume={resume}
+        rythme={rythme}
         alertes={alertes}
         actions={actions}
         onPeriode={setPeriode}

@@ -41,6 +41,11 @@ Choix de la période : **7 jours, 1 mois, 3 mois**.
 - **Panier moyen** : ventes ÷ commandes. Aucune commande → « — », jamais un 0 € inventé.
 - Toujours affiché : « Ventes chargées jusqu'au JJ/MM ».
 
+### 1 bis. Le rythme de la semaine
+
+Un compte-tours montre les vidéos notées sur les 7 derniers jours, par rapport à l'objectif
+(objectif par jour × 7, par exemple « 3/7 »). Pas d'objectif réglé (0) : pas de compte-tours.
+
 ### 2. Les gains réels
 
 **Gains réels = ventes − commissions et frais de la plateforme**, tels qu'écrits dans le fichier de la boutique.
@@ -102,6 +107,12 @@ dès le premier vrai fichier. Les chiffres de la vidéo OnzeTable ne servent jam
 - **Branchement direct TikTok / Instagram** : il faut des comptes pro et une validation longue. Plus tard, un par un.
 - **Analyse automatique des hooks et des vidéos** : annoncée dans la vidéo, jamais montrée. Peut-être plus tard.
 - **Comptes pour d'autres vendeurs, abonnement, vente de l'appli** : version 2 ou après, si l'appli fait ses preuves.
+
+## Le look
+
+Choix de Kévin (5 octobre) : **« Compteur »**, le tableau de bord d'une voiture. Compte-tours pour
+le rythme de vidéos, compteur kilométrique pour les ventes, voyants pour les alertes (orange à
+traiter, vert bonne nouvelle, bleu pour info). Sur ordinateur : le compteur à gauche, les voyants à droite.
 
 ## Comment c'est construit
 

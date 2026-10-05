@@ -1,3 +1,4 @@
+import { formatNombre } from '../argent';
 import { FENETRE_VIDEO_MS, ventesEntre } from '../calculs/fenetres';
 import { NOMS_RESEAUX, type EtatAlerte, type Reglages, type Video } from '../modele';
 import { ajouterJours, dateParis, jourMois, joursEntre, quandParis } from '../temps';
@@ -180,7 +181,7 @@ function alerteVideo(video: Video, ctx: ContexteAlertes): Alerte {
     };
   }
 
-  const vues = video.vues !== undefined ? `${video.vues.toLocaleString('fr-FR')} vues, ` : '';
+  const vues = video.vues !== undefined ? `${formatNombre(video.vues)} vues, ` : '';
   if (n > 0) {
     return {
       ...base,
