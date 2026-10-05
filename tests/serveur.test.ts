@@ -284,10 +284,10 @@ describe('paiements Stripe → ventes', () => {
       charge('ch_mp_rembourse', { amount: 2099, refunded: true, amount_refunded: 2099, balance_transaction: solde }),
       charge('ch_mp_moitie', { amount: 2099, amount_refunded: 1050, balance_transaction: solde }),
     ]);
-    expect(ventes.map((v) => [v.numeroCommande, v.montantCentimes, v.fraisCentimes])).toEqual([
-      ['ch_mp', 1990, null],
-      ['ch_mp_rembourse', 1990, null],
-      ['ch_mp_moitie', 995, null],
+    expect(ventes.map((v) => [v.numeroCommande, v.montantCentimes, v.fraisCentimes, v.tvaCentimes])).toEqual([
+      ['ch_mp', 1990, null, 109],
+      ['ch_mp_rembourse', 1990, null, 109],
+      ['ch_mp_moitie', 995, null, 54],
     ]);
   });
 

@@ -31,6 +31,8 @@ export interface Resume {
   ventesSansFrais: number;
   /** Ventes − frais. null si des frais manquent : on ne devine pas. */
   gainsCentimes: number | null;
+  /** TVA retenue par la boutique sur les ventes non remboursées ; null si aucune vente n'en donne. */
+  tvaCentimes: number | null;
 }
 
 export function calculerResume(ventes: Vente[], periode: Periode, maintenant: Date): Resume {
@@ -47,6 +49,7 @@ export function calculerResume(ventes: Vente[], periode: Periode, maintenant: Da
   const commandes = gardees.length;
   const fraisCentimes = somme(gardees.map((v) => v.fraisCentimes ?? 0));
   const ventesSansFrais = gardees.filter((v) => v.fraisCentimes === null).length;
+  const avecTva = gardees.filter((v) => v.tvaCentimes !== undefined);
 
   return {
     periode,
@@ -60,6 +63,7 @@ export function calculerResume(ventes: Vente[], periode: Periode, maintenant: Da
     fraisCentimes,
     ventesSansFrais,
     gainsCentimes: ventesSansFrais > 0 ? null : ventesCentimes - fraisCentimes,
+    tvaCentimes: avecTva.length > 0 ? somme(avecTva.map((v) => v.tvaCentimes ?? 0)) : null,
   };
 }
 

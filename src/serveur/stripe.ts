@@ -100,6 +100,7 @@ export function chargesVersVentes(charges: ChargeStripe[]): { ventes: Vente[]; i
       // Avec Managed Payments, ses frais de 3,5 % ne sont pas dans ce paiement : Stripe les compte à part.
       // Tant que l'appli ne les lit pas, les frais restent inconnus plutôt que faux.
       fraisCentimes: solde && tva === 0 ? solde.fee : null,
+      ...(tvaGardee > 0 ? { tvaCentimes: tvaGardee } : {}),
       rembourse: c.refunded,
       produit: c.description ?? '',
     });

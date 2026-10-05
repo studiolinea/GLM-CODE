@@ -12,6 +12,7 @@ create table if not exists public.ventes (
   instant timestamptz not null,
   montant_centimes integer not null check (montant_centimes >= 0),
   frais_centimes integer check (frais_centimes >= 0),
+  tva_centimes integer check (tva_centimes >= 0),
   rembourse boolean not null default false,
   produit text not null default '',
   primary key (user_id, plateforme, numero_commande)

@@ -33,6 +33,7 @@ describe('calculerResume', () => {
       fraisCentimes: 500, // 1,50 + 1,50 + 2,00
       ventesSansFrais: 0,
       gainsCentimes: 6470, // 69,70 − 5,00
+      tvaCentimes: null, // le fichier ne donne pas de TVA retenue
     });
   });
 
@@ -55,6 +56,22 @@ describe('calculerResume', () => {
       panierMoyenCentimes: 2157, // 129,40 / 6 = 21,566…
       gainsCentimes: null,
     });
+  });
+
+  it('TVA retenue par la boutique : additionnée sur les ventes gardées seulement', () => {
+    const v = (numero: string, tva: number | undefined, rembourse = false) => ({
+      plateforme: 'stripe',
+      numeroCommande: numero,
+      instant: '2026-10-05T08:00:00.000Z',
+      montantCentimes: 1990,
+      fraisCentimes: null,
+      ...(tva !== undefined ? { tvaCentimes: tva } : {}),
+      rembourse,
+      produit: 'Guide detailing',
+    });
+    const r = calculerResume([v('a', 109), v('b', 109), v('c', 109, true), v('d', undefined)], '7j', maintenant);
+    expect(r.tvaCentimes).toBe(218);
+    expect(r.ventesCentimes).toBe(5970);
   });
 
   it('aucune vente : panier moyen et gains vides, jamais 0 € inventé pour le panier', () => {
