@@ -26,7 +26,8 @@ avec les chiffres qui le prouvent.
 - Tables et règles de sécurité : [supabase/schema.sql](supabase/schema.sql), à coller dans Supabase > SQL Editor.
 - L'appli lit l'adresse du projet et sa clé publique dans `VITE_SUPABASE_URL` et `VITE_SUPABASE_ANON_KEY`
   (fichier `.env`, valeurs publiques seulement, jamais la clé secrète).
-- Sans ces deux valeurs, l'appli garde les données sur l'appareil (c'est le cas de la version de test).
+- Sans ces deux valeurs, l'appli garde les données sur l'appareil (c'est le cas de la version de test,
+  construite avec `VITE_SUPABASE_URL= VITE_SUPABASE_ANON_KEY= npm run build`).
 - Les données d'exemple ne sont jamais écrites dans la base.
 
 ## Commandes
