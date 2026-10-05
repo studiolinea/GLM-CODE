@@ -162,6 +162,14 @@ Kévin veut que l'appli récupère les données toute seule, sans saisie ni fich
 Ordre : choisir la boutique en tenant compte de ce branchement (étape 7) → créer les comptes TikTok et
 Instagram du business → brancher les trois sources.
 
+**Prêt pour le grand public (demande de Kévin) :** les branchements se font **compte par compte**, dans les
+réglages. Section « Mes comptes reliés » : pour chaque source (boutique, TikTok, Instagram, puis Shopify plus
+tard), l'état (relié ou non), un bouton « Relier » et un bouton « Déconnecter ». Chaque personne ne relie que
+ses propres comptes et ne voit que ses propres données (déjà garanti par les règles de la base).
+À prévoir le jour de l'ouverture au public : rouvrir les inscriptions, « mot de passe oublié », validation
+des applis développeur par TikTok et Meta (obligatoire pour d'autres comptes que le sien), page de
+confidentialité.
+
 ## Idées pour plus tard (hors de ce plan)
 
 - **Reprendre des éléments de l'appli dashboard du projet Inicia** (projet Supabase mis en pause le 5 octobre
@@ -172,5 +180,7 @@ Instagram du business → brancher les trois sources.
 > Aller go
 
 > je souhaiterais que ça se face automatiquement en gros je le relis a c’est app pour qu’il est accept
+
+> je vais vouloir que dans les paramètres, tu laisses l'accessibilité. Genre, si je le mets au grand public, il faut que chaque personne puisse aller dans les paramètres, se connecter à ses propres comptes, comme il veut, se déconnecter.
 
 > Il y a des choses intéressantes dans l'application d'Inicia qu'on pourra analyser plus tard et peut-être implémenter dedans. Parce qu'on avait fait une météo interactive en fond, ça pourrait être sympa.
