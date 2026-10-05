@@ -11,6 +11,8 @@ export interface LigneVente {
   instant: string;
   montant_centimes: number;
   frais_centimes: number | null;
+  /** Colonne ajoutée par supabase/04-tva.sql ; envoyée seulement quand la vente a une TVA retenue. */
+  tva_centimes?: number | null;
   rembourse: boolean;
   produit: string;
 }
@@ -49,6 +51,7 @@ export function venteVersLigne(v: Vente, userId: string): LigneVente {
     instant: v.instant,
     montant_centimes: v.montantCentimes,
     frais_centimes: v.fraisCentimes,
+    ...(v.tvaCentimes !== undefined ? { tva_centimes: v.tvaCentimes } : {}),
     rembourse: v.rembourse,
     produit: v.produit,
   };
@@ -61,6 +64,7 @@ export function ligneVersVente(l: LigneVente): Vente {
     instant: iso(l.instant),
     montantCentimes: l.montant_centimes,
     fraisCentimes: l.frais_centimes,
+    ...(typeof l.tva_centimes === 'number' ? { tvaCentimes: l.tva_centimes } : {}),
     rembourse: l.rembourse,
     produit: l.produit,
   };

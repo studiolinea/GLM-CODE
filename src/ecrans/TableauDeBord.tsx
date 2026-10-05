@@ -121,6 +121,12 @@ export function TableauDeBord({
               {resume.ventesSansFrais > 1 ? 's' : ''} : pas de gains devinés.
             </p>
           )}
+          {resume.tvaCentimes !== null && (
+            <p className="note">
+              TVA retenue par la boutique : {euros(resume.tvaCentimes)}. Payée par tes clients et reversée à l’État :
+              elle n’est pas comptée dans tes ventes.
+            </p>
+          )}
           <p className="note">Gains = ventes moins commissions et frais. Avant impôts et cotisations.</p>
           <p className="note">
             {couverture ? `Ventes chargées jusqu’au ${quandParis(new Date(couverture))}.` : 'Aucun fichier de ventes ajouté.'}

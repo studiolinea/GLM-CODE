@@ -44,6 +44,8 @@ limitée en lecture (`rk_…`), jamais la clé secrète complète (`sk_…`).
   Si ce secret change, il suffit de relier à nouveau les comptes.
 - Table des comptes reliés : [supabase/02-comptes-relies.sql](supabase/02-comptes-relies.sql),
   puis [supabase/03-boutique-stripe.sql](supabase/03-boutique-stripe.sql) pour une base créée avant Stripe.
+- TVA retenue par Stripe (Managed Payments) : [supabase/04-tva.sql](supabase/04-tva.sql) pour une base créée
+  avant le 6 octobre. À lancer avant la première vraie vente.
 
 ## Commandes
 

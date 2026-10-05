@@ -12,6 +12,8 @@ export interface Vente {
   montantCentimes: number;
   /** Commission et frais de la plateforme en centimes ; null si le fichier ne les donne pas. */
   fraisCentimes: number | null;
+  /** TVA payée par le client et retenue par la plateforme pour l'État (Stripe Managed Payments). Absente sinon. */
+  tvaCentimes?: number;
   rembourse: boolean;
   produit: string;
 }

@@ -110,6 +110,27 @@ describe('lignes de la base', () => {
     expect(ligneVersVente(ligne)).toEqual(vente);
   });
 
+  it('TVA retenue : envoyée seulement si la vente en a une, et relue à l’identique', () => {
+    expect('tva_centimes' in venteVersLigne(vente, 'u1')).toBe(false);
+    // La base renvoie null pour une vente sans TVA : la vente relue doit être exactement la même.
+    expect(JSON.stringify(ligneVersVente({ ...venteVersLigne(vente, 'u1'), tva_centimes: null }))).toBe(JSON.stringify(vente));
+
+    const avecTva = {
+      plateforme: 'stripe',
+      numeroCommande: 'ch_1',
+      instant: '2026-10-04T10:00:00.000Z',
+      montantCentimes: 1990,
+      fraisCentimes: null,
+      tvaCentimes: 109,
+      rembourse: false,
+      produit: 'Guide detailing',
+    };
+    const ligne = venteVersLigne(avecTva, 'u1');
+    expect(ligne.tva_centimes).toBe(109);
+    // Même ordre des champs : sinon l'appli croirait la vente modifiée et la renverrait à chaque fois.
+    expect(JSON.stringify(ligneVersVente(ligne))).toBe(JSON.stringify(avecTva));
+  });
+
   it('une vidéo sans lien ni vues revient sans ces champs', () => {
     const ligne = { ...videoVersLigne(video, 'u1'), instant: '2026-10-05T14:00:00+00:00' };
     expect(ligne.lien).toBeNull();
