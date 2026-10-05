@@ -154,9 +154,11 @@ Choix de Kévin (5 octobre) : **sur le Mac surtout, et aussi sur le téléphone*
 
 ## Ce qui reste à décider avant de construire
 
-1. ~~La plateforme gratuite de la boutique~~ → **Lemon Squeezy**, choisie par Kévin le 5 octobre
-   (5 % + 0,50 $ par vente, TVA et factures gérées par la plateforme, branchement automatique possible).
-   Frais à revérifier sur leur site avant l'ouverture.
+1. ~~La plateforme gratuite de la boutique~~ → **Stripe Managed Payments**, choisie par Kévin le 5 octobre.
+   Il avait d'abord choisi Lemon Squeezy ; à l'inscription, Lemon Squeezy (qui appartient à Stripe) l'a orienté
+   vers Stripe Managed Payments. Frais : frais Stripe (environ 1,5 % + 0,25 € pour une carte européenne)
+   + 3,5 %. TVA et factures gérées par Stripe (« merchant of record »), frais visibles vente par vente.
+   Frais à revérifier avant l'ouverture. Lemon Squeezy reste lisible par l'appli (pour d'autres vendeurs).
 2. À côté de l'appli : écrire le guide detailing et ouvrir la boutique.
 
 ## Prochaine étape
