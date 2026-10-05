@@ -177,6 +177,12 @@ describe('ventes reçues de la boutique reliée', () => {
     expect(d.ventes.map((v) => v.numeroCommande)).toEqual(['1']);
   });
 
+  it('les paiements Stripe en mode test restent aussi hors des vraies données', async () => {
+    const { appliquerVentesBoutique } = await import('../src/donnees/useSynchroBoutique');
+    const sansTest = appliquerVentesBoutique(donneesVides(), [venteBoutique('ch_t', 'stripe-test')], maintenant.toISOString());
+    expect(sansTest.ventes).toEqual([]);
+  });
+
   it('les ventes du mode test restent dans l’exemple, jamais dans les vraies données', async () => {
     const { appliquerVentesBoutique } = await import('../src/donnees/useSynchroBoutique');
     const exemple = donneesExemple(maintenant);

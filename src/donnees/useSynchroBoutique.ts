@@ -3,11 +3,13 @@ import type { Donnees } from '../modele';
 import type { Vente } from '../ventes/modele';
 import { importerVentes } from './actions';
 import {
+  BOUTIQUES,
   deconnecterCompte,
   listerComptes,
-  relierLemonSqueezy,
-  synchroniserLemonSqueezy,
+  relierBoutique,
+  synchroniserBoutique,
   type CompteRelie,
+  type SourceBoutique,
   type SourceCompte,
 } from './comptesRelies';
 
@@ -17,8 +19,8 @@ export interface SynchroBoutique {
   enCours: boolean;
   erreur: string | null;
   synchroniser: () => Promise<void>;
-  /** Renvoie le nom de la boutique ; lève une erreur avec un message clair sinon. */
-  relier: (cle: string) => Promise<string>;
+  /** Renvoie le libellé de la boutique ; lève une erreur avec un message clair sinon. */
+  relier: (source: SourceBoutique, cle: string) => Promise<string>;
   deconnecter: (source: SourceCompte) => Promise<void>;
 }
 
@@ -30,8 +32,9 @@ const ECART_MIN_MS = 5 * 60_000; // en revenant sur l'appli, pas plus d'une sync
  * - les ventes du mode test ne s'ajoutent qu'aux données d'exemple, jamais aux vraies données.
  */
 export function appliquerVentesBoutique(d: Donnees, ventes: Vente[], synchroniseLe: string): Donnees {
-  const reelles = ventes.filter((v) => v.plateforme !== 'lemonsqueezy-test');
-  const tests = ventes.filter((v) => v.plateforme === 'lemonsqueezy-test');
+  const estTest = (v: Vente) => v.plateforme.endsWith('-test');
+  const reelles = ventes.filter((v) => !estTest(v));
+  const tests = ventes.filter(estTest);
   let resultat = d;
   // Sans vraie vente, on ne quitte pas l'exemple ; avec de vraies données, la date « à jour » avance quand même.
   if (reelles.length > 0 || !resultat.exemple) resultat = importerVentes(resultat, reelles, synchroniseLe).donnees;
@@ -54,10 +57,13 @@ export function useSynchroBoutique(modifier: (f: (d: Donnees) => Donnees) => voi
     try {
       const liste = await listerComptes();
       setComptes(liste);
-      if (!liste.some((c) => c.source === 'lemonsqueezy')) return;
+      const reliees = BOUTIQUES.filter((b) => liste.some((c) => c.source === b));
+      if (reliees.length === 0) return;
       setEnCours(true);
-      const r = await synchroniserLemonSqueezy();
-      modifier((d) => appliquerVentesBoutique(d, r.ventes, r.synchroniseLe));
+      for (const source of reliees) {
+        const r = await synchroniserBoutique(source);
+        modifier((d) => appliquerVentesBoutique(d, r.ventes, r.synchroniseLe));
+      }
       setComptes(await listerComptes());
       setErreur(null);
     } catch (e) {
@@ -79,8 +85,8 @@ export function useSynchroBoutique(modifier: (f: (d: Donnees) => Donnees) => voi
   }, [actif, synchroniser]);
 
   const relier = useCallback(
-    async (cle: string) => {
-      const libelle = await relierLemonSqueezy(cle);
+    async (source: SourceBoutique, cle: string) => {
+      const libelle = await relierBoutique(source, cle);
       await synchroniser();
       return libelle;
     },

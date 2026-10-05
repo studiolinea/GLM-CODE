@@ -5,7 +5,11 @@
 import type { Vente } from '../ventes/modele';
 import { client } from './config';
 
-export type SourceCompte = 'lemonsqueezy' | 'tiktok' | 'instagram';
+export type SourceCompte = 'stripe' | 'lemonsqueezy' | 'tiktok' | 'instagram';
+
+/** Les boutiques que l'appli sait relier, dans l'ordre d'affichage. */
+export type SourceBoutique = 'stripe' | 'lemonsqueezy';
+export const BOUTIQUES: SourceBoutique[] = ['stripe', 'lemonsqueezy'];
 
 export interface CompteRelie {
   source: SourceCompte;
@@ -64,14 +68,14 @@ export async function listerComptes(): Promise<CompteRelie[]> {
   }));
 }
 
-/** Relie la boutique Lemon Squeezy avec sa clé d'accès. Renvoie le nom de la boutique. */
-export async function relierLemonSqueezy(cle: string): Promise<string> {
-  const { libelle } = await appelerServeur<{ libelle: string }>('/api/comptes/lemonsqueezy/relier', { cle });
+/** Relie une boutique avec sa clé d'accès. Renvoie son libellé (par exemple le nom de la boutique). */
+export async function relierBoutique(source: SourceBoutique, cle: string): Promise<string> {
+  const { libelle } = await appelerServeur<{ libelle: string }>(`/api/comptes/${source}/relier`, { cle });
   return libelle;
 }
 
-export function synchroniserLemonSqueezy(): Promise<ResultatSynchro> {
-  return appelerServeur<ResultatSynchro>('/api/comptes/lemonsqueezy/synchroniser');
+export function synchroniserBoutique(source: SourceBoutique): Promise<ResultatSynchro> {
+  return appelerServeur<ResultatSynchro>(`/api/comptes/${source}/synchroniser`);
 }
 
 /** Efface le compte relié et sa clé. Les ventes déjà chargées restent. */

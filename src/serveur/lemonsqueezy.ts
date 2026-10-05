@@ -2,15 +2,14 @@
 // Aucun nom ni e-mail de client n'est gardé.
 
 import type { Vente } from '../ventes/modele';
+import { CleRefusee, DroitsInsuffisants, type Connecteur, type Recuperateur, type VenteIgnoree } from './commun';
+
+export { CleRefusee };
+export type { Recuperateur };
 
 const API = 'https://api.lemonsqueezy.com/v1';
 const PAR_PAGE = 100;
 const PAGES_MAX = 50;
-
-export type Recuperateur = typeof fetch;
-
-/** Lemon Squeezy refuse la clé (mauvaise, effacée ou incomplète). */
-export class CleRefusee extends Error {}
 
 export interface CommandeLemonSqueezy {
   id: string;
@@ -39,7 +38,8 @@ async function appeler<T>(cle: string, chemin: string, recuperer: Recuperateur):
       Authorization: `Bearer ${cle}`,
     },
   });
-  if (reponse.status === 401 || reponse.status === 403) throw new CleRefusee('Clé refusée par Lemon Squeezy');
+  if (reponse.status === 401) throw new CleRefusee('Clé refusée par Lemon Squeezy');
+  if (reponse.status === 403) throw new DroitsInsuffisants('Autorisation manquante');
   if (!reponse.ok) throw new Error(`Lemon Squeezy a répondu ${reponse.status}`);
   return (await reponse.json()) as T;
 }
@@ -67,10 +67,7 @@ export async function toutesLesCommandes(cle: string, recuperer: Recuperateur = 
   return commandes;
 }
 
-export interface CommandeIgnoree {
-  numero: string;
-  raison: string;
-}
+export type CommandeIgnoree = VenteIgnoree;
 
 /**
  * Transforme les commandes en ventes de l'appli.
@@ -115,3 +112,12 @@ export function commandesVersVentes(commandes: CommandeLemonSqueezy[]): {
   }
   return { ventes, ignorees };
 }
+
+export const connecteurLemonSqueezy: Connecteur = {
+  nom: 'Lemon Squeezy',
+  verifier: (cle, recuperer) => nomBoutique(cle, recuperer),
+  async lireVentes(cle, recuperer) {
+    return commandesVersVentes(await toutesLesCommandes(cle, recuperer));
+  },
+  messageDroits: 'Lemon Squeezy refuse l’accès avec cette clé. Crée une nouvelle clé, puis relie la boutique à nouveau.',
+};
