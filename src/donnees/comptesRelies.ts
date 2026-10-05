@@ -2,8 +2,11 @@
 // La liste se lit directement dans la base (chacun ne voit que les siens) ;
 // relier et synchroniser passent par le serveur de l'appli, qui garde les clés chiffrées.
 
+import type { MouvementBoutique } from '../serveur/commun';
 import type { Vente } from '../ventes/modele';
 import { client } from './config';
+
+export type { MouvementBoutique };
 
 export type SourceCompte = 'stripe' | 'lemonsqueezy' | 'tiktok' | 'instagram';
 
@@ -76,6 +79,12 @@ export async function relierBoutique(source: SourceBoutique, cle: string): Promi
 
 export function synchroniserBoutique(source: SourceBoutique): Promise<ResultatSynchro> {
   return appelerServeur<ResultatSynchro>(`/api/comptes/${source}/synchroniser`);
+}
+
+/** Les derniers mouvements d'argent enregistrés par la boutique, pour vérifier les frais et la TVA. */
+export async function mouvementsBoutique(source: SourceBoutique): Promise<MouvementBoutique[]> {
+  const { mouvements } = await appelerServeur<{ mouvements: MouvementBoutique[] }>(`/api/comptes/${source}/mouvements`);
+  return mouvements;
 }
 
 /** Efface le compte relié et sa clé. Les ventes déjà chargées restent. */

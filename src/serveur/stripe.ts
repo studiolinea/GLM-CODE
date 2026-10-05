@@ -2,7 +2,14 @@
 // Aucun nom ni e-mail de client n'est gardé.
 
 import type { Vente } from '../ventes/modele';
-import { CleRefusee, DroitsInsuffisants, type Connecteur, type Recuperateur, type VenteIgnoree } from './commun';
+import {
+  CleRefusee,
+  DroitsInsuffisants,
+  type Connecteur,
+  type MouvementBoutique,
+  type Recuperateur,
+  type VenteIgnoree,
+} from './commun';
 
 const API = 'https://api.stripe.com/v1';
 const PAR_PAGE = 100;
@@ -88,6 +95,41 @@ export function chargesVersVentes(charges: ChargeStripe[]): { ventes: Vente[]; i
   return { ventes, ignorees };
 }
 
+/** Un mouvement du solde Stripe, tel que l'API le renvoie (seuls ces champs sont lus). */
+export interface TransactionStripe {
+  type?: string;
+  reporting_category?: string;
+  created?: number;
+  amount?: number;
+  fee?: number;
+  net?: number;
+  currency?: string;
+  description?: string | null;
+  source?: string | { id?: string } | null;
+  fee_details?: { type?: string; amount?: number; description?: string | null }[];
+}
+
+/** Garde seulement ce qui sert à vérifier l'argent : aucun autre champ ne passe. */
+export function transactionsVersMouvements(transactions: TransactionStripe[]): MouvementBoutique[] {
+  const nombre = (n: unknown) => (typeof n === 'number' ? n : null);
+  return transactions.map((t) => ({
+    instant: typeof t.created === 'number' ? new Date(t.created * 1000).toISOString() : null,
+    type: t.type ?? '',
+    categorie: t.reporting_category ?? null,
+    montantCentimes: nombre(t.amount),
+    fraisCentimes: nombre(t.fee),
+    netCentimes: nombre(t.net),
+    devise: (t.currency ?? '').toLowerCase(),
+    description: t.description ?? null,
+    origine: typeof t.source === 'string' ? t.source : (t.source?.id ?? null),
+    detailFrais: (t.fee_details ?? []).map((f) => ({
+      type: f.type ?? '',
+      montantCentimes: nombre(f.amount),
+      description: f.description ?? null,
+    })),
+  }));
+}
+
 export const connecteurStripe: Connecteur = {
   nom: 'Stripe',
   refuserCle(cle) {
@@ -103,6 +145,10 @@ export const connecteurStripe: Connecteur = {
   },
   async lireVentes(cle, recuperer) {
     return chargesVersVentes(await toutesLesCharges(cle, recuperer));
+  },
+  async mouvements(cle, recuperer) {
+    const reponse = await appeler<{ data?: TransactionStripe[] }>(cle, '/balance_transactions?limit=25', recuperer);
+    return transactionsVersMouvements(reponse.data ?? []);
   },
   messageDroits:
     'Il manque une autorisation à cette clé Stripe : mets « Lecture » pour « Charges » et pour « Balance », puis recrée la clé.',

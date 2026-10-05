@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from 'react';
-import type { SourceBoutique } from '../donnees/comptesRelies';
+import { formatEuros } from '../argent';
+import { mouvementsBoutique, type MouvementBoutique, type SourceBoutique } from '../donnees/comptesRelies';
 import type { SynchroBoutique } from '../donnees/useSynchroBoutique';
 import { quandParis } from '../temps';
 
@@ -8,6 +9,8 @@ interface FicheBoutique {
   nom: string;
   placeholder: string;
   aide: ReactNode;
+  /** La boutique sait montrer ses derniers mouvements d'argent (frais, TVA). */
+  verification?: boolean;
 }
 
 const FICHES: FicheBoutique[] = [
@@ -23,6 +26,7 @@ const FICHES: FicheBoutique[] = [
         enregistrée.
       </>
     ),
+    verification: true,
   },
   {
     source: 'lemonsqueezy',
@@ -109,14 +113,17 @@ function Boutique({ fiche, boutique }: { fiche: FicheBoutique; boutique: Synchro
           </p>
           {relie.derniereErreur && <p className="erreur">{relie.derniereErreur}</p>}
           {!confirmer ? (
-            <div className="pied" style={{ justifyContent: 'flex-start' }}>
-              <button type="button" className="bouton" disabled={boutique.enCours} onClick={() => void boutique.synchroniser()}>
-                Synchroniser maintenant
-              </button>
-              <button type="button" className="bouton discret" onClick={() => setConfirmer(true)}>
-                Déconnecter la boutique
-              </button>
-            </div>
+            <>
+              <div className="pied" style={{ justifyContent: 'flex-start' }}>
+                <button type="button" className="bouton" disabled={boutique.enCours} onClick={() => void boutique.synchroniser()}>
+                  Synchroniser maintenant
+                </button>
+                <button type="button" className="bouton discret" onClick={() => setConfirmer(true)}>
+                  Déconnecter la boutique
+                </button>
+              </div>
+              {fiche.verification && <Verification source={fiche.source} />}
+            </>
           ) : (
             <div role="alert">
               <p className="erreur">Déconnecter la boutique ? Ta clé sera effacée. Tes ventes déjà chargées restent.</p>
@@ -158,6 +165,108 @@ function Boutique({ fiche, boutique }: { fiche: FicheBoutique; boutique: Synchro
           {message.texte}
         </p>
       )}
+    </div>
+  );
+}
+
+/** Noms en français des mouvements les plus courants ; le type exact donné par la plateforme reste visible. */
+const NOMS_TYPES: Record<string, string> = {
+  charge: 'paiement',
+  payment: 'paiement',
+  refund: 'remboursement',
+  payment_refund: 'remboursement',
+  stripe_fee: 'frais Stripe',
+  tax: 'taxe',
+  payout: 'virement vers ta banque',
+  adjustment: 'ajustement',
+  application_fee: 'commission',
+  transfer: 'transfert',
+};
+
+function nomType(type: string): string {
+  if (!type) return '—';
+  const nom = NOMS_TYPES[type];
+  return nom ? `${nom} (${type})` : type;
+}
+
+function somme(centimes: number | null, devise: string): string {
+  if (centimes === null) return '—';
+  if (devise === 'eur') return formatEuros(centimes);
+  return `${(centimes / 100).toFixed(2).replace('.', ',')}\u00a0${devise.toUpperCase()}`;
+}
+
+/** Ce que la boutique a enregistré, mouvement par mouvement : sert à vérifier les frais et la TVA. */
+function Verification({ source }: { source: SourceBoutique }) {
+  const [ouvert, setOuvert] = useState(false);
+  const [liste, setListe] = useState<MouvementBoutique[] | null>(null);
+  const [erreur, setErreur] = useState<string | null>(null);
+  const [enCours, setEnCours] = useState(false);
+
+  const lire = async () => {
+    setOuvert(true);
+    setErreur(null);
+    setEnCours(true);
+    try {
+      setListe(await mouvementsBoutique(source));
+    } catch (e) {
+      setErreur(e instanceof Error ? e.message : 'La lecture a échoué. Réessaie.');
+    } finally {
+      setEnCours(false);
+    }
+  };
+
+  if (!ouvert) {
+    return (
+      <div className="pied" style={{ justifyContent: 'flex-start' }}>
+        <button type="button" className="bouton discret" onClick={() => void lire()}>
+          Vérifier les frais et la TVA
+        </button>
+      </div>
+    );
+  }
+  return (
+    <div className="verification">
+      <p className="note">
+        Ce que la boutique a enregistré : ses 25 derniers mouvements d’argent, du plus récent au plus ancien. Rien
+        n’est gardé.
+      </p>
+      {enCours && <p className="texte-doux">Lecture…</p>}
+      {erreur && <p className="erreur">{erreur}</p>}
+      {!enCours && liste?.length === 0 && <p className="texte-doux">Aucun mouvement pour l’instant.</p>}
+      {liste && liste.length > 0 && (
+        <ul className="mouvements">
+          {liste.map((m, i) => (
+            <li key={i}>
+              <div className="mouvement-tete">
+                <span>{m.instant ? quandParis(new Date(m.instant)) : '—'}</span>
+                <span>{nomType(m.type)}</span>
+              </div>
+              <div>
+                montant {somme(m.montantCentimes, m.devise)} · frais {somme(m.fraisCentimes, m.devise)} · net{' '}
+                {somme(m.netCentimes, m.devise)}
+              </div>
+              {m.detailFrais.map((f, j) => (
+                <div key={j} className="texte-doux">
+                  dont {nomType(f.type)} : {somme(f.montantCentimes, m.devise)}
+                  {f.description && ` (« ${f.description} »)`}
+                </div>
+              ))}
+              {m.description && <div className="texte-doux">« {m.description} »</div>}
+              <div className="note">
+                origine : {m.origine ?? '—'} · catégorie : {m.categorie ?? '—'}
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+      <div className="pied" style={{ justifyContent: 'flex-start' }}>
+        <button type="button" className="bouton discret" disabled={enCours} onClick={() => void lire()}>
+          Relire
+        </button>
+        <button type="button" className="bouton discret" onClick={() => setOuvert(false)}>
+          Masquer
+        </button>
+      </div>
     </div>
   );
 }

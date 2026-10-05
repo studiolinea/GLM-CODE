@@ -20,6 +20,25 @@ export interface VentesLues {
   ignorees: VenteIgnoree[];
 }
 
+/**
+ * Un mouvement d'argent tel que la plateforme l'a enregistré, sans aucune donnée de client.
+ * Sert à vérifier les frais et la TVA. Une valeur absente reste null : rien n'est inventé.
+ */
+export interface MouvementBoutique {
+  instant: string | null;
+  /** Le type donné par la plateforme, tel quel (par exemple « charge » ou « stripe_fee »). */
+  type: string;
+  categorie: string | null;
+  montantCentimes: number | null;
+  fraisCentimes: number | null;
+  netCentimes: number | null;
+  devise: string;
+  description: string | null;
+  /** L'objet à l'origine du mouvement (par exemple « ch_… »), sans son contenu. */
+  origine: string | null;
+  detailFrais: { type: string; montantCentimes: number | null; description: string | null }[];
+}
+
 /** Un branchement à une boutique : vérifier une clé, puis lire les ventes. */
 export interface Connecteur {
   nom: string;
@@ -28,6 +47,8 @@ export interface Connecteur {
   /** Vérifie la clé et renvoie un libellé (par exemple le nom de la boutique). */
   verifier(cle: string, recuperer: Recuperateur): Promise<string>;
   lireVentes(cle: string, recuperer: Recuperateur): Promise<VentesLues>;
+  /** Les derniers mouvements d'argent, pour vérifier les frais et la TVA (seulement certaines boutiques). */
+  mouvements?(cle: string, recuperer: Recuperateur): Promise<MouvementBoutique[]>;
   /** Message quand il manque une autorisation à la clé. */
   messageDroits: string;
 }

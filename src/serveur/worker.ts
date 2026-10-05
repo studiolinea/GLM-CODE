@@ -77,14 +77,14 @@ export async function traiterApi(requete: Request, env: Env, recuperer: Recupera
     const userId = jeton ? await utilisateurConnecte(ctx) : null;
     if (!userId) return json(401, { erreur: 'Connecte-toi d’abord.' });
 
-    const chemin = /^\/api\/comptes\/([a-z]+)\/(relier|synchroniser)$/.exec(new URL(requete.url).pathname);
+    const chemin = /^\/api\/comptes\/([a-z]+)\/(relier|synchroniser|mouvements)$/.exec(new URL(requete.url).pathname);
     const connecteur = chemin ? BOUTIQUES[chemin[1]!] : undefined;
     if (requete.method !== 'POST' || !chemin || !connecteur) return json(404, { erreur: 'Adresse inconnue.' });
     const source = chemin[1]!;
     // « await » : une erreur pendant la liaison ou la synchro reste attrapée juste en dessous.
-    return await (chemin[2] === 'relier'
-      ? relier(requete, ctx, userId, source, connecteur, env.CLE_CHIFFREMENT)
-      : synchroniser(ctx, source, connecteur, env.CLE_CHIFFREMENT));
+    if (chemin[2] === 'relier') return await relier(requete, ctx, userId, source, connecteur, env.CLE_CHIFFREMENT);
+    if (chemin[2] === 'synchroniser') return await synchroniser(ctx, source, connecteur, env.CLE_CHIFFREMENT);
+    return await mouvements(ctx, source, connecteur, env.CLE_CHIFFREMENT);
   } catch (e) {
     // Le détail va dans les journaux Cloudflare ; la personne voit un message simple.
     console.error('Erreur du serveur', e);
@@ -147,37 +147,66 @@ async function relier(
   return json(200, { libelle });
 }
 
-async function synchroniser(ctx: Contexte, source: string, connecteur: Connecteur, secret: string): Promise<Response> {
-  const noter = (champs: { derniere_synchro?: string; derniere_erreur: string | null }) =>
-    base(ctx, `comptes_relies?source=eq.${source}`, { method: 'PATCH', body: JSON.stringify(champs) });
+/** Note sur le compte relié la date de synchro ou l'erreur, pour l'afficher dans les réglages. */
+function noter(ctx: Contexte, source: string, champs: { derniere_synchro?: string; derniere_erreur: string | null }) {
+  return base(ctx, `comptes_relies?source=eq.${source}`, { method: 'PATCH', body: JSON.stringify(champs) });
+}
 
+/** La clé enregistrée de la boutique, déchiffrée ; sinon la réponse d'erreur à renvoyer. */
+async function cleEnregistree(
+  ctx: Contexte,
+  source: string,
+  connecteur: Connecteur,
+  secret: string,
+): Promise<{ cle: string } | { reponse: Response }> {
   const lecture = await base(ctx, `comptes_relies?source=eq.${source}&select=cle_chiffree`);
-  if (!lecture.ok) return json(502, { erreur: 'Impossible de lire la boutique reliée. Réessaie.' });
+  if (!lecture.ok) return { reponse: json(502, { erreur: 'Impossible de lire la boutique reliée. Réessaie.' }) };
   const lignes = (await lecture.json()) as { cle_chiffree: string }[];
-  if (!lignes[0]) return json(404, { erreur: `Aucune boutique ${connecteur.nom} reliée.` });
-
-  let cle: string;
+  if (!lignes[0]) return { reponse: json(404, { erreur: `Aucune boutique ${connecteur.nom} reliée.` }) };
   try {
-    cle = await dechiffrer(lignes[0].cle_chiffree, secret);
+    return { cle: await dechiffrer(lignes[0].cle_chiffree, secret) };
   } catch {
-    await noter({ derniere_erreur: 'Clé illisible : relie la boutique à nouveau.' });
-    return json(409, { erreur: 'La clé enregistrée est illisible. Déconnecte la boutique, puis relie-la à nouveau.' });
+    await noter(ctx, source, { derniere_erreur: 'Clé illisible : relie la boutique à nouveau.' });
+    return {
+      reponse: json(409, { erreur: 'La clé enregistrée est illisible. Déconnecte la boutique, puis relie-la à nouveau.' }),
+    };
   }
+}
 
+/** Le message quand la boutique refuse la clé enregistrée, ou qu'il lui manque une autorisation. */
+function messageCleEnregistree(e: CleRefusee | DroitsInsuffisants, connecteur: Connecteur): string {
+  return e instanceof DroitsInsuffisants
+    ? connecteur.messageDroits
+    : `${connecteur.nom} refuse la clé enregistrée. Déconnecte la boutique, puis relie-la avec une nouvelle clé.`;
+}
+
+async function synchroniser(ctx: Contexte, source: string, connecteur: Connecteur, secret: string): Promise<Response> {
+  const lue = await cleEnregistree(ctx, source, connecteur, secret);
+  if ('reponse' in lue) return lue.reponse;
   try {
-    const { ventes, ignorees } = await connecteur.lireVentes(cle, ctx.recuperer);
+    const { ventes, ignorees } = await connecteur.lireVentes(lue.cle, ctx.recuperer);
     const synchroniseLe = new Date().toISOString();
-    await noter({ derniere_synchro: synchroniseLe, derniere_erreur: null });
+    await noter(ctx, source, { derniere_synchro: synchroniseLe, derniere_erreur: null });
     return json(200, { ventes, ignorees, synchroniseLe });
   } catch (e) {
     if (e instanceof CleRefusee || e instanceof DroitsInsuffisants) {
-      const message =
-        e instanceof DroitsInsuffisants
-          ? connecteur.messageDroits
-          : `${connecteur.nom} refuse la clé enregistrée. Déconnecte la boutique, puis relie-la avec une nouvelle clé.`;
-      await noter({ derniere_erreur: message });
+      const message = messageCleEnregistree(e, connecteur);
+      await noter(ctx, source, { derniere_erreur: message });
       return json(400, { erreur: message });
     }
+    return json(502, { erreur: `${connecteur.nom} ne répond pas. Réessaie dans un moment.` });
+  }
+}
+
+/** Les derniers mouvements d'argent de la boutique, pour vérifier les frais et la TVA. Rien n'est enregistré. */
+async function mouvements(ctx: Contexte, source: string, connecteur: Connecteur, secret: string): Promise<Response> {
+  if (!connecteur.mouvements) return json(404, { erreur: 'Adresse inconnue.' });
+  const lue = await cleEnregistree(ctx, source, connecteur, secret);
+  if ('reponse' in lue) return lue.reponse;
+  try {
+    return json(200, { mouvements: await connecteur.mouvements(lue.cle, ctx.recuperer) });
+  } catch (e) {
+    if (e instanceof CleRefusee || e instanceof DroitsInsuffisants) return json(400, { erreur: messageCleEnregistree(e, connecteur) });
     return json(502, { erreur: `${connecteur.nom} ne répond pas. Réessaie dans un moment.` });
   }
 }
