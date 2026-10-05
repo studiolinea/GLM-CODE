@@ -143,6 +143,25 @@ Règle : `calculs/` et `alertes/` ne dépendent de rien d'autre. Ils se testent 
 
 À côté de l'appli (pas dans ce plan) : écrire le guide detailing, ouvrir la boutique, publier les vidéos.
 
+## Étape 9 (demandée par Kévin le 5 octobre) — Tout automatique
+
+Kévin veut que l'appli récupère les données toute seule, sans saisie ni fichier.
+**Possible, mais seulement une fois les comptes du business créés** (boutique, TikTok, Instagram).
+
+| Source | Comment | Ce qu'il faut |
+|---|---|---|
+| Ventes | API de la plateforme : Gumroad se lit avec une clé d'accès ; Payhip prévient l'appli à chaque vente (webhooks) | La boutique ouverte (étape 7) |
+| TikTok | API « Display » de TikTok : liste des vidéos et leurs vues, pour le compte connecté (mode « sandbox », sans validation, jusqu'à 10 comptes) | Un compte TikTok du business + une appli développeur TikTok |
+| Instagram | API Instagram (connexion Instagram) : publications et vues du compte connecté | Un compte Instagram **professionnel** (Créateur ou Entreprise) + une appli développeur Meta |
+
+- Une petite partie « serveur » dans le Worker Cloudflare déjà en ligne : connexion aux comptes, et relevé
+  automatique chaque jour. Les clés secrètes restent dans les réglages Cloudflare, jamais dans le code.
+- « J'ai publié » et l'ajout de fichier restent disponibles en secours.
+- Coût visé : 0 € (API gratuites, offres gratuites de Cloudflare et Supabase). À revérifier au moment de le faire.
+
+Ordre : choisir la boutique en tenant compte de ce branchement (étape 7) → créer les comptes TikTok et
+Instagram du business → brancher les trois sources.
+
 ## Idées pour plus tard (hors de ce plan)
 
 - **Reprendre des éléments de l'appli dashboard du projet Inicia** (projet Supabase mis en pause le 5 octobre
@@ -151,5 +170,7 @@ Règle : `calculs/` et `alertes/` ne dépendent de rien d'autre. Ils se testent 
 ## Paroles de Kévin (5 octobre)
 
 > Aller go
+
+> je souhaiterais que ça se face automatiquement en gros je le relis a c’est app pour qu’il est accept
 
 > Il y a des choses intéressantes dans l'application d'Inicia qu'on pourra analyser plus tard et peut-être implémenter dedans. Parce qu'on avait fait une météo interactive en fond, ça pourrait être sympa.
