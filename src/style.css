@@ -604,6 +604,57 @@ a.bouton {
   border-top: 1px solid var(--bord);
 }
 
+/* ───── Comptes reliés (réglages) ───── */
+.titre-reglage {
+  margin: 0 0 10px;
+  font-family: var(--police-titre);
+  font-weight: 700;
+  font-size: 0.85rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.compte-relie {
+  margin-bottom: 10px;
+  padding: 12px;
+  background: var(--case);
+  border: 1px solid var(--bord);
+  border-radius: 12px;
+}
+.compte-relie .texte-doux {
+  margin: 6px 0 0;
+}
+.compte-relie .champ {
+  margin: 10px 0 4px;
+}
+.compte-relie .note {
+  margin: 0 0 8px;
+}
+.compte-entete {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.compte-nom {
+  font-weight: 600;
+}
+.puce {
+  flex: none;
+  padding: 2px 8px;
+  border: 1px solid var(--bord);
+  border-radius: 999px;
+  font-family: var(--police-titre);
+  font-weight: 600;
+  font-size: 0.62rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--doux);
+}
+.puce-on {
+  border-color: rgba(70, 223, 136, 0.6);
+  color: var(--vert);
+}
+
 /* ───── Bandeau d'erreur (connexion) ───── */
 .bandeau-erreur {
   display: flex;

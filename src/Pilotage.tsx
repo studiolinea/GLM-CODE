@@ -12,6 +12,7 @@ import {
 } from './donnees/actions';
 import { donneesExemple } from './donnees/exemple';
 import { useDonnees, type Source } from './donnees/useDonnees';
+import { useSynchroBoutique } from './donnees/useSynchroBoutique';
 import { AjoutFichier, type BilanImport } from './ecrans/AjoutFichier';
 import { EcranMessage } from './ecrans/EcranMessage';
 import { Reglages, type Compte } from './ecrans/Reglages';
@@ -87,6 +88,8 @@ function Cockpit({
   compte?: Compte;
 }) {
   const maintenant = useMaintenant();
+  // Les ventes de la boutique reliée arrivent toutes seules (seulement avec la base en ligne).
+  const boutique = useSynchroBoutique(modifier, enLigne);
   const [periode, setPeriode] = useState<Periode>('7j');
   const [fenetre, setFenetre] = useState<Fenetre>({ type: 'aucune' });
 
@@ -194,6 +197,7 @@ function Cockpit({
           maintenant={maintenant}
           enLigne={enLigne}
           compte={compte}
+          boutique={enLigne ? boutique : undefined}
           onObjectif={(objectifParJour) => modifier((d) => changerReglages(d, { ...d.reglages, objectifParJour }))}
           onRestaurer={(restaurees) => modifier(() => restaurees)}
           // La confirmation se fait dans les réglages, avant d'arriver ici.

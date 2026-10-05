@@ -35,6 +35,13 @@ avec les chiffres qui le prouvent.
 Cloudflare reconstruit et publie l'appli à chaque modification de la branche `main`
 (commande de build `npm run build`, puis `npx wrangler deploy` avec `wrangler.jsonc`).
 
+Le petit serveur (`src/serveur/worker.ts`) répond aux adresses `/api/…` : il relie les comptes
+(Lemon Squeezy pour l'instant) et lit les ventes au nom de la personne connectée.
+- Il a besoin du secret **`CLE_CHIFFREMENT`**, posé dans Cloudflare (Worker « pilotage » > Paramètres >
+  Variables et secrets), jamais dans le code. Il chiffre les clés d'accès des comptes reliés.
+  Si ce secret change, il suffit de relier à nouveau les comptes.
+- Table des comptes reliés : [supabase/02-comptes-relies.sql](supabase/02-comptes-relies.sql).
+
 ## Commandes
 
 ```bash
