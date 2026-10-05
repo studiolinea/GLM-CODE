@@ -30,6 +30,11 @@ avec les chiffres qui le prouvent.
   construite avec `VITE_SUPABASE_URL= VITE_SUPABASE_ANON_KEY= npm run build`).
 - Les données d'exemple ne sont jamais écrites dans la base.
 
+## Mise en ligne (Cloudflare)
+
+Cloudflare reconstruit et publie l'appli à chaque modification de la branche `main`
+(commande de build `npm run build`, puis `npx wrangler deploy` avec `wrangler.jsonc`).
+
 ## Commandes
 
 ```bash
