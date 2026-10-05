@@ -16,10 +16,18 @@ avec les chiffres qui le prouvent.
 | 2. Les alertes A, B, C | ✅ |
 | 3. Les écrans, avec les données d'exemple | ✅ fait, le look reste à valider par Kévin |
 | 4. Ce que Kévin peut faire dans l'appli | ✅ (données gardées sur l'appareil jusqu'à l'étape 5) |
-| 5. Les mêmes données sur le Mac et le téléphone | à faire |
+| 5. Les mêmes données sur le Mac et le téléphone | code prêt, testé avec une base simulée ; en attente du projet Supabase de Kévin |
 | 6. Mettre l'appli en ligne | à faire |
 | 7. Lire le vrai fichier de la boutique | à faire |
 | 8. Vérifier avec de vraies ventes | à faire |
+
+## La base en ligne (Supabase)
+
+- Tables et règles de sécurité : [supabase/schema.sql](supabase/schema.sql), à coller dans Supabase > SQL Editor.
+- L'appli lit l'adresse du projet et sa clé publique dans `VITE_SUPABASE_URL` et `VITE_SUPABASE_ANON_KEY`
+  (fichier `.env`, valeurs publiques seulement, jamais la clé secrète).
+- Sans ces deux valeurs, l'appli garde les données sur l'appareil (c'est le cas de la version de test).
+- Les données d'exemple ne sont jamais écrites dans la base.
 
 ## Commandes
 

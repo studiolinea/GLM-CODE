@@ -4,9 +4,17 @@ import type { Donnees } from '../modele';
 import { dateParis } from '../temps';
 import { Feuille, telecharger } from './Feuille';
 
+/** Le compte connecté, quand l'appli est reliée à la base en ligne. */
+export interface Compte {
+  email: string;
+  deconnecter: () => Promise<void>;
+}
+
 export function Reglages({
   donnees,
   maintenant,
+  enLigne,
+  compte,
   onObjectif,
   onRestaurer,
   onRemettreExemple,
@@ -14,6 +22,8 @@ export function Reglages({
 }: {
   donnees: Donnees;
   maintenant: Date;
+  enLigne: boolean;
+  compte?: Compte;
   onObjectif: (objectifParJour: number) => void;
   onRestaurer: (donnees: Donnees) => void;
   onRemettreExemple: () => void;
@@ -54,7 +64,9 @@ export function Reglages({
 
       <hr className="separateur" />
       <p className="texte-doux">
-        Tes données sont gardées sur cet appareil. La sauvegarde en fait une copie dans un fichier, au cas où.
+        {enLigne
+          ? 'Tes données sont dans ta base en ligne : les mêmes sur le Mac et le téléphone. La sauvegarde en fait une copie dans un fichier, au cas où.'
+          : 'Tes données sont gardées sur cet appareil. La sauvegarde en fait une copie dans un fichier, au cas où.'}
       </p>
       {message && <p className={message.type}>{message.texte}</p>}
       <div className="pied" style={{ justifyContent: 'flex-start' }}>
@@ -81,7 +93,7 @@ export function Reglages({
             }}
           />
         </label>
-        {!donnees.exemple && !confirmer && (
+        {!enLigne && !donnees.exemple && !confirmer && (
           <button type="button" className="bouton discret" onClick={() => setConfirmer(true)}>
             Revoir l’exemple
           </button>
@@ -110,6 +122,18 @@ export function Reglages({
             </button>
           </div>
         </div>
+      )}
+
+      {compte && (
+        <>
+          <hr className="separateur" />
+          <p className="texte-doux">Connecté avec {compte.email}.</p>
+          <div className="pied" style={{ justifyContent: 'flex-start' }}>
+            <button type="button" className="bouton" onClick={() => void compte.deconnecter()}>
+              Se déconnecter
+            </button>
+          </div>
+        </>
       )}
 
       <div className="pied">

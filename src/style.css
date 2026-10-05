@@ -604,6 +604,50 @@ a.bouton {
   border-top: 1px solid var(--bord);
 }
 
+/* ───── Bandeau d'erreur (connexion) ───── */
+.bandeau-erreur {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 0 0 14px;
+  padding: 10px 6px 10px 14px;
+  border: 1px solid var(--danger);
+  border-radius: 12px;
+  color: var(--danger);
+  font-size: 0.9rem;
+}
+
+/* ───── Écrans de chargement et de connexion ───── */
+.ecran-centre {
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 14px;
+  min-height: 100vh;
+  max-width: 440px;
+  margin: 0 auto;
+  padding: 24px 16px;
+  text-align: center;
+}
+.ecran-centre .sous-titre {
+  margin: 0;
+}
+.formulaire {
+  width: 100%;
+  display: grid;
+  gap: 4px;
+  text-align: left;
+}
+.bouton.large {
+  width: 100%;
+  padding: 13px;
+}
+.bouton:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .jauge-aiguille {
     animation: none;
