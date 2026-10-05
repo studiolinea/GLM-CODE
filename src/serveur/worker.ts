@@ -23,7 +23,11 @@ const BOUTIQUES: Record<string, Connecteur> = {
 
 export default {
   async fetch(requete: Request, env: Env): Promise<Response> {
-    if (new URL(requete.url).pathname.startsWith('/api/')) return traiterApi(requete, env, fetch);
+    // Sur Cloudflare, fetch refuse d'être appelé depuis un autre objet (ctx.recuperer(…)) :
+    // on l'enveloppe pour qu'il soit toujours appelé seul.
+    if (new URL(requete.url).pathname.startsWith('/api/')) {
+      return traiterApi(requete, env, (entree, init) => fetch(entree, init));
+    }
     return env.ASSETS.fetch(requete);
   },
 };
@@ -77,10 +81,13 @@ export async function traiterApi(requete: Request, env: Env, recuperer: Recupera
     const connecteur = chemin ? BOUTIQUES[chemin[1]!] : undefined;
     if (requete.method !== 'POST' || !chemin || !connecteur) return json(404, { erreur: 'Adresse inconnue.' });
     const source = chemin[1]!;
-    return chemin[2] === 'relier'
+    // « await » : une erreur pendant la liaison ou la synchro reste attrapée juste en dessous.
+    return await (chemin[2] === 'relier'
       ? relier(requete, ctx, userId, source, connecteur, env.CLE_CHIFFREMENT)
-      : synchroniser(ctx, source, connecteur, env.CLE_CHIFFREMENT);
-  } catch {
+      : synchroniser(ctx, source, connecteur, env.CLE_CHIFFREMENT));
+  } catch (e) {
+    // Le détail va dans les journaux Cloudflare ; la personne voit un message simple.
+    console.error('Erreur du serveur', e);
     return json(500, { erreur: 'Le serveur a eu un problème. Réessaie dans un moment.' });
   }
 }
@@ -127,7 +134,16 @@ async function relier(
       derniere_erreur: null,
     }),
   });
-  if (!enregistrement.ok) return json(502, { erreur: 'Impossible d’enregistrer la boutique reliée. Réessaie.' });
+  if (!enregistrement.ok) {
+    // 23514 : la base refuse ce nom de boutique, elle date d'avant son arrivée dans l'appli.
+    const detail = (await enregistrement.json().catch(() => null)) as { code?: string } | null;
+    if (detail?.code === '23514') {
+      return json(502, {
+        erreur: 'La base de l’appli n’accepte pas encore cette boutique : dans Supabase, lance le texte SQL « 03-boutique-stripe.sql », puis réessaie.',
+      });
+    }
+    return json(502, { erreur: 'Impossible d’enregistrer la boutique reliée. Réessaie.' });
+  }
   return json(200, { libelle });
 }
 
