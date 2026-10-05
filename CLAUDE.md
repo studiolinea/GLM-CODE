@@ -15,4 +15,7 @@
 - Données : sans `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY`, tout reste sur l'appareil ; avec, tout passe par le
   compte en ligne (`src/donnees/depot.ts`, `synchro.ts`, `depotSupabase.ts`). Les données d'exemple ne vont jamais
   dans la base. Ne jamais mettre une clé secrète (« service_role », « secret ») dans le code ou le `.env`.
+- Comptes reliés (Lemon Squeezy, puis TikTok et Instagram) : chacun relie et déconnecte les siens dans les réglages.
+  Les clés d'accès passent par le serveur (`src/serveur/`), qui les chiffre avec le secret Cloudflare `CLE_CHIFFREMENT`.
+  Les commandes en mode test (« lemonsqueezy-test ») ne vont jamais dans les vraies données.
 - Aucune inscription à un service, aucun paiement, aucun achat sans l'accord explicite de Kévin.

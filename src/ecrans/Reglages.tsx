@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { lireSauvegarde, versSauvegarde } from '../donnees/actions';
+import type { SynchroBoutique } from '../donnees/useSynchroBoutique';
 import type { Donnees } from '../modele';
 import { dateParis } from '../temps';
+import { ComptesRelies } from './ComptesRelies';
 import { Feuille, telecharger } from './Feuille';
 
 /** Le compte connecté, quand l'appli est reliée à la base en ligne. */
@@ -15,6 +17,7 @@ export function Reglages({
   maintenant,
   enLigne,
   compte,
+  boutique,
   onObjectif,
   onRestaurer,
   onRemettreExemple,
@@ -24,6 +27,8 @@ export function Reglages({
   maintenant: Date;
   enLigne: boolean;
   compte?: Compte;
+  /** Les comptes reliés (boutique, réseaux), seulement avec la base en ligne. */
+  boutique?: SynchroBoutique;
   onObjectif: (objectifParJour: number) => void;
   onRestaurer: (donnees: Donnees) => void;
   onRemettreExemple: () => void;
@@ -61,6 +66,13 @@ export function Reglages({
           onChange={(e) => changerObjectif(e.target.value)}
         />
       </label>
+
+      {boutique && (
+        <>
+          <hr className="separateur" />
+          <ComptesRelies boutique={boutique} />
+        </>
+      )}
 
       <hr className="separateur" />
       <p className="texte-doux">

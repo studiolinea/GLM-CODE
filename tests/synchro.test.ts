@@ -166,3 +166,33 @@ describe('Synchro', () => {
     expect(depot.compte.videos.map((v) => v.id)).toEqual(['v1']);
   });
 });
+
+describe('ventes reçues de la boutique reliée', () => {
+  const venteBoutique = (numero: string, plateforme = 'lemonsqueezy'): Vente => ({ ...vente, plateforme, numeroCommande: numero });
+
+  it('une vraie vente fait disparaître l’exemple', async () => {
+    const { appliquerVentesBoutique } = await import('../src/donnees/useSynchroBoutique');
+    const d = appliquerVentesBoutique(donneesExemple(maintenant), [venteBoutique('1')], maintenant.toISOString());
+    expect(d.exemple).toBe(false);
+    expect(d.ventes.map((v) => v.numeroCommande)).toEqual(['1']);
+  });
+
+  it('les ventes du mode test restent dans l’exemple, jamais dans les vraies données', async () => {
+    const { appliquerVentesBoutique } = await import('../src/donnees/useSynchroBoutique');
+    const exemple = donneesExemple(maintenant);
+    const avecTest = appliquerVentesBoutique(exemple, [venteBoutique('T1', 'lemonsqueezy-test')], maintenant.toISOString());
+    expect(avecTest.exemple).toBe(true);
+    expect(calculerChangements(exemple, avecTest)).toBeNull();
+
+    const reelles = donneesVides();
+    const sansTest = appliquerVentesBoutique(reelles, [venteBoutique('T1', 'lemonsqueezy-test')], maintenant.toISOString());
+    expect(sansTest.ventes).toEqual([]);
+    expect(sansTest.couverture).toBe(maintenant.toISOString());
+  });
+
+  it('boutique vide pendant l’exemple : l’exemple reste', async () => {
+    const { appliquerVentesBoutique } = await import('../src/donnees/useSynchroBoutique');
+    const exemple = donneesExemple(maintenant);
+    expect(appliquerVentesBoutique(exemple, [], maintenant.toISOString())).toBe(exemple);
+  });
+});
