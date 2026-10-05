@@ -7,7 +7,7 @@
 
 create table if not exists public.comptes_relies (
   user_id uuid not null default auth.uid() references auth.users (id) on delete cascade,
-  source text not null check (source in ('lemonsqueezy', 'tiktok', 'instagram')),
+  source text not null check (source in ('stripe', 'lemonsqueezy', 'shopify', 'tiktok', 'instagram')),
   cle_chiffree text not null,
   libelle text not null default '',
   relie_le timestamptz not null default now(),

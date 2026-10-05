@@ -181,3 +181,120 @@ describe('serveur : comptes reliés Lemon Squeezy', () => {
     expect(await r.text()).toBe('page');
   });
 });
+
+// ── Stripe ──
+
+import { chargesVersVentes, type ChargeStripe } from '../src/serveur/stripe';
+
+const charge = (id: string, autres: Partial<ChargeStripe> = {}): ChargeStripe => ({
+  id,
+  amount: 1990,
+  amount_refunded: 0,
+  currency: 'eur',
+  created: Date.parse('2026-10-05T08:15:00Z') / 1000,
+  status: 'succeeded',
+  paid: true,
+  refunded: false,
+  livemode: true,
+  description: 'Guide detailing',
+  balance_transaction: { amount: 1990, fee: 125, net: 1865, currency: 'eur' },
+  ...autres,
+});
+
+describe('paiements Stripe → ventes', () => {
+  it('garde le montant et les vrais frais donnés par Stripe', () => {
+    const { ventes } = chargesVersVentes([charge('ch_1')]);
+    expect(ventes).toEqual([
+      {
+        plateforme: 'stripe',
+        numeroCommande: 'ch_1',
+        instant: '2026-10-05T08:15:00.000Z',
+        montantCentimes: 1990,
+        fraisCentimes: 125,
+        rembourse: false,
+        produit: 'Guide detailing',
+      },
+    ]);
+  });
+
+  it('remboursement total, partiel, mode test, frais absents', () => {
+    const { ventes } = chargesVersVentes([
+      charge('ch_2', { refunded: true, amount_refunded: 1990 }),
+      charge('ch_3', { amount: 2990, amount_refunded: 1000 }),
+      charge('ch_4', { livemode: false }),
+      charge('ch_5', { balance_transaction: 'txn_123' }),
+    ]);
+    expect(ventes.map((v) => [v.numeroCommande, v.montantCentimes, v.rembourse, v.plateforme, v.fraisCentimes])).toEqual([
+      ['ch_2', 1990, true, 'stripe', 125],
+      ['ch_3', 1990, false, 'stripe', 125],
+      ['ch_4', 1990, false, 'stripe-test', 125],
+      ['ch_5', 1990, false, 'stripe', null],
+    ]);
+  });
+
+  it('écarte les paiements échoués et les autres devises', () => {
+    const { ventes, ignorees } = chargesVersVentes([charge('ch_6', { status: 'failed', paid: false }), charge('ch_7', { currency: 'usd' })]);
+    expect(ventes).toEqual([]);
+    expect(ignorees.map((i) => i.numero)).toEqual(['ch_6', 'ch_7']);
+  });
+});
+
+function fauxStripe() {
+  const ligne: { cle_chiffree?: string; libelle?: string; derniere_synchro?: string | null; derniere_erreur?: string | null } = {};
+  const recuperer = (async (entree: RequestInfo | URL, init?: RequestInit) => {
+    const url = new URL(String(entree));
+    const methode = init?.method ?? 'GET';
+    const entetes = new Headers(init?.headers);
+    const repondre = (statut: number, corps?: unknown) => new Response(corps === undefined ? null : JSON.stringify(corps), { status: statut });
+    if (url.pathname === '/auth/v1/user') return repondre(200, { id: 'u1' });
+    if (url.pathname === '/rest/v1/comptes_relies') {
+      if (methode === 'POST' || methode === 'PATCH') Object.assign(ligne, JSON.parse(String(init?.body)));
+      if (methode === 'GET') return repondre(200, ligne.cle_chiffree ? [{ cle_chiffree: ligne.cle_chiffree }] : []);
+      return repondre(201);
+    }
+    if (url.host === 'api.stripe.com') {
+      const cle = entetes.get('Authorization');
+      if (cle === 'Bearer rk_test_sans_droits_0123456789') return repondre(403, { error: { type: 'invalid_request_error' } });
+      if (cle !== 'Bearer rk_test_bonne_cle_0123456789') return repondre(401, {});
+      const apres = url.searchParams.get('starting_after');
+      if (!apres) return repondre(200, { data: [charge('ch_a', { livemode: false }), charge('ch_b', { livemode: false })], has_more: true });
+      return repondre(200, { data: [charge('ch_c', { livemode: false })], has_more: false });
+    }
+    return repondre(404, {});
+  }) as typeof fetch;
+  return { recuperer, ligne };
+}
+
+describe('serveur : boutique Stripe', () => {
+  it('refuse une clé secrète complète (sk_), sans même l’essayer', async () => {
+    const f = fauxStripe();
+    const r = await traiterApi(appel('/api/comptes/stripe/relier', { cle: 'sk_test_cle_complete_0123456789' }), env, f.recuperer);
+    expect(r.status).toBe(400);
+    expect(((await r.json()) as { erreur: string }).erreur).toContain('rk_');
+    expect(f.ligne.cle_chiffree).toBeUndefined();
+  });
+
+  it('dit quelle autorisation manque', async () => {
+    const f = fauxStripe();
+    const r = await traiterApi(appel('/api/comptes/stripe/relier', { cle: 'rk_test_sans_droits_0123456789' }), env, f.recuperer);
+    expect(r.status).toBe(400);
+    expect(((await r.json()) as { erreur: string }).erreur).toContain('Lecture');
+  });
+
+  it('relie, puis lit toutes les pages de paiements', async () => {
+    const f = fauxStripe();
+    const relie = await traiterApi(appel('/api/comptes/stripe/relier', { cle: 'rk_test_bonne_cle_0123456789' }), env, f.recuperer);
+    expect(await relie.json()).toEqual({ libelle: 'Stripe (mode test)' });
+    expect(f.ligne.cle_chiffree).not.toContain('rk_test');
+    const r = await traiterApi(appel('/api/comptes/stripe/synchroniser'), env, f.recuperer);
+    const corps = (await r.json()) as { ventes: { numeroCommande: string; plateforme: string }[] };
+    expect(corps.ventes.map((v) => v.numeroCommande)).toEqual(['ch_a', 'ch_b', 'ch_c']);
+    expect(corps.ventes.every((v) => v.plateforme === 'stripe-test')).toBe(true);
+  });
+
+  it('refuse une boutique inconnue', async () => {
+    const f = fauxStripe();
+    const r = await traiterApi(appel('/api/comptes/inconnue/relier', { cle: 'x'.repeat(30) }), env, f.recuperer);
+    expect(r.status).toBe(404);
+  });
+});
