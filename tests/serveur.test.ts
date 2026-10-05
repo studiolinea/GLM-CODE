@@ -267,6 +267,30 @@ describe('paiements Stripe → ventes', () => {
     expect([m!.instant, m!.montantCentimes, m!.fraisCentimes, m!.netCentimes, m!.origine]).toEqual([null, null, null, null, null]);
   });
 
+  it('Managed Payments : la TVA retenue par Stripe n’est ni une vente ni un frais', () => {
+    // Le vrai paiement test du 6 octobre : 19,90 € + 1,09 € de TVA (5,5 %), frais de paiement 0,56 €.
+    const solde = {
+      amount: 2099,
+      fee: 165,
+      net: 1934,
+      currency: 'eur',
+      fee_details: [
+        { type: 'withheld_tax', amount: 109 },
+        { type: 'stripe_fee', amount: 56 },
+      ],
+    };
+    const { ventes } = chargesVersVentes([
+      charge('ch_mp', { amount: 2099, balance_transaction: solde }),
+      charge('ch_mp_rembourse', { amount: 2099, refunded: true, amount_refunded: 2099, balance_transaction: solde }),
+      charge('ch_mp_moitie', { amount: 2099, amount_refunded: 1050, balance_transaction: solde }),
+    ]);
+    expect(ventes.map((v) => [v.numeroCommande, v.montantCentimes, v.fraisCentimes])).toEqual([
+      ['ch_mp', 1990, null],
+      ['ch_mp_rembourse', 1990, null],
+      ['ch_mp_moitie', 995, null],
+    ]);
+  });
+
   it('écarte les paiements échoués et les autres devises', () => {
     const { ventes, ignorees } = chargesVersVentes([charge('ch_6', { status: 'failed', paid: false }), charge('ch_7', { currency: 'usd' })]);
     expect(ventes).toEqual([]);

@@ -177,6 +177,7 @@ const NOMS_TYPES: Record<string, string> = {
   payment_refund: 'remboursement',
   stripe_fee: 'frais Stripe',
   tax: 'taxe',
+  withheld_tax: 'TVA retenue par Stripe',
   payout: 'virement vers ta banque',
   adjustment: 'ajustement',
   application_fee: 'commission',

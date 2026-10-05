@@ -135,6 +135,13 @@ Règle : `calculs/` et `alertes/` ne dépendent de rien d'autre. Ils se testent 
   Payments ajoute 3,5 % du total (TVA comprise) aux frais habituels, et ces frais semblent comptés à part.
   Aujourd'hui l'appli ne compte que les frais attachés au paiement, et le montant inclut peut-être la TVA.
   À corriger d'après le paiement test, pour que les gains réels soient exacts.
+- **Paiement test du 6 octobre (Managed Payments, livre électronique, 19,90 € HT) :** le client paie 20,99 €,
+  dont 1,09 € de TVA (5,5 %). Dans le paiement, Stripe enregistre des frais de 1,65 € : 1,09 € de TVA retenue
+  (« withheld_tax ») et 0,56 € de frais de paiement. Le net est de 19,34 €. Les 3,5 % de Managed Payments
+  (environ 0,73 €) n'apparaissent pas dans ce paiement.
+  - Corrigé : le montant d'une vente est maintenant la part de Kévin, sans la TVA retenue (19,90 €).
+  - En attendant de savoir comment Stripe compte les 3,5 %, les frais de ces ventes restent « inconnus »
+    plutôt que faux. À revoir quand une ligne « frais Stripe » séparée apparaît dans « Vérifier les frais et la TVA ».
 
 ### Étape 8 — La vérification avec de vraies ventes
 - Après les premières vraies ventes, comparer à la main les chiffres de l'appli et ceux de la plateforme.
