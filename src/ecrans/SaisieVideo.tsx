@@ -80,11 +80,12 @@ export function SaisieVideo({
         <div className="ligne">
           <label className="champ">
             <span>Date</span>
-            <input type="date" value={date} max={aujourdhui} onChange={(e) => changerDate(e.target.value)} />
+            <input id="video-date" type="date" value={date} max={aujourdhui} onChange={(e) => changerDate(e.target.value)} />
           </label>
           <label className="champ">
             <span>Heure</span>
             <input
+              id="video-heure"
               type="time"
               value={heure}
               onChange={(e) => {
@@ -96,11 +97,11 @@ export function SaisieVideo({
         </div>
         <label className="champ">
           <span>Lien de la vidéo (facultatif)</span>
-          <input type="url" inputMode="url" placeholder="https://" value={lien} onChange={(e) => setLien(e.target.value)} />
+          <input id="video-lien" type="url" inputMode="url" placeholder="https://" value={lien} onChange={(e) => setLien(e.target.value)} />
         </label>
         <label className="champ">
           <span>Vues (facultatif, à compléter plus tard)</span>
-          <input type="text" inputMode="numeric" placeholder="ex. 850" value={vues} onChange={(e) => setVues(e.target.value)} />
+          <input id="video-vues" type="text" inputMode="numeric" placeholder="ex. 850" value={vues} onChange={(e) => setVues(e.target.value)} />
         </label>
         {erreur && <p className="erreur">{erreur}</p>}
         <div className="pied">

@@ -49,12 +49,15 @@ button {
 
 /* En-tête */
 .entete {
+  display: grid;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+.entete-haut {
   display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 18px;
 }
 .entete h1 {
   margin: 0;
@@ -129,7 +132,20 @@ button {
   grid-template-columns: repeat(3, 1fr);
   gap: 12px;
 }
+.chiffres > div {
+  min-width: 0;
+}
+/* Sur un petit écran, les ventes prennent toute la largeur, le reste passe dessous. */
+@media (max-width: 480px) {
+  .chiffres {
+    grid-template-columns: 1fr 1fr;
+  }
+  .chiffres > div:first-child {
+    grid-column: 1 / -1;
+  }
+}
 .chiffre-valeur {
+  overflow-wrap: anywhere;
   font-size: 1.45rem;
   font-weight: 700;
   letter-spacing: -0.02em;
@@ -250,6 +266,12 @@ button {
   padding: 9px 14px;
   font-size: 0.92rem;
 }
+a.bouton {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+  color: var(--texte);
+}
 .bouton.principal {
   background: var(--texte);
   border-color: var(--texte);
@@ -286,7 +308,8 @@ button {
 }
 .barre .bouton {
   flex: 1;
-  padding: 12px;
+  padding: 12px 8px;
+  white-space: nowrap;
 }
 .barre .bouton.icone-seule {
   flex: none;
@@ -301,7 +324,6 @@ button {
     background: none;
     border: 0;
     backdrop-filter: none;
-    margin-bottom: 18px;
     justify-content: flex-end;
   }
   .barre .bouton {

@@ -77,6 +77,15 @@ describe('importerVentes', () => {
     expect(r.fusion.ajoutees).toBe(4);
   });
 
+  it('des ventes d’essai restent marquées comme exemple', () => {
+    const exemple = donneesExemple(maintenant);
+    const r = importerVentes(exemple, lecture.ventes, maintenant.toISOString(), { essai: true });
+    expect(r.exempleRetire).toBe(false);
+    expect(r.donnees.exemple).toBe(true);
+    expect(r.donnees.videos).toEqual(exemple.videos);
+    expect(r.donnees.ventes).toHaveLength(exemple.ventes.length + 4);
+  });
+
   it('garde la couverture la plus récente', () => {
     const recent = '2026-10-05T16:00:00.000Z';
     const ancien = '2026-10-01T16:00:00.000Z';

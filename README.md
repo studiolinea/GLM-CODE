@@ -14,8 +14,8 @@ avec les chiffres qui le prouvent.
 | 0. Préparer le terrain | ✅ |
 | 1. Lire les ventes et faire le résumé | ✅ |
 | 2. Les alertes A, B, C | ✅ |
-| 3. Les écrans, avec les données d'exemple | à faire |
-| 4. Ce que Kévin peut faire dans l'appli | à faire |
+| 3. Les écrans, avec les données d'exemple | ✅ fait, le look reste à valider par Kévin |
+| 4. Ce que Kévin peut faire dans l'appli | ✅ (données gardées sur l'appareil jusqu'à l'étape 5) |
 | 5. Les mêmes données sur le Mac et le téléphone | à faire |
 | 6. Mettre l'appli en ligne | à faire |
 | 7. Lire le vrai fichier de la boutique | à faire |

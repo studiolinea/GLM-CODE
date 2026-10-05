@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import type { Action, Alerte } from '../alertes/alertes';
 import { formatEuros } from '../argent';
 import { PERIODES, type Periode, type Resume } from '../calculs/resume';
@@ -19,6 +20,7 @@ export function TableauDeBord({
   periode,
   resume,
   alertes,
+  actions,
   onPeriode,
   onAction,
   onRanger,
@@ -30,6 +32,8 @@ export function TableauDeBord({
   periode: Periode;
   resume: Resume;
   alertes: Alerte[];
+  /** Boutons d'action : en haut sur ordinateur, collés en bas sur téléphone. */
+  actions: ReactNode;
   onPeriode: (p: Periode) => void;
   onAction: (action: Action) => void;
   onRanger: (id: string, statut: 'fait' | 'plus-tard') => void;
@@ -40,9 +44,12 @@ export function TableauDeBord({
   return (
     <>
       <header className="entete">
-        <div>
-          <h1>Pilotage</h1>
-          <p className="sous-titre">Ma boutique — {FORMAT_JOUR.format(maintenant)}</p>
+        <div className="entete-haut">
+          <div>
+            <h1>Pilotage</h1>
+            <p className="sous-titre">Ma boutique — {FORMAT_JOUR.format(maintenant)}</p>
+          </div>
+          {actions}
         </div>
         <div className="periodes" role="group" aria-label="Période">
           {(Object.keys(PERIODES) as Periode[]).map((p) => (

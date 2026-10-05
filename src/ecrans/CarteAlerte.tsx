@@ -11,6 +11,7 @@ export function CarteAlerte({
   onAction: (action: Action) => void;
   onRanger: (statut: 'fait' | 'plus-tard') => void;
 }) {
+  const action = alerte.action;
   return (
     <li className={`alerte ${alerte.ton}`}>
       <h3>
@@ -22,9 +23,15 @@ export function CarteAlerte({
       <p className="dapres">{alerte.dapres}</p>
       {alerte.note && <p className="note">{alerte.note}</p>}
       <div className="alerte-actions">
-        <button className="bouton principal" onClick={() => onAction(alerte.action)}>
-          {alerte.action.libelle}
-        </button>
+        {action.cible === 'lien' ? (
+          <a className="bouton principal" href={action.url} target="_blank" rel="noopener noreferrer">
+            {action.libelle}
+          </a>
+        ) : (
+          <button className="bouton principal" onClick={() => onAction(action)}>
+            {action.libelle}
+          </button>
+        )}
         <button className="bouton" onClick={() => onRanger('fait')}>
           Fait
         </button>

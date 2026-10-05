@@ -39,15 +39,21 @@ export interface ResultatImport {
 /**
  * Ajoute les ventes d'un fichier. Le premier vrai fichier fait disparaître l'exemple.
  * `couverture` = moment de l'export du fichier ; on garde le plus récent.
+ * Avec `essai`, les ventes s'ajoutent aux données d'exemple, qui restent marquées comme exemple.
  */
-export function importerVentes(d: Donnees, ventes: Vente[], couverture: string): ResultatImport {
-  const base = quitterExemple(d);
+export function importerVentes(
+  d: Donnees,
+  ventes: Vente[],
+  couverture: string,
+  options: { essai?: boolean } = {},
+): ResultatImport {
+  const base = options.essai ? d : quitterExemple(d);
   const fusion = fusionnerVentes(base.ventes, ventes);
   const plusRecente = base.couverture && base.couverture > couverture ? base.couverture : couverture;
   return {
     donnees: { ...base, ventes: fusion.ventes, couverture: plusRecente },
     fusion,
-    exempleRetire: d.exemple,
+    exempleRetire: d.exemple && !options.essai,
   };
 }
 
