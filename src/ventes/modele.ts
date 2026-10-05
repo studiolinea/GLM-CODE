@@ -8,7 +8,7 @@ export interface Vente {
   numeroCommande: string;
   /** Moment de la vente, ISO UTC. */
   instant: string;
-  /** Ce que le client a payé, en centimes. */
+  /** Ce que le client a payé, en centimes, sans la TVA quand la plateforme la retient (Stripe Managed Payments). */
   montantCentimes: number;
   /** Commission et frais de la plateforme en centimes ; null si le fichier ne les donne pas. */
   fraisCentimes: number | null;

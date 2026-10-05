@@ -20,6 +20,7 @@ interface TransactionSolde {
   fee: number;
   net: number;
   currency: string;
+  fee_details?: { type?: string; amount?: number }[];
 }
 
 export interface ChargeStripe {
@@ -65,7 +66,9 @@ export async function toutesLesCharges(cle: string, recuperer: Recuperateur = fe
 
 /**
  * Transforme les paiements Stripe en ventes de l'appli.
- * - Les frais viennent de Stripe, paiement par paiement (y compris ceux de Managed Payments).
+ * - Le montant est la part du vendeur : sans la TVA que Stripe retient avec Managed Payments.
+ * - Les frais viennent de Stripe, paiement par paiement. Avec Managed Payments, ses 3,5 % sont comptés à part :
+ *   les frais restent inconnus (null) tant que l'appli ne les lit pas.
  * - Les paiements du mode test gardent la plateforme « stripe-test » : jamais dans les vraies données.
  */
 export function chargesVersVentes(charges: ChargeStripe[]): { ventes: Vente[]; ignorees: VenteIgnoree[] } {
@@ -80,19 +83,32 @@ export function chargesVersVentes(charges: ChargeStripe[]): { ventes: Vente[]; i
       ignorees.push({ numero: c.id, raison: `devise ${c.currency} : seules les ventes en euros sont lues` });
       continue;
     }
-    const solde = typeof c.balance_transaction === 'object' && c.balance_transaction ? c.balance_transaction : null;
+    const solde =
+      typeof c.balance_transaction === 'object' && c.balance_transaction && c.balance_transaction.currency.toLowerCase() === 'eur'
+        ? c.balance_transaction
+        : null;
+    // Managed Payments : Stripe retient la TVA du client (« withheld_tax ») ; elle n'est ni à Kévin, ni un frais.
+    const tva = somme((solde?.fee_details ?? []).filter((f) => f.type === 'withheld_tax').map((f) => f.amount ?? 0));
+    // Remboursement partiel : on garde la part non remboursée, et la TVA qui va avec.
+    const paye = c.refunded ? c.amount : Math.max(0, c.amount - (c.amount_refunded ?? 0));
+    const tvaGardee = c.refunded || c.amount === 0 ? tva : Math.round((tva * paye) / c.amount);
     ventes.push({
       plateforme: c.livemode ? 'stripe' : 'stripe-test',
       numeroCommande: c.id,
       instant: new Date(c.created * 1000).toISOString(),
-      // Remboursement partiel : on garde la part non remboursée.
-      montantCentimes: c.refunded ? c.amount : Math.max(0, c.amount - (c.amount_refunded ?? 0)),
-      fraisCentimes: solde && solde.currency.toLowerCase() === 'eur' ? solde.fee : null,
+      montantCentimes: Math.max(0, paye - tvaGardee),
+      // Avec Managed Payments, ses frais de 3,5 % ne sont pas dans ce paiement : Stripe les compte à part.
+      // Tant que l'appli ne les lit pas, les frais restent inconnus plutôt que faux.
+      fraisCentimes: solde && tva === 0 ? solde.fee : null,
       rembourse: c.refunded,
       produit: c.description ?? '',
     });
   }
   return { ventes, ignorees };
+}
+
+function somme(nombres: number[]): number {
+  return nombres.reduce((a, b) => a + b, 0);
 }
 
 /** Un mouvement du solde Stripe, tel que l'API le renvoie (seuls ces champs sont lus). */
