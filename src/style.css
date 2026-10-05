@@ -655,6 +655,35 @@ a.bouton {
   color: var(--vert);
 }
 
+/* Vérification des frais et de la TVA : les mouvements d'argent de la boutique */
+.verification {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--bord);
+}
+.mouvements {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.82rem;
+  overflow-wrap: anywhere;
+}
+.mouvements li {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--bord);
+}
+.mouvement-tete {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-weight: 600;
+}
+.compte-relie .mouvements .texte-doux,
+.compte-relie .mouvements .note {
+  margin: 2px 0 0;
+  font-size: 0.78rem;
+}
+
 /* ───── Bandeau d'erreur (connexion) ───── */
 .bandeau-erreur {
   display: flex;

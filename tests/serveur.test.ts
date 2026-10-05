@@ -184,7 +184,7 @@ describe('serveur : comptes reliés Lemon Squeezy', () => {
 
 // ── Stripe ──
 
-import { chargesVersVentes, type ChargeStripe } from '../src/serveur/stripe';
+import { chargesVersVentes, transactionsVersMouvements, type ChargeStripe } from '../src/serveur/stripe';
 
 const charge = (id: string, autres: Partial<ChargeStripe> = {}): ChargeStripe => ({
   id,
@@ -232,6 +232,41 @@ describe('paiements Stripe → ventes', () => {
     ]);
   });
 
+  it('mouvements d’argent : garde seulement ce qui sert à vérifier les frais et la TVA', () => {
+    const brut = {
+      type: 'charge',
+      reporting_category: 'charge',
+      created: Date.parse('2026-10-05T22:40:00Z') / 1000,
+      amount: 1990,
+      fee: 125,
+      net: 1865,
+      currency: 'EUR',
+      description: null,
+      source: { id: 'ch_1', billing_details: { name: 'Client' } },
+      fee_details: [{ type: 'stripe_fee', amount: 125, description: 'Stripe processing fees' }],
+      autre_champ: 'pas gardé',
+    };
+    expect(transactionsVersMouvements([brut])).toEqual([
+      {
+        instant: '2026-10-05T22:40:00.000Z',
+        type: 'charge',
+        categorie: 'charge',
+        montantCentimes: 1990,
+        fraisCentimes: 125,
+        netCentimes: 1865,
+        devise: 'eur',
+        description: null,
+        origine: 'ch_1',
+        detailFrais: [{ type: 'stripe_fee', montantCentimes: 125, description: 'Stripe processing fees' }],
+      },
+    ]);
+  });
+
+  it('mouvements d’argent : un nombre absent reste inconnu, jamais 0', () => {
+    const [m] = transactionsVersMouvements([{ type: 'stripe_fee' }]);
+    expect([m!.instant, m!.montantCentimes, m!.fraisCentimes, m!.netCentimes, m!.origine]).toEqual([null, null, null, null, null]);
+  });
+
   it('écarte les paiements échoués et les autres devises', () => {
     const { ventes, ignorees } = chargesVersVentes([charge('ch_6', { status: 'failed', paid: false }), charge('ch_7', { currency: 'usd' })]);
     expect(ventes).toEqual([]);
@@ -256,6 +291,17 @@ function fauxStripe() {
       const cle = entetes.get('Authorization');
       if (cle === 'Bearer rk_test_sans_droits_0123456789') return repondre(403, { error: { type: 'invalid_request_error' } });
       if (cle !== 'Bearer rk_test_bonne_cle_0123456789') return repondre(401, {});
+      if (url.pathname === '/v1/balance_transactions') {
+        return repondre(200, {
+          data: [
+            { id: 'txn_1', type: 'charge', reporting_category: 'charge', created: 1759700000, amount: 1990, fee: 125, net: 1865,
+              currency: 'eur', description: null, source: 'ch_a', status: 'pending',
+              fee_details: [{ amount: 125, currency: 'eur', description: 'Stripe processing fees', type: 'stripe_fee', application: null }] },
+            { id: 'txn_2', type: 'stripe_fee', reporting_category: 'fee', created: 1759700100, amount: -70, fee: 0, net: -70,
+              currency: 'eur', description: 'Frais', source: null, fee_details: [] },
+          ],
+        });
+      }
       const apres = url.searchParams.get('starting_after');
       if (!apres) return repondre(200, { data: [charge('ch_a', { livemode: false }), charge('ch_b', { livemode: false })], has_more: true });
       return repondre(200, { data: [charge('ch_c', { livemode: false })], has_more: false });
@@ -296,6 +342,39 @@ describe('serveur : boutique Stripe', () => {
     const f = fauxStripe();
     const r = await traiterApi(appel('/api/comptes/inconnue/relier', { cle: 'x'.repeat(30) }), env, f.recuperer);
     expect(r.status).toBe(404);
+  });
+
+  it('montre les derniers mouvements d’argent de la boutique, sans rien enregistrer', async () => {
+    const f = fauxStripe();
+    await traiterApi(appel('/api/comptes/stripe/relier', { cle: 'rk_test_bonne_cle_0123456789' }), env, f.recuperer);
+    const avant = { ...f.ligne };
+    const r = await traiterApi(appel('/api/comptes/stripe/mouvements'), env, f.recuperer);
+    expect(r.status).toBe(200);
+    const { mouvements } = (await r.json()) as { mouvements: { type: string; netCentimes: number; origine: string | null }[] };
+    expect(mouvements.map((m) => [m.type, m.netCentimes, m.origine])).toEqual([
+      ['charge', 1865, 'ch_a'],
+      ['stripe_fee', -70, null],
+    ]);
+    expect(f.ligne).toEqual(avant);
+  });
+
+  it('mouvements : boutique pas reliée, autorisation manquante, boutique qui ne sait pas les montrer', async () => {
+    const f = fauxStripe();
+    const sansBoutique = await traiterApi(appel('/api/comptes/stripe/mouvements'), env, f.recuperer);
+    expect(sansBoutique.status).toBe(404);
+    expect(((await sansBoutique.json()) as { erreur: string }).erreur).toContain('Aucune boutique Stripe');
+
+    await traiterApi(appel('/api/comptes/stripe/relier', { cle: 'rk_test_bonne_cle_0123456789' }), env, f.recuperer);
+    const sansDroits = (async (entree: RequestInfo | URL, init?: RequestInit) =>
+      new URL(String(entree)).pathname === '/v1/balance_transactions'
+        ? new Response('{}', { status: 403 })
+        : f.recuperer(entree, init)) as typeof fetch;
+    const r = await traiterApi(appel('/api/comptes/stripe/mouvements'), env, sansDroits);
+    expect(r.status).toBe(400);
+    expect(((await r.json()) as { erreur: string }).erreur).toContain('Balance');
+
+    const ls = await traiterApi(appel('/api/comptes/lemonsqueezy/mouvements'), env, faux().recuperer);
+    expect(ls.status).toBe(404);
   });
 
   it('marche dans le vrai serveur : fetch est toujours appelé seul, comme l’exige Cloudflare', async () => {

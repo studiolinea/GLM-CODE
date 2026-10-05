@@ -18,7 +18,7 @@ avec les chiffres qui le prouvent.
 | 4. Ce que Kévin peut faire dans l'appli | ✅ |
 | 5. Les mêmes données sur le Mac et le téléphone | ✅ (projet Supabase « Pilotage », compte de Kévin créé le 5 octobre) |
 | 6. Mettre l'appli en ligne | ✅ https://pilotage.studiolinea-pro.workers.dev |
-| 7. Lire le vrai fichier de la boutique | à faire |
+| 7. Lire les ventes de la boutique | en cours : boutique Stripe reliée en mode test le 6 octobre ; reste à vérifier la TVA et les frais avec un paiement test |
 | 8. Vérifier avec de vraies ventes | à faire |
 
 ## La base en ligne (Supabase)
@@ -36,7 +36,8 @@ Cloudflare reconstruit et publie l'appli à chaque modification de la branche `m
 (commande de build `npm run build`, puis `npx wrangler deploy` avec `wrangler.jsonc`).
 
 Le petit serveur (`src/serveur/worker.ts`) répond aux adresses `/api/…` : il relie les boutiques
-(Stripe, Lemon Squeezy) et lit les ventes au nom de la personne connectée. Stripe : seulement une clé
+(Stripe, Lemon Squeezy) et lit les ventes au nom de la personne connectée. Pour Stripe, il montre aussi
+les derniers mouvements d'argent (« Vérifier les frais et la TVA »), sans rien enregistrer. Stripe : seulement une clé
 limitée en lecture (`rk_…`), jamais la clé secrète complète (`sk_…`).
 - Il a besoin du secret **`CLE_CHIFFREMENT`**, posé dans Cloudflare (Worker « pilotage » > Paramètres >
   Variables et secrets), jamais dans le code. Il chiffre les clés d'accès des comptes reliés.

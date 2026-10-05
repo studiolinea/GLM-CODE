@@ -128,6 +128,13 @@ Règle : `calculs/` et `alertes/` ne dépendent de rien d'autre. Ils se testent 
 - Écrire le lecteur de cette plateforme dans `ventes/adaptateurs/`, à partir d'un vrai export (même vide)
   ou de l'exemple officiel de la plateforme. Les noms et e-mails clients sont ignorés à la lecture.
 - **Fini quand :** un export réel se charge sans erreur, et un fichier d'une autre plateforme est refusé proprement.
+- **Où on en est (6 octobre) :** plutôt qu'un fichier, l'appli lit directement les ventes Stripe (étape 9, voir
+  plus bas). La boutique Stripe de Kévin est reliée en mode test, et les ventes arrivent toutes seules.
+- **Reste avant la première vraie vente :** un paiement test (argent fictif), puis « Vérifier les frais et la TVA »
+  dans les réglages. Ce bouton montre ce que Stripe a enregistré, mouvement par mouvement. Selon Stripe, Managed
+  Payments ajoute 3,5 % du total (TVA comprise) aux frais habituels, et ces frais semblent comptés à part.
+  Aujourd'hui l'appli ne compte que les frais attachés au paiement, et le montant inclut peut-être la TVA.
+  À corriger d'après le paiement test, pour que les gains réels soient exacts.
 
 ### Étape 8 — La vérification avec de vraies ventes
 - Après les premières vraies ventes, comparer à la main les chiffres de l'appli et ceux de la plateforme.
