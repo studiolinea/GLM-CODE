@@ -55,7 +55,7 @@ button {
 .page {
   max-width: 1120px;
   margin: 0 auto;
-  padding: 20px 16px 120px;
+  padding: calc(20px + env(safe-area-inset-top, 0px)) 16px 120px;
 }
 
 /* ───── En-tête ───── */
