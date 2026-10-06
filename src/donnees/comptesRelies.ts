@@ -56,7 +56,7 @@ async function appelerServeur<T>(chemin: string, corps: unknown = {}): Promise<T
   } catch {
     throw new Error('Le serveur de l’appli ne répond pas correctement. Réessaie dans un moment.');
   }
-  if (!reponse.ok) throw new Error(contenu.erreur ?? `Erreur du serveur (${reponse.status}).`);
+  if (!reponse.ok) throw new Error(contenu.erreur ?? `Le serveur de l’appli a eu un problème (code ${reponse.status}). Réessaie dans un moment.`);
   return contenu as T;
 }
 

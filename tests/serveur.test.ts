@@ -160,6 +160,9 @@ describe('serveur : comptes reliés Lemon Squeezy', () => {
     const f = faux();
     const r = await traiterApi(appel('/api/comptes/lemonsqueezy/relier', { cle: CLE_LS }), { ...env, CLE_CHIFFREMENT: undefined }, f.recuperer);
     expect(r.status).toBe(503);
+    const { erreur } = (await r.json()) as { erreur: string };
+    expect(erreur).toContain('Réglage du serveur à faire');
+    expect(erreur).toContain('CLE_CHIFFREMENT');
   });
 
   it('refuse une clé que Lemon Squeezy n’accepte pas', async () => {
@@ -449,7 +452,9 @@ describe('serveur : boutique Stripe', () => {
     }) as typeof fetch;
     const r = await traiterApi(appel('/api/comptes/stripe/relier', { cle: 'rk_test_bonne_cle_0123456789' }), env, recuperer);
     expect(r.status).toBe(502);
-    expect(((await r.json()) as { erreur: string }).erreur).toContain('03-boutique-stripe.sql');
+    const { erreur } = (await r.json()) as { erreur: string };
+    expect(erreur).toContain('03-boutique-stripe.sql');
+    expect(erreur).toMatch(/^Réglage du serveur à faire/);
   });
 
   it('une panne pendant l’enregistrement donne un message clair, sans faire tomber le serveur', async () => {

@@ -113,7 +113,7 @@ export async function traiterApi(requete: Request, env: Env, recuperer: Recupera
     // Retour de TikTok après l'accord : simple renvoi vers l'appli, qui finit la liaison au nom de la personne.
     if (requete.method === 'GET' && adresse.pathname === '/api/tiktok/retour') return retourTikTok(adresse);
     if (!env.CLE_CHIFFREMENT) {
-      return json(503, { erreur: 'Le serveur n’est pas encore configuré : il manque la clé de chiffrement dans Cloudflare.' });
+      return json(503, { erreur: 'Réglage du serveur à faire : ajoute le secret « CLE_CHIFFREMENT » dans Cloudflare.' });
     }
     const secret = env.CLE_CHIFFREMENT;
     const jeton = (requete.headers.get('Authorization') ?? '').replace(/^Bearer\s+/i, '').trim();
@@ -206,7 +206,7 @@ async function enregistrerCompte(
   const detail = (await enregistrement.json().catch(() => null)) as { code?: string } | null;
   if (detail?.code === '23514') {
     return json(502, {
-      erreur: 'La base de l’appli n’accepte pas encore cette boutique : dans Supabase, lance le texte SQL « 03-boutique-stripe.sql », puis réessaie.',
+      erreur: 'Réglage du serveur à faire : la base n’accepte pas encore cette boutique. Dans Supabase, lance le texte SQL « 03-boutique-stripe.sql », puis réessaie.',
     });
   }
   return json(502, { erreur: 'Impossible d’enregistrer le compte relié. Réessaie.' });
@@ -301,7 +301,7 @@ async function mouvements(ctx: Contexte, source: string, connecteur: Connecteur,
 const MESSAGE_DROITS_TIKTOK =
   'TikTok n’a pas donné l’accès à tes vidéos : relie ton compte à nouveau et accepte l’accès à tes vidéos publiques.';
 const MESSAGE_TIKTOK_PAS_CONFIGURE =
-  'TikTok n’est pas encore configuré sur le serveur : il manque la clé TikTok dans Cloudflare.';
+  'Réglage du serveur à faire : ajoute les secrets « TIKTOK_CLIENT_KEY » et « TIKTOK_CLIENT_SECRET » dans Cloudflare.';
 
 function clesTikTok(env: Env): ClesTikTok | null {
   return env.TIKTOK_CLIENT_KEY && env.TIKTOK_CLIENT_SECRET

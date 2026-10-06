@@ -59,7 +59,7 @@ export async function lireComptesRelies(
 ): Promise<{ erreurs: string[]; ignorees: VenteEcartee[] }> {
   const erreurs: string[] = [];
   const ignorees: VenteEcartee[] = [];
-  const message = (e: unknown) => (e instanceof Error ? e.message : 'La synchronisation a échoué. Réessaie.');
+  const message = (e: unknown) => (e instanceof Error ? e.message : 'L’actualisation a échoué. Réessaie.');
   for (const source of BOUTIQUES.filter((b) => liste.some((c) => c.source === b))) {
     try {
       const r = await appels.boutique(businessId, source);
@@ -165,7 +165,7 @@ export function useSynchroBoutique(
           setComptes(await listerComptes(businessId));
         } catch (e) {
           if (!monte.current) return;
-          setErreur(e instanceof Error ? e.message : 'La synchronisation a échoué. Réessaie.');
+          setErreur(e instanceof Error ? e.message : 'L’actualisation a échoué. Réessaie.');
         }
       } while (relancer.current && monte.current);
     })();

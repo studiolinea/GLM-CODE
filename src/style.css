@@ -936,6 +936,22 @@ a.bouton {
   margin: 2px 0 0;
   font-size: 0.78rem;
 }
+/* Les codes bruts de la plateforme : visibles, mais discrets */
+.compte-relie .mouvements .detail-brut {
+  margin-top: 4px;
+  font-size: 0.7rem;
+  opacity: 0.8;
+}
+/* Vérification ouverte : un trait la sépare de « Déconnecter la boutique » */
+.verification + .pied {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--bord);
+}
+/* « Actualiser maintenant », juste sous « Mes comptes reliés » */
+.pied-haut {
+  margin: 0 0 12px;
+}
 
 /* ───── Bandeau d'erreur (connexion) ───── */
 .bandeau-erreur {
