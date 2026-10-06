@@ -4,7 +4,7 @@ import { formatEuros } from '../argent';
 import { PERIODES, type Periode, type Resume } from '../calculs/resume';
 import type { Rythme } from '../calculs/rythme';
 import { quandParis } from '../temps';
-import { PHRASE_GAINS } from '../texte';
+import { accord, nombre, PHRASE_GAINS } from '../texte';
 import { CarteAlerte } from './CarteAlerte';
 import { IconeChevron, Logo } from './Icones';
 import { Jauge } from './Jauge';
@@ -66,7 +66,7 @@ export function TableauDeBord({
   onAction: (action: Action) => void;
   onRanger: (id: string, statut: 'fait' | 'plus-tard') => void;
   onQuitterExemple: () => void;
-  /** Ventes envoyées par la boutique mais pas comptées (autre devise…). */
+  /** Ventes envoyées par la boutique mais pas comptées ; la raison de chacune est dans les réglages. */
   ventesEcartees?: number;
 }) {
   // Sans aucun fichier ni vente, on n'affiche pas de chiffres : « — ».
@@ -175,8 +175,8 @@ export function TableauDeBord({
           )}
           {ventesEcartees > 0 && (
             <p className="note alerte-note">
-              {ventesEcartees} vente{ventesEcartees > 1 ? 's' : ''} de ta boutique pas comptée{ventesEcartees > 1 ? 's' : ''} ici
-              (autre devise…) : le détail est dans les réglages.
+              {nombre(ventesEcartees, 'vente')} de ta boutique pas {accord(ventesEcartees, 'comptée')} ici : la raison est dans
+              les réglages.
             </p>
           )}
           <p className="note">{PHRASE_GAINS}</p>

@@ -5,6 +5,7 @@ import type { Vente } from '../ventes/modele';
 import {
   CleRefusee,
   DroitsInsuffisants,
+  raisonAutreDevise,
   type Connecteur,
   type MouvementBoutique,
   type Recuperateur,
@@ -85,7 +86,7 @@ export function chargesVersVentes(charges: ChargeStripe[]): { ventes: Vente[]; i
       continue;
     }
     if ((c.currency ?? '').toLowerCase() !== 'eur') {
-      ignorees.push({ numero: c.id, raison: `devise ${c.currency} : seules les ventes en euros sont lues` });
+      ignorees.push({ numero: c.id, raison: raisonAutreDevise(c.currency) });
       continue;
     }
     const solde =

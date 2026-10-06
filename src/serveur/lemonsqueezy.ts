@@ -2,7 +2,7 @@
 // Aucun nom ni e-mail de client n'est gardé.
 
 import type { Vente } from '../ventes/modele';
-import { CleRefusee, DroitsInsuffisants, type Connecteur, type Recuperateur, type VenteIgnoree } from './commun';
+import { CleRefusee, DroitsInsuffisants, raisonAutreDevise, type Connecteur, type Recuperateur, type VenteIgnoree } from './commun';
 
 export { CleRefusee };
 export type { Recuperateur };
@@ -94,7 +94,7 @@ export function commandesVersVentes(commandes: CommandeLemonSqueezy[]): {
       continue;
     }
     if ((a.currency ?? '').toUpperCase() !== 'EUR') {
-      ignorer(`devise ${a.currency ?? 'inconnue'} : seules les ventes en euros sont lues`);
+      ignorer(raisonAutreDevise(a.currency));
       continue;
     }
     const instant = a.created_at ? new Date(a.created_at) : null;
