@@ -39,6 +39,27 @@ const SUR_APPAREIL: Source = { type: 'appareil' };
  */
 const ATTENTE_RESEAU_MS = 2500;
 
+/** Au-delà, la déconnexion n'attend plus Supabase : la session est effacée de l'appareil quand même. */
+const ATTENTE_DECONNEXION_MS = 5000;
+
+/** Efface de l'appareil tout ce que l'appli gardait pour ce compte : copies des business, liste, dernier compte. */
+function oublierToutLeCompte(userId: string | undefined): void {
+  if (userId) {
+    oublierCache(userId);
+    oublierBusiness(userId);
+  }
+  oublierCompte();
+}
+
+/** Sans réseau, Supabase ne peut pas fermer la session et la garde : on l'efface nous-mêmes de l'appareil. */
+function oublierSessionSupabase(): void {
+  try {
+    for (const cle of Object.keys(localStorage)) if (cle.startsWith('sb-')) localStorage.removeItem(cle);
+  } catch {
+    // Rien à faire.
+  }
+}
+
 /** Le business à ouvrir sans réseau, s'il a une copie sur l'appareil ; sinon null. */
 function businessHorsLigne(userId: string): Business | null {
   const memoire = memoireBusiness(userId);
@@ -84,6 +105,9 @@ function AvecCompte({ client }: { client: SupabaseClient }) {
       if (nouvelle) {
         setSession(nouvelle);
       } else if (evenement === 'SIGNED_OUT') {
+        // Aussi quand la déconnexion vient d'ailleurs (« Se déconnecter » sur un autre appareil, session révoquée) :
+        // rien de ce compte ne reste sur cet appareil.
+        oublierToutLeCompte(compteRetenu()?.userId);
         setHorsLigne(null);
         setSession(null);
       }
@@ -129,14 +153,18 @@ function AvecCompte({ client }: { client: SupabaseClient }) {
           // D'abord fermer les écrans du compte : une synchro qui finirait après ne réécrit plus la copie de l'appareil.
           setSortie(true);
           await new Promise((fin) => setTimeout(fin, 0));
-          oublierCache(userId);
-          oublierBusiness(userId);
-          oublierCompte();
-          try {
-            await client.auth.signOut();
-          } finally {
-            setSortie(false);
-          }
+          oublierToutLeCompte(userId);
+          const fermee = await Promise.race([
+            client.auth.signOut().then(
+              ({ error }) => !error,
+              () => false,
+            ),
+            new Promise<boolean>((fin) => setTimeout(() => fin(false), ATTENTE_DECONNEXION_MS)),
+          ]);
+          if (!fermee) oublierSessionSupabase();
+          setHorsLigne(null);
+          setSession(null);
+          setSortie(false);
         },
       }}
     />
@@ -177,9 +205,19 @@ function AvecBusiness({
   // Une seule lecture à la fois : sinon un compte tout neuf recevrait deux « Mon premier business ».
   const lecture = useRef<Promise<Business[]> | null>(null);
 
+  // Faux dès que les écrans du compte sont fermés (déconnexion) : une réponse qui arrive après n'écrit plus rien.
+  const monte = useRef(false);
+  useEffect(() => {
+    monte.current = true;
+    return () => {
+      monte.current = false;
+    };
+  }, []);
+
   /** La liste lue en ligne : affichée, et gardée sur l'appareil pour ouvrir l'appli sans réseau. */
   const garderListe = useCallback(
     (lue: Business[]) => {
+      if (!monte.current) return;
       retenirListe(userId, lue);
       setListe(lue);
     },
@@ -239,6 +277,7 @@ function AvecBusiness({
 
   const choisir = useCallback(
     (id: string) => {
+      if (!monte.current) return;
       retenirBusiness(userId, id);
       setActuelId(id);
     },
