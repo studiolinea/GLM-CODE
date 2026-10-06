@@ -264,7 +264,13 @@ function Cockpit({
       )}
 
       {fenetre.type === 'import' && (
-        <AjoutFichier maintenant={maintenant} exemple={donnees.exemple} onImporter={importer} onFermer={fermer} />
+        <AjoutFichier
+          maintenant={maintenant}
+          exemple={donnees.exemple}
+          enLigne={enLigne}
+          onImporter={importer}
+          onFermer={fermer}
+        />
       )}
 
       {fenetre.type === 'business' && business && (

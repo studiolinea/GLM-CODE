@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { NOMS_RESEAUX, type Reseau, type Video } from '../modele';
 import { dateParis, heureParis, instantParis } from '../temps';
+import { fr } from '../texte';
 import { Feuille } from './Feuille';
 
 function nouvelId(): string {
@@ -30,6 +31,7 @@ export function SaisieVideo({
   const [lien, setLien] = useState(video?.lien ?? '');
   const [vues, setVues] = useState(video?.vues !== undefined ? String(video.vues) : '');
   const [erreur, setErreur] = useState('');
+  const [confirmer, setConfirmer] = useState(false);
 
   const changerDate = (nouvelle: string) => {
     setDate(nouvelle);
@@ -48,7 +50,7 @@ export function SaisieVideo({
     }
     const lienPropre = lien.trim();
     if (lienPropre && !/^https?:\/\/\S+$/i.test(lienPropre)) {
-      return setErreur('Le lien doit commencer par https://');
+      return setErreur('Le lien doit commencer par « https:// ».');
     }
     let nombreVues: number | undefined;
     if (vues.trim() !== '') {
@@ -103,20 +105,34 @@ export function SaisieVideo({
           <span>Vues (facultatif, à compléter plus tard)</span>
           <input id="video-vues" type="text" inputMode="numeric" placeholder="ex. 850" value={vues} onChange={(e) => setVues(e.target.value)} />
         </label>
-        {erreur && <p className="erreur">{erreur}</p>}
-        <div className="pied">
-          {video && onSupprimer && (
-            <button type="button" className="bouton danger" onClick={() => onSupprimer(video.id)}>
-              Supprimer
+        {erreur && <p className="erreur">{fr(erreur)}</p>}
+        {confirmer && video && onSupprimer ? (
+          <div role="alert">
+            <p className="erreur">Supprimer cette vidéo ? Ça ne peut pas être annulé.</p>
+            <div className="pied">
+              <button type="button" className="bouton danger" onClick={() => onSupprimer(video.id)}>
+                Oui, supprimer
+              </button>
+              <button type="button" className="bouton discret" onClick={() => setConfirmer(false)}>
+                Annuler
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="pied">
+            {video && onSupprimer && (
+              <button type="button" className="bouton danger" onClick={() => setConfirmer(true)}>
+                Supprimer
+              </button>
+            )}
+            <button type="button" className="bouton discret" onClick={onFermer}>
+              Annuler
             </button>
-          )}
-          <button type="button" className="bouton discret" onClick={onFermer}>
-            Annuler
-          </button>
-          <button type="submit" className="bouton principal">
-            Enregistrer
-          </button>
-        </div>
+            <button type="submit" className="bouton principal">
+              Enregistrer
+            </button>
+          </div>
+        )}
       </form>
     </Feuille>
   );

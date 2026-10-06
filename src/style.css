@@ -770,11 +770,20 @@ a.bouton {
 }
 /* Bouton qui ouvre le choix d'un fichier : le vrai champ est caché à l'œil, mais atteignable au clavier */
 .choix-fichier {
+  display: inline-flex;
+  align-items: center;
   cursor: pointer;
 }
 .choix-fichier:has(input:focus-visible) {
   outline: 2px solid var(--ambre);
   outline-offset: 2px;
+}
+/* « Fichier de ventes » : le grand bouton pour choisir le fichier, puis le bilan */
+.fichier-ventes {
+  margin: 2px 0 14px;
+}
+.bilan-fichier {
+  margin-top: 4px;
 }
 /* Pied de page : conditions et confidentialité */
 .liens-legaux {

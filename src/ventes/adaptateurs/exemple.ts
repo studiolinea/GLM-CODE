@@ -10,7 +10,7 @@ const NON = new Set(['non', 'n', 'no', 'false', 'faux', '0', '']);
 
 export const adaptateurExemple: Adaptateur = {
   plateforme: 'exemple',
-  nom: "Format d'exemple",
+  nom: 'Format d’exemple',
 
   reconnait(entetes) {
     const colonnes = new Set(entetes.map((e) => e.toLowerCase()));
