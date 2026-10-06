@@ -65,6 +65,7 @@ export function Reglages({
           id="objectif-par-jour"
           type="number"
           inputMode="numeric"
+          autoComplete="off"
           min={0}
           max={20}
           value={objectif}
