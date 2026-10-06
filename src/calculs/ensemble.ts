@@ -2,7 +2,7 @@
 // Même règle que partout : un chiffre qu'on ne connaît pas n'est jamais deviné.
 
 import type { Video } from '../modele';
-import { dateParis } from '../temps';
+import { dateParis, quandParis } from '../temps';
 import { cleVente, type Vente } from '../ventes/modele';
 import { bornesPeriode, calculerResume, type Periode, type Resume } from './resume';
 
@@ -13,6 +13,16 @@ export interface DonneesBusiness {
   videos: Video[];
   /** Jusqu'à quand les ventes sont lues ; null si aucune vente n'a encore été lue (boutique pas reliée). */
   couverture?: string | null;
+  /** Ce qui est relié à ce business (absent si on ne le sait pas). */
+  relies?: {
+    boutique: boolean;
+    /** Un réseau (TikTok, Instagram) est relié. */
+    reseau: boolean;
+    /** La plus récente des actualisations réussies de ses comptes reliés, ISO UTC ; null si aucune. */
+    derniereSynchro: string | null;
+  };
+  /** Faux tant que ce business n'a jamais commencé avec de vraies données : son écran montre alors l'exemple. */
+  exempleTermine?: boolean;
 }
 
 export interface LigneEnsemble {
@@ -25,6 +35,24 @@ export interface LigneEnsemble {
   vide: boolean;
   /** Vrai si aucune vente n'a encore été lue (boutique pas reliée) : ses ventes sont inconnues, pas « 0 € ». */
   ventesInconnues: boolean;
+  /** « à jour le 06/10 à 14h05 » : la dernière actualisation de ses comptes reliés ; null si rien n'est relié. */
+  aJour: string | null;
+  /** Pour un business vide : ce qu'il en est vraiment (boutique reliée sans vente, rien de relié, exemple). */
+  etatVide: string | null;
+}
+
+/** Ce qu'on dit d'un business sans aucune vente ni vidéo, selon ce qui y est relié. */
+function etatVide(b: DonneesBusiness): string {
+  if (b.relies?.boutique) return 'Boutique reliée, aucune vente pour l’instant.';
+  if (b.exempleTermine === false && !b.couverture) return 'Données d’exemple seulement.';
+  if (!b.relies) return 'Pas encore de données : relie sa boutique et ses comptes.';
+  if (b.relies.reseau) return 'Aucune vidéo pour l’instant, et sa boutique n’est pas reliée.';
+  return 'Rien de relié pour l’instant : relie sa boutique et ses comptes.';
+}
+
+function aJour(b: DonneesBusiness): string | null {
+  if (!b.relies || (!b.relies.boutique && !b.relies.reseau)) return null;
+  return b.relies.derniereSynchro ? `à jour le ${quandParis(new Date(b.relies.derniereSynchro))}` : 'pas encore actualisé';
 }
 
 export interface TotalEnsemble {
@@ -57,13 +85,16 @@ export function calculerEnsemble(business: DonneesBusiness[], periode: Periode, 
       const date = dateParis(new Date(v.instant));
       return date >= debut && date <= fin;
     }).length;
+    const vide = b.ventes.length === 0 && b.videos.length === 0;
     return {
       id: b.id,
       nom: b.nom,
       resume,
       videos,
-      vide: b.ventes.length === 0 && b.videos.length === 0,
+      vide,
       ventesInconnues: b.ventes.length === 0 && b.couverture === null,
+      aJour: aJour(b),
+      etatVide: vide ? etatVide(b) : null,
     };
   });
 

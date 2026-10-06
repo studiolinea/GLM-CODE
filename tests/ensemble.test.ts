@@ -79,3 +79,55 @@ describe('vue d’ensemble de tous les business', () => {
     expect(e.total).toMatchObject({ ventesCentimes: 0, commandes: 0, gainsCentimes: 0, tvaCentimes: null });
   });
 });
+
+describe('vue d’ensemble : l’état réel de chaque business', () => {
+  const rien = { boutique: false, reseau: false, derniereSynchro: null };
+  const etat = (b: DonneesBusiness) => calculerEnsemble([b], '7j', maintenant).lignes[0]!;
+
+  it('boutique reliée mais aucune vente : on le dit, avec l’heure de la dernière actualisation (Paris)', () => {
+    const l = etat(
+      business('a', 'Kit', {
+        couverture: '2026-10-06T07:30:00Z',
+        exempleTermine: true,
+        relies: { boutique: true, reseau: false, derniereSynchro: '2026-10-06T07:30:00Z' },
+      }),
+    );
+    expect(l.etatVide).toBe('Boutique reliée, aucune vente pour l’instant.');
+    expect(l.aJour).toBe('à jour le 06/10 à 09h30');
+  });
+
+  it('rien de relié : on invite à relier, sans « à jour »', () => {
+    const l = etat(business('a', 'Tout neuf', { couverture: null, exempleTermine: true, relies: rien }));
+    expect(l.etatVide).toBe('Rien de relié pour l’instant : relie sa boutique et ses comptes.');
+    expect(l.aJour).toBeNull();
+  });
+
+  it('jamais commencé (son écran montre l’exemple) : « Données d’exemple seulement. »', () => {
+    const l = etat(business('a', 'Mon premier business', { couverture: null, exempleTermine: false, relies: rien }));
+    expect(l.etatVide).toBe('Données d’exemple seulement.');
+  });
+
+  it('seulement TikTok relié, sans vidéo : sa boutique n’est pas reliée', () => {
+    const l = etat(
+      business('a', 'Kit', { couverture: null, exempleTermine: true, relies: { boutique: false, reseau: true, derniereSynchro: null } }),
+    );
+    expect(l.etatVide).toBe('Aucune vidéo pour l’instant, et sa boutique n’est pas reliée.');
+    expect(l.aJour).toBe('pas encore actualisé');
+  });
+
+  it('un business avec des ventes n’a pas de phrase « vide », mais garde son « à jour »', () => {
+    const l = etat(
+      business('a', 'Guide', {
+        ventes: [vente('1', '2026-10-05T10:00:00Z')],
+        couverture: '2026-10-05T12:00:00Z',
+        relies: { boutique: true, reseau: true, derniereSynchro: '2026-10-05T12:00:00Z' },
+      }),
+    );
+    expect(l.etatVide).toBeNull();
+    expect(l.aJour).toBe('à jour le 05/10 à 14h00');
+  });
+
+  it('sans savoir ce qui est relié, on ne dit rien de faux', () => {
+    expect(etat(business('a', 'Inconnu')).etatVide).toBe('Pas encore de données : relie sa boutique et ses comptes.');
+  });
+});

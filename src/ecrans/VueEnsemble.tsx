@@ -117,8 +117,9 @@ export function VueEnsemble({
                   <span className="ligne-business-nom">{l.nom}</span>
                   {l.id === actuelId && <span className="puce puce-on">Ouvert</span>}
                 </div>
+                {l.aJour && <p className="note ligne-business-etat">{l.aJour}</p>}
                 {l.vide ? (
-                  <p className="texte-doux">Pas encore de données : relie sa boutique et ses comptes.</p>
+                  <p className="texte-doux">{fr(l.etatVide ?? 'Pas encore de données.')}</p>
                 ) : (
                   <div className="chiffres-ensemble">
                     <Chiffre nom="Ventes" valeur={l.ventesInconnues ? '—' : euros(l.resume.ventesCentimes)} />
