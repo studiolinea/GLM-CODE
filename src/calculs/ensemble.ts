@@ -63,6 +63,8 @@ export interface TotalEnsemble {
   gainsCentimes: number | null;
   /** Les business dont les gains sont inconnus. */
   businessSansGains: string[];
+  /** Vrai si aucun business n'a de vente lue : ventes, commandes et gains du total sont inconnus (« — »). */
+  ventesInconnues: boolean;
   /** TVA retenue par les boutiques ; null si aucun business n'en donne. */
   tvaCentimes: number | null;
   remboursementsCentimes: number;
@@ -76,6 +78,9 @@ export interface Ensemble {
   lignes: LigneEnsemble[];
   total: TotalEnsemble;
 }
+
+/** Stripe et Lemon Squeezy : l'identifiant d'un paiement est unique entre tous les comptes. */
+const NUMEROS_UNIQUES = /^(stripe|lemonsqueezy)(-test)?$/;
 
 export function calculerEnsemble(business: DonneesBusiness[], periode: Periode, maintenant: Date): Ensemble {
   const { debut, fin } = bornesPeriode(periode, dateParis(maintenant));
@@ -99,7 +104,10 @@ export function calculerEnsemble(business: DonneesBusiness[], periode: Periode, 
   });
 
   // Un même compte (Stripe, TikTok) peut être relié dans deux business : chaque vente et chaque vidéo ne compte qu'une fois.
-  const ventesUniques = [...new Map(business.flatMap((b) => b.ventes).map((v) => [cleVente(v), v])).values()];
+  // Seulement pour les boutiques dont les numéros sont uniques partout : ceux d'un fichier de ventes repartent de 1 dans
+  // chaque business, et deux ventes différentes y portent le même numéro.
+  const cle = (b: DonneesBusiness, v: Vente) => (NUMEROS_UNIQUES.test(v.plateforme) ? cleVente(v) : `${b.id}|${cleVente(v)}`);
+  const ventesUniques = [...new Map(business.flatMap((b) => b.ventes.map((v) => [cle(b, v), v] as const))).values()];
   const videosUniques = new Set(
     business.flatMap((b) => b.videos).filter((v) => {
       const date = dateParis(new Date(v.instant));
@@ -109,6 +117,8 @@ export function calculerEnsemble(business: DonneesBusiness[], periode: Periode, 
   const tout = calculerResume(ventesUniques, periode, maintenant);
 
   const sansGains = lignes.filter((l) => l.resume.gainsCentimes === null);
+  // Aucune vente lue nulle part : le total des ventes est inconnu, pas « 0 € ».
+  const ventesInconnues = lignes.every((l) => l.ventesInconnues);
   return {
     periode,
     debut,
@@ -120,6 +130,7 @@ export function calculerEnsemble(business: DonneesBusiness[], periode: Periode, 
       fraisCentimes: tout.fraisCentimes,
       gainsCentimes: tout.gainsCentimes,
       businessSansGains: sansGains.map((l) => l.nom),
+      ventesInconnues,
       tvaCentimes: tout.tvaCentimes,
       remboursementsCentimes: tout.remboursementsCentimes,
       videos: videosUniques.size,

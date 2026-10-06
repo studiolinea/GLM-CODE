@@ -89,6 +89,8 @@ async function utilisateurConnecte(ctx: Pick<Contexte, 'env' | 'jeton' | 'recupe
   const reponse = await ctx.recuperer(`${ctx.env.SUPABASE_URL}/auth/v1/user`, {
     headers: { apikey: ctx.env.SUPABASE_CLE_PUBLIQUE, Authorization: `Bearer ${ctx.jeton}` },
   });
+  // Supabase en panne ou surchargé : ce n'est pas la connexion de la personne qui a expiré.
+  if (reponse.status >= 500 || reponse.status === 429) throw new Error(`Supabase Auth a répondu ${reponse.status}`);
   if (!reponse.ok) return null;
   const utilisateur = (await reponse.json()) as { id?: string };
   return utilisateur.id ?? null;
@@ -117,7 +119,13 @@ export async function traiterApi(requete: Request, env: Env, recuperer: Recupera
     }
     const secret = env.CLE_CHIFFREMENT;
     const jeton = (requete.headers.get('Authorization') ?? '').replace(/^Bearer\s+/i, '').trim();
-    const userId = jeton ? await utilisateurConnecte({ env, jeton, recuperer }) : null;
+    let userId: string | null = null;
+    try {
+      userId = jeton ? await utilisateurConnecte({ env, jeton, recuperer }) : null;
+    } catch (e) {
+      console.error('Vérification de la connexion impossible', e);
+      return json(503, { erreur: 'La vérification de ta connexion ne répond pas. Réessaie dans un moment.' });
+    }
     if (!userId) return json(401, { erreur: 'Connecte-toi d’abord.' });
 
     const tiktok = /^\/api\/comptes\/tiktok\/(connexion|relier|synchroniser)$/.exec(adresse.pathname);

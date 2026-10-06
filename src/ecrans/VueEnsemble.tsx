@@ -44,6 +44,7 @@ export function VueEnsemble({
   const ensemble = useMemo(() => (donnees ? calculerEnsemble(donnees, periode, maintenant) : null), [donnees, periode, maintenant]);
   const euros = (centimes: number | null) => (centimes === null ? '—' : formatEuros(centimes));
   const sansVentes = ensemble ? ensemble.lignes.filter((l) => l.ventesInconnues && !l.vide).map((l) => l.nom) : [];
+  const inconnues = ensemble?.total.ventesInconnues ?? false;
   const liste = (noms: string[]) => noms.map((n) => `« ${n} »`).join(', ');
 
   return (
@@ -79,12 +80,15 @@ export function VueEnsemble({
           <section className="total-ensemble" aria-label="Total de tous tes business">
             <div className="etiquette">Total · {PERIODES[periode].libelle}</div>
             <div className="chiffres-ensemble">
-              <Chiffre nom="Ventes" valeur={euros(ensemble.total.ventesCentimes)} />
-              <Chiffre nom="Commandes" valeur={String(ensemble.total.commandes)} />
-              <Chiffre nom="Gains réels" valeur={euros(ensemble.total.gainsCentimes)} gains />
+              <Chiffre nom="Ventes" valeur={inconnues ? '—' : euros(ensemble.total.ventesCentimes)} />
+              <Chiffre nom="Commandes" valeur={inconnues ? '—' : String(ensemble.total.commandes)} />
+              <Chiffre nom="Gains réels" valeur={inconnues ? '—' : euros(ensemble.total.gainsCentimes)} gains />
               <Chiffre nom="Vidéos" valeur={String(ensemble.total.videos)} />
             </div>
-            {sansVentes.length > 0 && (
+            {inconnues && (
+              <p className="note">Aucune vente lue pour l’instant : relie la boutique de tes business pour voir leurs ventes ici.</p>
+            )}
+            {!inconnues && sansVentes.length > 0 && (
               <p className="note alerte-note">
                 {fr(
                   sansVentes.length === 1

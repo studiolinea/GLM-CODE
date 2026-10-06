@@ -48,7 +48,7 @@ describe('commandes Lemon Squeezy → ventes', () => {
     expect(ventes).toEqual([
       {
         plateforme: 'lemonsqueezy',
-        numeroCommande: '101',
+        numeroCommande: '1',
         instant: '2026-10-05T08:15:00.000Z',
         montantCentimes: 1990,
         fraisCentimes: null,
@@ -65,9 +65,9 @@ describe('commandes Lemon Squeezy → ventes', () => {
       commande('4', { order_number: 104, currency: 'EUR', total: 1990, status: 'paid', created_at: '2026-10-04T12:00:00Z', test_mode: true }),
     ]);
     expect(ventes.map((v) => [v.numeroCommande, v.montantCentimes, v.rembourse, v.plateforme])).toEqual([
-      ['102', 1990, true, 'lemonsqueezy'],
-      ['103', 1990, false, 'lemonsqueezy'],
-      ['104', 1990, false, 'lemonsqueezy-test'],
+      ['2', 1990, true, 'lemonsqueezy'],
+      ['3', 1990, false, 'lemonsqueezy'],
+      ['4', 1990, false, 'lemonsqueezy-test'],
     ]);
   });
 
@@ -77,8 +77,19 @@ describe('commandes Lemon Squeezy → ventes', () => {
       commande('6', { order_number: 106, currency: 'USD', total: 1990, status: 'paid', created_at: '2026-10-04T12:00:00Z' }),
     ]);
     expect(ventes).toEqual([]);
-    expect(ignorees.map((i) => i.numero)).toEqual(['105', '106']);
+    expect(ignorees.map((i) => i.numero)).toEqual(['5', '6']);
     expect(ignorees[1]!.raison).toContain('euros');
+  });
+
+  it('deux boutiques avec la même commande n°1 : deux ventes, et leur numéro ne change pas quand une boutique s’ajoute', () => {
+    const premiere = commande('1001', { store_id: 1, order_number: 1, currency: 'EUR', total: 1990, status: 'paid', created_at: '2026-10-04T12:00:00Z' });
+    const avant = commandesVersVentes([premiere]).ventes.map((v) => v.numeroCommande);
+    const apres = commandesVersVentes([
+      premiere,
+      commande('2002', { store_id: 2, order_number: 1, currency: 'EUR', total: 4900, status: 'paid', created_at: '2026-10-05T12:00:00Z' }),
+    ]).ventes.map((v) => v.numeroCommande);
+    expect(avant).toEqual(['1001']);
+    expect(apres).toEqual(['1001', '2002']);
   });
 });
 
@@ -143,6 +154,13 @@ describe('serveur : comptes reliés Lemon Squeezy', () => {
     expect(r.status).toBe(401);
   });
 
+  it.each([500, 503, 429])('Supabase Auth en panne (%i) : « réessaie », pas « connexion expirée »', async (statut) => {
+    const recuperer = (async () => new Response('{}', { status: statut })) as typeof fetch;
+    const r = await traiterApi(appel('/api/comptes/lemonsqueezy/synchroniser'), env, recuperer);
+    expect(r.status).toBe(503);
+    expect(((await r.json()) as { erreur: string }).erreur).toContain('Réessaie dans un moment');
+  });
+
   it('chaque compte relié appartient à un business : sans business, rien n’est fait', async () => {
     const f = faux();
     const r = await traiterApi(appel('/api/comptes/lemonsqueezy/relier', { cle: CLE_LS, business: 'pas-un-business' }), env, f.recuperer);
@@ -188,7 +206,7 @@ describe('serveur : comptes reliés Lemon Squeezy', () => {
     const r = await traiterApi(appel('/api/comptes/lemonsqueezy/synchroniser'), env, f.recuperer);
     expect(r.status).toBe(200);
     const corps = (await r.json()) as { ventes: { numeroCommande: string }[]; synchroniseLe: string };
-    expect(corps.ventes.map((v) => v.numeroCommande)).toEqual(['101', '102']);
+    expect(corps.ventes.map((v) => v.numeroCommande)).toEqual(['1', '2']);
     expect(f.ligne.derniere_synchro).toBe(corps.synchroniseLe);
     expect(f.ligne.derniere_erreur).toBeNull();
   });

@@ -53,6 +53,7 @@ describe('vue d’ensemble de tous les business', () => {
       fraisCentimes: 212,
       gainsCentimes: 6758,
       businessSansGains: [],
+      ventesInconnues: false,
       tvaCentimes: 109,
       remboursementsCentimes: 0,
       videos: 2,
@@ -71,6 +72,45 @@ describe('vue d’ensemble de tous les business', () => {
     expect(e.total.gainsCentimes).toBeNull();
     expect(e.total.businessSansGains).toEqual(['Sans frais']);
     expect(e.total.ventesCentimes).toBe(3980);
+  });
+
+  it('le même paiement Stripe relié dans deux business ne compte qu’une fois', () => {
+    const e = calculerEnsemble(
+      [
+        business('a', 'A', { ventes: [vente('ch_1', '2026-10-05T10:00:00Z')] }),
+        business('b', 'B', { ventes: [vente('ch_1', '2026-10-05T10:00:00Z')] }),
+      ],
+      '7j',
+      maintenant,
+    );
+    expect(e.total).toMatchObject({ ventesCentimes: 1990, commandes: 1 });
+  });
+
+  it('deux ventes de fichier avec le même numéro dans deux business sont deux ventes différentes', () => {
+    const e = calculerEnsemble(
+      [
+        business('a', 'A', { ventes: [vente('1', '2026-10-05T10:00:00Z', { plateforme: 'exemple' })] }),
+        business('b', 'B', { ventes: [vente('1', '2026-10-05T11:00:00Z', { plateforme: 'exemple', montantCentimes: 4900 })] }),
+      ],
+      '7j',
+      maintenant,
+    );
+    expect(e.total).toMatchObject({ ventesCentimes: 6890, commandes: 2 });
+  });
+
+  it('aucune vente lue nulle part : le total des ventes est inconnu, pas « 0 € »', () => {
+    const e = calculerEnsemble(
+      [business('a', 'Mon premier business', { couverture: null }), business('b', 'Tout neuf', { couverture: null })],
+      '7j',
+      maintenant,
+    );
+    expect(e.total.ventesInconnues).toBe(true);
+    const avecUneVente = calculerEnsemble(
+      [business('a', 'Guide', { ventes: [vente('1', '2026-10-05T10:00:00Z')] }), business('b', 'Tout neuf', { couverture: null })],
+      '7j',
+      maintenant,
+    );
+    expect(avecUneVente.total.ventesInconnues).toBe(false);
   });
 
   it('un business vide est signalé, et compte pour 0 vente', () => {

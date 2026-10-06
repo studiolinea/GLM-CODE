@@ -82,13 +82,11 @@ export function commandesVersVentes(commandes: CommandeLemonSqueezy[]): {
 } {
   const ventes: Vente[] = [];
   const ignorees: CommandeIgnoree[] = [];
-  // Une clé peut ouvrir plusieurs boutiques, et chacune numérote ses commandes à partir de 1 :
-  // dans ce cas, le numéro garde aussi la boutique, sinon une commande en écraserait une autre.
-  const plusieursBoutiques = new Set(commandes.map((c) => c.attributes?.store_id).filter((s) => s !== undefined)).size > 1;
   for (const c of commandes) {
     const a = c.attributes ?? {};
-    const numero =
-      plusieursBoutiques && a.store_id !== undefined ? `${a.store_id}-${a.order_number ?? c.id}` : String(a.order_number ?? c.id);
+    // L'identifiant de la commande, unique entre toutes les boutiques et qui ne change jamais. Le numéro affiché
+    // (order_number) repart de 1 dans chaque boutique : une commande en écraserait une autre.
+    const numero = String(c.id);
     const ignorer = (raison: string) => ignorees.push({ numero, raison });
 
     if (a.status !== 'paid' && a.status !== 'refunded' && a.status !== 'partial_refund') {
