@@ -273,7 +273,14 @@ function Cockpit({
               </button>
             )
           )}
-          <button className="bouton discret icone-seule bandeau-fermer" onClick={() => { curseurSurEcran(); effacerRouges(); }} aria-label="Fermer le message">
+          <button
+            className="bouton discret icone-seule bandeau-fermer"
+            onClick={() => {
+              curseurSurEcran();
+              effacerRouges();
+            }}
+            aria-label="Fermer le message"
+          >
             <IconeCroix />
           </button>
         </div>
@@ -283,7 +290,10 @@ function Cockpit({
           <span className="bandeau-texte">{fr(succesTikTok)}</span>
           <button
             className="bouton discret icone-seule bandeau-fermer"
-            onClick={boutique.effacerMessageTikTok}
+            onClick={() => {
+              curseurSurEcran();
+              boutique.effacerMessageTikTok();
+            }}
             aria-label="Fermer le message"
           >
             <IconeCroix />
@@ -293,7 +303,14 @@ function Cockpit({
       {business?.annonce && (
         <div className="bandeau-info" role="status">
           <span className="bandeau-texte">{fr(business.annonce)}</span>
-          <button className="bouton discret icone-seule bandeau-fermer" onClick={business.effacerAnnonce} aria-label="Fermer le message">
+          <button
+            className="bouton discret icone-seule bandeau-fermer"
+            onClick={() => {
+              curseurSurEcran();
+              business.effacerAnnonce();
+            }}
+            aria-label="Fermer le message"
+          >
             <IconeCroix />
           </button>
         </div>
