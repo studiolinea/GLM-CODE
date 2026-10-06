@@ -44,20 +44,20 @@ describe('Alerte A : « Tu n’as pas publié aujourd’hui »', () => {
     expect(a).toMatchObject({
       id: 'publication-2026-10-05',
       titre: 'Tu n’as pas publié aujourd’hui',
-      dapres: 'D’après : Aucune vidéo notée pour l’instant. Ton objectif : 1 par jour.',
+      dapres: 'D’après : aucune vidéo notée pour l’instant. Ton objectif : 1 par jour.',
       action: { cible: 'saisie-video', libelle: 'J’ai publié' },
     });
   });
 
   it('dernière vidéo il y a 3 jours', () => {
     const [a] = parType(contexte({ videos: [video('v1', '2026-10-02T10:00:00Z')] }), 'publication');
-    expect(a?.dapres).toBe('D’après : Ton dernier post date de 3 jours. Ton objectif : 1 par jour.');
+    expect(a?.dapres).toBe('D’après : ta dernière vidéo remonte à 3 jours. Ton objectif : 1 par jour.');
   });
 
   it('dernière vidéo hier soir, en heure de Paris', () => {
     // 4 octobre, 23 h 30 à Paris.
     const [a] = parType(contexte({ videos: [video('v1', '2026-10-04T21:30:00Z')] }), 'publication');
-    expect(a?.dapres).toContain('Ton dernier post date d’hier.');
+    expect(a?.dapres).toContain('ta dernière vidéo date d’hier.');
   });
 
   it('pas d’alerte si l’objectif du jour est atteint', () => {
@@ -67,7 +67,7 @@ describe('Alerte A : « Tu n’as pas publié aujourd’hui »', () => {
   it('objectif de 2 par jour avec 1 vidéo publiée', () => {
     const [a] = parType(contexte({ reglages: { objectifParJour: 2 }, videos: [video('v1', ilYA(2))] }), 'publication');
     expect(a?.titre).toBe('Encore 1 vidéo pour ton objectif du jour');
-    expect(a?.dapres).toBe('D’après : Tu as publié 1 vidéo aujourd’hui. Ton objectif : 2 par jour.');
+    expect(a?.dapres).toBe('D’après : tu as publié 1 vidéo aujourd’hui. Ton objectif : 2 par jour.');
   });
 
   it('objectif à 0 : pas de rappel', () => {
@@ -102,6 +102,7 @@ describe('Alerte B : ce qu’a donné chaque vidéo', () => {
     const [a] = parType(contexte({ videos: [video('v1', ilYA(60))], couverture: ilYA(20) }), 'video');
     expect(a?.id).toBe('video-v1-tot');
     expect(a?.dapres).toContain('il manque la fin des 48 h');
+    expect(a?.dapres).toMatch(/^D’après : ventes chargées jusqu’au /);
   });
 
   it('compte la vente au début de la fenêtre, pas celle pile à la fin', () => {
@@ -217,15 +218,32 @@ describe('avec la base en ligne : tout arrive des comptes reliés, rien à noter
   it('pas publié aujourd’hui : « Actualiser » si TikTok est relié, sinon « Relier TikTok »', () => {
     const [avec] = parType(contexte({ comptes: relie }), 'publication');
     expect(avec).toMatchObject({
-      dapres: 'D’après : Aucune vidéo pour l’instant. Ton objectif : 1 par jour.',
+      dapres: 'D’après : aucune vidéo pour l’instant. Ton objectif : 1 par jour.',
       action: { cible: 'actualiser', libelle: 'Actualiser' },
     });
     const [sans] = parType(contexte({ comptes: { boutique: true, videos: false } }), 'publication');
     expect(sans?.action).toEqual({ cible: 'comptes', libelle: 'Relier TikTok' });
   });
 
-  it('une vidéo sans lien ne se complète plus à la main quand TikTok est relié', () => {
+  it('une vidéo TikTok sans lien, TikTok relié : pas de bouton (elle se met à jour toute seule)', () => {
     const [a] = parType(contexte({ comptes: relie, videos: [video('v1', ilYA(2))] }), 'video');
-    expect(a?.action).toEqual({ cible: 'actualiser', libelle: 'Actualiser' });
+    expect(a).toBeDefined();
+    expect(a?.action).toBeUndefined();
+  });
+
+  it('une vidéo Instagram sans lien se complète à la main, même avec TikTok relié', () => {
+    const [a] = parType(contexte({ comptes: relie, videos: [video('v1', ilYA(2), { reseau: 'instagram' })] }), 'video');
+    expect(a?.action).toEqual({ cible: 'modifier-video', libelle: 'Compléter la vidéo', videoId: 'v1' });
+  });
+
+  it('une vidéo avec son lien garde « Voir la vidéo »', () => {
+    const v = video('v1', ilYA(2), { lien: 'https://www.tiktok.com/@kevin/video/9' });
+    const [a] = parType(contexte({ comptes: relie, videos: [v] }), 'video');
+    expect(a?.action).toEqual({ cible: 'lien', libelle: 'Voir la vidéo', url: 'https://www.tiktok.com/@kevin/video/9' });
+  });
+
+  it('pas encore de vente chargée : le constat commence par une minuscule', () => {
+    const [a] = parType(contexte({ couverture: null, comptes: relie, videos: [video('v1', ilYA(60))] }), 'video');
+    expect(a?.dapres).toMatch(/^D’après : aucune vente chargée, il manque la fin des 48 h/);
   });
 });

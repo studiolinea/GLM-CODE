@@ -10,7 +10,7 @@ const NON = new Set(['non', 'n', 'no', 'false', 'faux', '0', '']);
 
 export const adaptateurExemple: Adaptateur = {
   plateforme: 'exemple',
-  nom: "Format d'exemple",
+  nom: 'Format d’exemple',
 
   reconnait(entetes) {
     const colonnes = new Set(entetes.map((e) => e.toLowerCase()));
@@ -24,21 +24,21 @@ export const adaptateurExemple: Adaptateur = {
     if (!numeroCommande) return 'numéro de commande manquant';
 
     const instant = lireDateHeure(champ('date'));
-    if (!instant) return `date illisible (« ${champ('date')} »)`;
+    if (!instant) return `date illisible (« ${champ('date')} »)`;
 
     const montantCentimes = lireMontant(champ('montant'));
-    if (montantCentimes === null || montantCentimes < 0) return `montant illisible (« ${champ('montant')} »)`;
+    if (montantCentimes === null || montantCentimes < 0) return `montant illisible (« ${champ('montant')} »)`;
 
     let fraisCentimes: number | null = null;
     if (champ('frais') !== '') {
       const frais = lireMontant(champ('frais'));
-      if (frais === null) return `frais illisibles (« ${champ('frais')} »)`;
+      if (frais === null) return `frais illisibles (« ${champ('frais')} »)`;
       fraisCentimes = Math.abs(frais);
     }
 
     const rembourseTexte = champ('rembourse').toLowerCase();
     if (!OUI.has(rembourseTexte) && !NON.has(rembourseTexte)) {
-      return `colonne « rembourse » illisible (« ${champ('rembourse')} »)`;
+      return `colonne « rembourse » illisible (« ${champ('rembourse')} »)`;
     }
 
     return {

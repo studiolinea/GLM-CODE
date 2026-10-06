@@ -26,18 +26,20 @@ export function Jauge({ valeur, max }: { valeur: number; max: number }) {
   const pas = max <= 14 ? 1 : max / 4;
   const crans: number[] = [];
   for (let v = 0; v <= max + 1e-9; v += pas) crans.push(v);
-  const [ax, ay] = point(angle(valeur), 62);
+  // Aiguille courte : elle reste au-dessus du chiffre, même à zéro.
+  const [ax, ay] = point(angle(valeur), 40);
+  const atteint = max > 0 && valeur >= max;
 
   return (
     <svg
       className="jauge"
-      viewBox="0 0 200 175"
+      viewBox="0 0 200 178"
       role="img"
       aria-label={`${valeur} vidéo${valeur > 1 ? 's' : ''} publiée${valeur > 1 ? 's' : ''} sur ${max} visées ces 7 derniers jours`}
     >
       <path className="jauge-fond" d={arc(DEBUT, DEBUT - BALAYAGE)} fill="none" strokeWidth="10" strokeLinecap="round" />
       {valeur > 0 && (
-        <path className="jauge-valeur" d={arc(DEBUT, angle(valeur))} fill="none" strokeWidth="10" strokeLinecap="round" />
+        <path className={`jauge-valeur${atteint ? ' atteint' : ''}`} d={arc(DEBUT, angle(valeur))} fill="none" strokeWidth="10" strokeLinecap="round" />
       )}
       <g className="jauge-cran" strokeWidth="2" fill="none">
         {crans.map((v) => {
@@ -59,10 +61,10 @@ export function Jauge({ valeur, max }: { valeur: number; max: number }) {
         style={{ '--depart': `${angle(valeur) - DEBUT}deg` } as CSSProperties}
       />
       <circle className="jauge-moyeu" cx={CX} cy={CY} r="7" strokeWidth="2" />
-      <text className="jauge-grand" x={CX} y="134" textAnchor="middle">
+      <text className="jauge-grand" x={CX} y="152" textAnchor="middle">
         {valeur}/{max}
       </text>
-      <text className="jauge-petit" x={CX} y="150" textAnchor="middle">
+      <text className="jauge-petit" x={CX} y="168" textAnchor="middle">
         VIDÉOS · 7 JOURS
       </text>
     </svg>

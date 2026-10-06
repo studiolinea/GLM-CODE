@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, type ReactNode } from 'react';
+import { IconeCroix } from './Icones';
 
 /** Fenêtre qui monte du bas sur téléphone, centrée sur ordinateur. Croix, Échap ou clic à côté pour fermer. */
 export function Feuille({ titre, onFermer, children }: { titre: string; onFermer: () => void; children: ReactNode }) {
@@ -15,7 +16,7 @@ export function Feuille({ titre, onFermer, children }: { titre: string; onFermer
     document.addEventListener('keydown', surTouche);
     // Avec une souris, on se place sur le premier champ. Sur téléphone, non : le clavier monterait tout seul.
     const souris = typeof window.matchMedia === 'function' && window.matchMedia('(pointer: fine)').matches;
-    const premier = souris ? ref.current?.querySelector<HTMLElement>('input, button:not(.fermer-feuille)') : null;
+    const premier = souris ? ref.current?.querySelector<HTMLElement>('input:not([disabled]), button:not(.fermer-feuille):not([disabled])') : null;
     (premier ?? ref.current)?.focus();
     return () => document.removeEventListener('keydown', surTouche);
   }, []);
@@ -26,7 +27,7 @@ export function Feuille({ titre, onFermer, children }: { titre: string; onFermer
         <div className="feuille-tete">
           <h2 id={idTitre}>{titre}</h2>
           <button type="button" className="fermer-feuille" aria-label="Fermer la fenêtre" onClick={onFermer}>
-            ✕
+            <IconeCroix />
           </button>
         </div>
         {children}

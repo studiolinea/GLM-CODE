@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { formatEuros } from '../argent';
 import { calculerEnsemble, type DonneesBusiness } from '../calculs/ensemble';
 import { PERIODES, type Periode } from '../calculs/resume';
+import { fr, PHRASE_GAINS } from '../texte';
 import { Feuille } from './Feuille';
 
 const COURTS: Record<Periode, string> = { '7j': '7 J', '1m': '1 M', '3m': '3 M' };
@@ -11,18 +12,21 @@ export function VueEnsemble({
   charger,
   actuelId,
   maintenant,
+  periodeInitiale = '7j',
   onOuvrir,
   onFermer,
 }: {
   charger: () => Promise<DonneesBusiness[]>;
   actuelId: string;
   maintenant: Date;
+  /** La période du tableau de bord : la vue d'ensemble s'ouvre sur la même. */
+  periodeInitiale?: Periode;
   onOuvrir: (id: string) => void;
   onFermer: () => void;
 }) {
   const [donnees, setDonnees] = useState<DonneesBusiness[] | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
-  const [periode, setPeriode] = useState<Periode>('7j');
+  const [periode, setPeriode] = useState<Periode>(periodeInitiale);
 
   const lire = useCallback(async () => {
     setErreur(null);
@@ -39,6 +43,8 @@ export function VueEnsemble({
 
   const ensemble = useMemo(() => (donnees ? calculerEnsemble(donnees, periode, maintenant) : null), [donnees, periode, maintenant]);
   const euros = (centimes: number | null) => (centimes === null ? '—' : formatEuros(centimes));
+  const sansVentes = ensemble ? ensemble.lignes.filter((l) => l.ventesInconnues && !l.vide).map((l) => l.nom) : [];
+  const liste = (noms: string[]) => noms.map((n) => `« ${n} »`).join(', ');
 
   return (
     <Feuille titre="Vue d’ensemble" onFermer={onFermer}>
@@ -60,7 +66,7 @@ export function VueEnsemble({
 
       {erreur && (
         <>
-          <p className="erreur">{erreur}</p>
+          <p className="erreur">{fr(erreur)}</p>
           <button type="button" className="bouton" onClick={() => void lire()}>
             Réessayer
           </button>
@@ -78,29 +84,29 @@ export function VueEnsemble({
               <Chiffre nom="Gains réels" valeur={euros(ensemble.total.gainsCentimes)} gains />
               <Chiffre nom="Vidéos" valeur={String(ensemble.total.videos)} />
             </div>
-            {ensemble.lignes.some((l) => l.ventesInconnues && !l.vide) && (
+            {sansVentes.length > 0 && (
               <p className="note alerte-note">
-                Aucune vente lue pour{' '}
-                {ensemble.lignes
-                  .filter((l) => l.ventesInconnues && !l.vide)
-                  .map((l) => `« ${l.nom} »`)
-                  .join(', ')}{' '}
-                : sa boutique n’est pas reliée, ses ventes ne sont pas dans le total.
+                {fr(
+                  sansVentes.length === 1
+                    ? `Aucune vente lue pour ${liste(sansVentes)} : sa boutique n’est pas reliée, ses ventes ne sont pas dans le total.`
+                    : `Aucune vente lue pour ${liste(sansVentes)} : leurs boutiques ne sont pas reliées, leurs ventes ne sont pas dans le total.`,
+                )}
               </p>
             )}
             {ensemble.total.businessSansGains.length > 0 && (
               <p className="note alerte-note">
-                Gains inconnus pour {ensemble.total.businessSansGains.map((n) => `« ${n} »`).join(', ')} : des frais ne
-                sont pas fournis par la boutique, donc pas de total deviné.
+                {fr(
+                  `Gains inconnus pour ${liste(ensemble.total.businessSansGains)} : des frais ne sont pas fournis par la boutique, donc pas de total deviné.`,
+                )}
               </p>
             )}
             {ensemble.total.tvaCentimes !== null && (
               <p className="note">
-                TVA retenue par les boutiques : {formatEuros(ensemble.total.tvaCentimes)}, pas comptée dans les ventes.
+                TVA retenue par les boutiques : {formatEuros(ensemble.total.tvaCentimes)}, pas comptée dans les ventes.
               </p>
             )}
             {ensemble.total.remboursementsCentimes > 0 && (
-              <p className="note">Remboursé : {formatEuros(ensemble.total.remboursementsCentimes)}.</p>
+              <p className="note">Remboursé : {formatEuros(ensemble.total.remboursementsCentimes)}.</p>
             )}
           </section>
 
@@ -112,7 +118,7 @@ export function VueEnsemble({
                   {l.id === actuelId && <span className="puce puce-on">Ouvert</span>}
                 </div>
                 {l.vide ? (
-                  <p className="texte-doux">Pas encore de données : relie sa boutique et ses comptes.</p>
+                  <p className="texte-doux">Pas encore de données : relie sa boutique et ses comptes.</p>
                 ) : (
                   <div className="chiffres-ensemble">
                     <Chiffre nom="Ventes" valeur={l.ventesInconnues ? '—' : euros(l.resume.ventesCentimes)} />
@@ -123,7 +129,7 @@ export function VueEnsemble({
                 )}
                 {l.id !== actuelId && (
                   <div className="pied" style={{ justifyContent: 'flex-start' }}>
-                    <button type="button" className="bouton" onClick={() => onOuvrir(l.id)}>
+                    <button type="button" className="bouton contour" onClick={() => onOuvrir(l.id)}>
                       Ouvrir
                     </button>
                   </div>
@@ -131,7 +137,7 @@ export function VueEnsemble({
               </li>
             ))}
           </ul>
-          <p className="note">Gains = ventes moins commissions et frais, avant impôts et cotisations.</p>
+          <p className="note">{PHRASE_GAINS}</p>
         </>
       )}
     </Feuille>
@@ -142,7 +148,7 @@ function Chiffre({ nom, valeur, gains = false }: { nom: string; valeur: string; 
   return (
     <div className={`lecture ${gains ? 'gains' : ''}`}>
       <span className="etiquette">{nom}</span>
-      <b>{valeur}</b>
+      <b className={valeur === '—' ? 'vide' : undefined}>{valeur}</b>
     </div>
   );
 }

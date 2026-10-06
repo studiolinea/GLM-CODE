@@ -1,4 +1,5 @@
 import Papa from 'papaparse';
+import { nombre } from '../texte';
 import { adaptateurExemple } from './adaptateurs/exemple';
 import { cleVente, type Adaptateur, type LigneIgnoree, type ResultatLecture, type Vente } from './modele';
 
@@ -37,7 +38,7 @@ export function lireFichierVentes(texte: string, adaptateurs: Adaptateur[] = ADA
   if (parCle.size === 0 && lignesIgnorees.length > 0) {
     return {
       ok: false,
-      erreur: `Aucune vente lisible dans ce fichier (${lignesIgnorees.length} ligne(s) refusée(s)). Rien n’a été modifié.`,
+      erreur: `Aucune vente lisible dans ce fichier (${nombre(lignesIgnorees.length, 'ligne refusée', 'lignes refusées')}). Rien n’a été modifié.`,
     };
   }
 

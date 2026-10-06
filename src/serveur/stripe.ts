@@ -156,9 +156,9 @@ export const connecteurStripe: Connecteur = {
   nom: 'Stripe',
   refuserCle(cle) {
     if (cle.startsWith('sk_')) {
-      return 'Cette clé donne tous les droits sur ton compte Stripe. Crée plutôt une clé limitée en lecture : elle commence par « rk_ ».';
+      return 'Cette clé donne tous les droits sur ton compte Stripe. Crée plutôt une clé limitée en lecture : elle commence par « rk_ ».';
     }
-    if (!cle.startsWith('rk_')) return 'Ce n’est pas une clé limitée Stripe : elle doit commencer par « rk_ ».';
+    if (!cle.startsWith('rk_')) return 'Ce n’est pas une clé limitée Stripe : elle doit commencer par « rk_ ».';
     return null;
   },
   async verifier(cle, recuperer) {
@@ -173,5 +173,5 @@ export const connecteurStripe: Connecteur = {
     return transactionsVersMouvements(reponse.data ?? []);
   },
   messageDroits:
-    'Il manque une autorisation à cette clé Stripe : mets « Lecture » pour « Charges » et pour « Balance », puis recrée la clé.',
+    'Il manque une autorisation à cette clé Stripe : mets « Lecture » pour « Charges » et pour « Balance », puis recrée la clé.',
 };

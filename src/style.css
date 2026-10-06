@@ -34,6 +34,7 @@ html {
 body {
   margin: 0;
   min-height: 100vh;
+  min-height: 100dvh;
   background: radial-gradient(130% 480px at 50% 0%, var(--fond-haut) 0%, var(--fond) 100%) no-repeat, var(--fond);
   color: var(--texte);
   font-family: var(--police);
@@ -70,6 +71,10 @@ button {
   justify-content: space-between;
   gap: 16px;
 }
+.entete-titre {
+  flex: 1;
+  min-width: 0;
+}
 .marque {
   display: flex;
   align-items: center;
@@ -79,10 +84,32 @@ button {
   font-size: 1.2rem;
   letter-spacing: 0.18em;
 }
+/* Le petit compte-tours de l'icône, devant « PILOTAGE » */
+.logo {
+  flex: none;
+  margin-right: -2px;
+}
+.logo-piste {
+  stroke: #343b45;
+}
+.logo-arc {
+  stroke: var(--ambre);
+}
+.logo-aiguille {
+  stroke: var(--aiguille);
+}
+.logo-moyeu {
+  fill: var(--aiguille);
+}
+/* Les icônes au trait (Icones.tsx) prennent la couleur du texte */
+.icone {
+  display: block;
+  flex: none;
+}
 .tag {
   font-family: var(--police-titre);
   font-weight: 600;
-  font-size: 0.62rem;
+  font-size: 0.68rem;
   letter-spacing: 0.14em;
   color: var(--ambre);
   border: 1px solid rgba(255, 176, 58, 0.5);
@@ -106,6 +133,8 @@ button {
   border-radius: 9px;
 }
 .rapport {
+  min-width: 52px;
+  min-height: 38px;
   background: none;
   border: 0;
   border-radius: 6px;
@@ -138,11 +167,16 @@ button {
   margin-right: 4px;
 }
 .lien-bandeau {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  margin-top: 2px;
   background: none;
   border: 0;
   padding: 0;
   color: var(--ambre);
   font-weight: 600;
+  text-align: left;
   text-decoration: underline;
   text-underline-offset: 3px;
 }
@@ -174,7 +208,7 @@ button {
 .etiquette {
   font-family: var(--police-titre);
   font-weight: 600;
-  font-size: 0.64rem;
+  font-size: 0.7rem;
   letter-spacing: 0.16em;
   color: var(--doux);
   text-transform: uppercase;
@@ -193,6 +227,11 @@ button {
 .jauge-valeur {
   stroke: var(--ambre);
   filter: drop-shadow(0 0 5px rgba(255, 176, 58, 0.6));
+}
+/* Objectif atteint : la jauge passe au vert */
+.jauge-valeur.atteint {
+  stroke: var(--vert);
+  filter: drop-shadow(0 0 5px rgba(70, 223, 136, 0.6));
 }
 .jauge-cran {
   stroke: var(--cran);
@@ -302,6 +341,11 @@ button {
   font-size: 1.35rem;
   text-shadow: 0 0 12px rgba(70, 223, 136, 0.35);
 }
+/* « — » : pas de valeur, donc ni vert ni halo */
+.lecture b.vide {
+  color: var(--doux);
+  text-shadow: none;
+}
 .note {
   margin: 10px 0 0;
   color: var(--doux);
@@ -394,11 +438,43 @@ button {
   margin-top: 3px;
   font-style: italic;
 }
+/* Boutons d'un voyant : en grille sur téléphone (l'action en grand, puis « Fait » et « Plus tard »),
+   en ligne sur grand écran. */
 .alerte-actions {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 8px;
   margin-top: 10px;
+}
+.alerte-actions .bouton {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* Petit écran (320 px) : voyant un peu plus petit, pour que « Plus tard » tienne sur une ligne */
+@media (max-width: 379px) {
+  .alerte {
+    grid-template-columns: 32px minmax(0, 1fr);
+    gap: 10px;
+  }
+  .voyant {
+    width: 32px;
+    height: 32px;
+    font-size: 0.95rem;
+  }
+  .alerte-actions .bouton {
+    padding-inline: 8px;
+    font-size: 0.74rem;
+  }
+}
+.alerte-actions.avec-action > :first-child {
+  grid-column: 1 / -1;
+}
+@media (min-width: 760px) {
+  .alerte-actions {
+    display: flex;
+    flex-wrap: wrap;
+  }
 }
 .rien {
   margin: 0;
@@ -409,8 +485,26 @@ button {
   color: var(--doux);
 }
 
+/* Texte lu à voix haute, mais pas affiché */
+.cache {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
 /* ───── Boutons ───── */
+/* Toujours au moins 44 px de haut : assez grand pour un pouce. */
 .bouton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
   border: 1px solid var(--bord);
   background: var(--panneau);
   color: var(--texte);
@@ -473,14 +567,58 @@ a.bouton {
   border-top: 1px solid var(--bord);
 }
 .barre .bouton {
-  flex: 1;
+  display: block;
+  flex: 1 1 auto;
+  min-width: 0;
   padding: 13px 6px;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .barre .bouton.icone-seule {
+  display: inline-flex;
   flex: none;
   padding-inline: 14px;
   font-size: 1rem;
+}
+/* Petit écran (320 px) : un peu plus serré, pour que tout tienne sur une ligne */
+@media (max-width: 379px) {
+  .barre {
+    gap: 6px;
+  }
+  .barre .bouton {
+    font-size: 0.74rem;
+    letter-spacing: 0.03em;
+  }
+}
+/* « Actualiser », avec l'heure de la dernière actualisation réussie en dessous */
+.bouton.actualiser {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  line-height: 1.15;
+}
+.actualiser-texte,
+.a-jour {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.a-jour {
+  font-family: var(--police);
+  font-weight: 600;
+  font-size: 0.74rem;
+  letter-spacing: 0;
+  text-transform: none;
+  opacity: 0.78;
+}
+.bouton.icone-seule {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 @media (min-width: 760px) {
   .page {
@@ -508,6 +646,8 @@ a.bouton {
   align-items: flex-end;
   justify-content: center;
   background: rgba(0, 0, 0, 0.65);
+  overscroll-behavior: contain;
+  animation: voile 180ms ease-out;
 }
 .feuille:focus {
   outline: none;
@@ -516,7 +656,10 @@ a.bouton {
   width: 100%;
   max-width: 520px;
   max-height: 92vh;
+  max-height: 92dvh;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  animation: monter 180ms ease-out;
   background: var(--panneau);
   border: 1px solid var(--bord);
   border-radius: 20px 20px 0 0;
@@ -528,6 +671,37 @@ a.bouton {
   }
   .feuille {
     border-radius: 20px;
+    animation-name: apparaitre;
+  }
+}
+/* Sur téléphone, une petite poignée grise en haut de la feuille */
+@media (max-width: 759px) {
+  .feuille-tete::before {
+    content: '';
+    position: absolute;
+    top: 6px;
+    left: 50%;
+    width: 36px;
+    height: 4px;
+    margin-left: -18px;
+    border-radius: 2px;
+    background: var(--cran);
+  }
+}
+@keyframes monter {
+  from {
+    transform: translateY(100%);
+  }
+}
+@keyframes apparaitre {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+}
+@keyframes voile {
+  from {
+    opacity: 0;
   }
 }
 .feuille-tete {
@@ -545,6 +719,10 @@ a.bouton {
 }
 .fermer-feuille {
   flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
   width: 44px;
   height: 44px;
   border: 1px solid var(--bord);
@@ -577,6 +755,7 @@ a.bouton {
 }
 .champ input {
   width: 100%;
+  min-width: 0;
   min-height: 44px;
   padding: 10px 12px;
   background: var(--case);
@@ -585,7 +764,7 @@ a.bouton {
 }
 .ligne {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 12px;
 }
 .choix {
@@ -615,6 +794,9 @@ a.bouton {
   gap: 8px;
   margin-top: 6px;
 }
+.pied.pied-centre {
+  justify-content: center;
+}
 .erreur {
   margin: 0 0 12px;
   color: var(--danger);
@@ -635,7 +817,7 @@ a.bouton {
   border-top: 1px solid var(--bord);
 }
 
-/* ───── Comptes reliés (réglages) ───── */
+/* ───── Réglages ───── */
 .titre-reglage {
   margin: 0 0 10px;
   font-family: var(--police-titre);
@@ -644,6 +826,70 @@ a.bouton {
   letter-spacing: 0.14em;
   text-transform: uppercase;
 }
+.titre-reglage + .texte-doux {
+  margin-top: 0;
+}
+/* Objectif : « – N + » */
+.objectif {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.objectif .bouton.icone-seule {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+}
+.objectif-valeur {
+  min-width: 2ch;
+  font-family: var(--police-titre);
+  font-weight: 700;
+  font-size: 1.6rem;
+  line-height: 1;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+/* Bouton qui ouvre le choix d'un fichier : le vrai champ est caché à l'œil, mais atteignable au clavier */
+.choix-fichier {
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+}
+.choix-fichier:has(input:focus-visible) {
+  outline: 2px solid var(--ambre);
+  outline-offset: 2px;
+}
+/* « Fichier de ventes » : le grand bouton pour choisir le fichier, puis le bilan */
+.fichier-ventes {
+  margin: 2px 0 14px;
+}
+.bilan-fichier {
+  margin-top: 4px;
+}
+/* Pied de page : conditions et confidentialité */
+.liens-legaux {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 2px;
+  margin: 14px 0 0;
+  color: var(--doux);
+  font-size: 0.85rem;
+}
+.liens-legaux a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 8px;
+  color: var(--doux);
+  text-underline-offset: 3px;
+}
+.liens-legaux a:focus-visible {
+  outline: 2px solid var(--ambre);
+  outline-offset: 2px;
+}
+
+/* ───── Comptes reliés (réglages) ───── */
 .compte-relie {
   margin-bottom: 10px;
   padding: 12px;
@@ -659,6 +905,17 @@ a.bouton {
 }
 .compte-relie .note {
   margin: 0 0 8px;
+}
+.compte-relie .texte-doux + .note {
+  margin-top: 8px;
+}
+.compte-relie .pied + .erreur,
+.compte-relie .pied + .succes {
+  margin-top: 10px;
+}
+.compte-relie > :last-child,
+.ligne-business > :last-child {
+  margin-bottom: 0;
 }
 .compte-entete {
   display: flex;
@@ -676,7 +933,7 @@ a.bouton {
   border-radius: 999px;
   font-family: var(--police-titre);
   font-weight: 600;
-  font-size: 0.62rem;
+  font-size: 0.68rem;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--doux);
@@ -730,6 +987,9 @@ a.bouton {
 }
 .selecteur-business-action {
   flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   color: var(--ambre);
   font-family: var(--police-titre);
   font-weight: 600;
@@ -753,8 +1013,26 @@ a.bouton {
 .chiffres-ensemble .lecture b {
   font-size: 1.05rem;
 }
+/* « Vue d'ensemble de mes business » : un lien ambre, au-dessus de la période */
 .lien-ensemble {
-  margin: 0 0 4px;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  margin: 0;
+  padding: 0;
+  background: none;
+  border: 0;
+  color: var(--ambre);
+  font-family: var(--police);
+  font-weight: 600;
+  font-size: 0.92rem;
+  text-align: left;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.lien-ensemble:focus-visible {
+  outline: 2px solid var(--ambre);
+  outline-offset: 2px;
 }
 .tableau-business {
   display: grid;
@@ -817,19 +1095,49 @@ a.bouton {
   margin: 2px 0 0;
   font-size: 0.78rem;
 }
+/* Les codes bruts de la plateforme : visibles, mais discrets */
+.compte-relie .mouvements .detail-brut {
+  margin-top: 4px;
+  font-size: 0.7rem;
+  opacity: 0.8;
+}
+/* Vérification ouverte : un trait la sépare de « Déconnecter la boutique » */
+.verification + .pied {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--bord);
+}
+/* « Actualiser maintenant », juste sous « Mes comptes reliés » */
+.pied-haut {
+  margin: 0 0 12px;
+}
 
-/* ───── Bandeau d'erreur (connexion) ───── */
+/* ───── Bandeau d'erreur : le message, la croix en haut à droite, l'action en dessous ───── */
 .bandeau-erreur {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  column-gap: 6px;
   margin: 0 0 14px;
-  padding: 10px 6px 10px 14px;
+  padding: 4px 4px 4px 14px;
   border: 1px solid var(--danger);
   border-radius: 12px;
   color: var(--danger);
   font-size: 0.9rem;
+}
+.bandeau-texte {
+  grid-column: 1;
+  grid-row: 1;
+  padding: 8px 0;
+}
+.bandeau-fermer {
+  grid-column: 2;
+  grid-row: 1;
+}
+.bandeau-action {
+  grid-column: 1 / -1;
+  justify-self: start;
+  margin: -4px 0 4px -13px;
 }
 
 /* ───── Écrans de chargement et de connexion ───── */
@@ -839,6 +1147,7 @@ a.bouton {
   justify-items: center;
   gap: 14px;
   min-height: 100vh;
+  min-height: 100dvh;
   max-width: 440px;
   margin: 0 auto;
   padding: 24px 16px;
@@ -863,7 +1172,9 @@ a.bouton {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .jauge-aiguille {
+  .jauge-aiguille,
+  .voile,
+  .feuille {
     animation: none;
   }
 }

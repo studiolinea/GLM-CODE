@@ -4,7 +4,9 @@ import { formatEuros } from '../argent';
 import { PERIODES, type Periode, type Resume } from '../calculs/resume';
 import type { Rythme } from '../calculs/rythme';
 import { quandParis } from '../temps';
+import { nombre, PHRASE_GAINS } from '../texte';
 import { CarteAlerte } from './CarteAlerte';
+import { IconeChevron, Logo } from './Icones';
 import { Jauge } from './Jauge';
 import { Odometre } from './Odometre';
 
@@ -15,6 +17,12 @@ const FORMAT_JOUR = new Intl.DateTimeFormat('fr-FR', {
   month: 'long',
   year: 'numeric',
 });
+
+/** « Mardi 6 octobre 2026 » : la date du jour à Paris, avec une majuscule. */
+function jourEnTete(maintenant: Date): string {
+  const jour = FORMAT_JOUR.format(maintenant);
+  return jour.charAt(0).toUpperCase() + jour.slice(1);
+}
 
 /** Libellés courts du sélecteur de période, comme le levier d'une boîte automatique. */
 const COURTS: Record<Periode, string> = { '7j': '7 J', '1m': '1 M', '3m': '3 M' };
@@ -64,36 +72,39 @@ export function TableauDeBord({
   // Sans aucun fichier ni vente, on n'affiche pas de chiffres : « — ».
   const sansDonnees = !couverture && resume.commandes === 0 && resume.nbRemboursements === 0;
   const euros = (centimes: number | null) => (sansDonnees || centimes === null ? '—' : formatEuros(centimes));
+  // Un « — » (pas de valeur) reste gris : jamais en vert comme un vrai gain.
+  const valeur = (texte: string | number) => <b className={texte === '—' ? 'vide' : undefined}>{texte}</b>;
 
   return (
     <>
       <header className="entete">
         <div className="entete-haut">
-          <div>
+          <div className="entete-titre">
             <div className="marque">
+              <Logo />
               PILOTAGE
               {exemple && <span className="tag">EXEMPLE</span>}
             </div>
+            <p className="sous-titre">
+              {onBusiness ? '' : 'Ma boutique · '}
+              {jourEnTete(maintenant)}
+            </p>
             {onBusiness && (
-              <button className="selecteur-business" onClick={onBusiness} aria-label={`Business ouvert : ${nomBusiness}. Changer de business`}>
+              <button className="selecteur-business" onClick={onBusiness} aria-label={`Business ouvert : ${nomBusiness}. Changer de business`}>
                 <span className="selecteur-business-texte">
                   <span className="etiquette">Business</span>
                   <span className="selecteur-business-nom">{nomBusiness}</span>
                 </span>
                 <span className="selecteur-business-action" aria-hidden="true">
-                  Changer ▾
+                  Changer <IconeChevron taille={16} />
                 </span>
               </button>
             )}
             {onEnsemble && (
-              <button className="bouton discret lien-ensemble" onClick={onEnsemble}>
+              <button className="lien-ensemble" onClick={onEnsemble}>
                 Vue d’ensemble de mes business
               </button>
             )}
-            <p className="sous-titre">
-              {onBusiness ? '' : 'Ma boutique · '}
-              {FORMAT_JOUR.format(maintenant)}
-            </p>
           </div>
           {actions}
         </div>
@@ -134,41 +145,41 @@ export function TableauDeBord({
           <div className="lectures">
             <div className="lecture">
               <span className="etiquette">Commandes</span>
-              <b>{sansDonnees ? '—' : resume.commandes}</b>
+              {valeur(sansDonnees ? '—' : resume.commandes)}
             </div>
             <div className="lecture">
               <span className="etiquette">Panier moyen</span>
-              <b>{euros(resume.panierMoyenCentimes)}</b>
+              {valeur(euros(resume.panierMoyenCentimes))}
             </div>
             <div className="lecture gains">
               <span className="etiquette">Gains réels</span>
-              <b>{euros(resume.gainsCentimes)}</b>
+              {valeur(euros(resume.gainsCentimes))}
             </div>
             <div className="lecture">
               <span className="etiquette">Remboursé</span>
-              <b>{euros(resume.remboursementsCentimes)}</b>
+              {valeur(euros(resume.remboursementsCentimes))}
             </div>
           </div>
 
           {!sansDonnees && resume.gainsCentimes === null && (
             <p className="note alerte-note">
               Frais non fournis par la boutique pour {resume.ventesSansFrais} vente
-              {resume.ventesSansFrais > 1 ? 's' : ''} : pas de gains devinés.
+              {resume.ventesSansFrais > 1 ? 's' : ''} : pas de gains devinés.
             </p>
           )}
           {resume.tvaCentimes !== null && (
             <p className="note">
-              TVA retenue par la boutique : {euros(resume.tvaCentimes)}. Payée par tes clients et reversée à l’État :
-              elle n’est pas comptée dans tes ventes.
+              TVA retenue par la boutique : {euros(resume.tvaCentimes)}. Elle est payée par tes clients et reversée à
+              l’État, donc pas comptée dans tes ventes.
             </p>
           )}
           {ventesEcartees > 0 && (
             <p className="note alerte-note">
               {ventesEcartees} vente{ventesEcartees > 1 ? 's' : ''} de ta boutique pas comptée{ventesEcartees > 1 ? 's' : ''} ici
-              (autre devise…) : le détail est dans les réglages.
+              (autre devise…) : le détail est dans les réglages.
             </p>
           )}
-          <p className="note">Gains = ventes moins commissions et frais. Avant impôts et cotisations.</p>
+          <p className="note">{PHRASE_GAINS}</p>
           <p className="note">
             {couverture ? `Ventes chargées jusqu’au ${quandParis(new Date(couverture))}.` : automatique ? 'Aucune vente lue pour l’instant.' : 'Aucun fichier de ventes ajouté.'}
           </p>
@@ -177,13 +188,13 @@ export function TableauDeBord({
         <section className="zone-voyants" aria-labelledby="titre-voyants">
           <div className="titre-section">
             <h2 id="titre-voyants">Voyants</h2>
-            <span className="compteur">{alertes.length === 0 ? 'tout est éteint' : `${alertes.length} à traiter`}</span>
+            <span className="compteur">{alertes.length === 0 ? 'tout est éteint' : nombre(alertes.length, 'allumé')}</span>
           </div>
           {alertes.length === 0 ? (
             <p className="rien">
               {automatique
                 ? 'Aucun voyant allumé. Tes ventes et tes vidéos arrivent toutes seules.'
-                : 'Aucun voyant allumé. Note ta prochaine vidéo avec « J’ai publié ».'}
+                : 'Aucun voyant allumé. Note ta prochaine vidéo avec « J’ai publié ».'}
             </p>
           ) : (
             <ul className="alertes">

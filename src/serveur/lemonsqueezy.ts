@@ -92,7 +92,7 @@ export function commandesVersVentes(commandes: CommandeLemonSqueezy[]): {
     const ignorer = (raison: string) => ignorees.push({ numero, raison });
 
     if (a.status !== 'paid' && a.status !== 'refunded' && a.status !== 'partial_refund') {
-      ignorer(`commande non payée (statut « ${a.status ?? 'inconnu'} »)`);
+      ignorer(`commande non payée (statut « ${a.status ?? 'inconnu'} »)`);
       continue;
     }
     if ((a.currency ?? '').toUpperCase() !== 'EUR') {

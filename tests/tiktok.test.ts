@@ -191,7 +191,10 @@ describe('serveur : TikTok', () => {
     const f = fauxTikTok();
     const r = await traiterApi(appel('/api/comptes/tiktok/connexion', { business: BUSINESS }), { ...env, TIKTOK_CLIENT_SECRET: undefined }, f.recuperer);
     expect(r.status).toBe(503);
-    expect(((await r.json()) as { erreur: string }).erreur).toContain('Cloudflare');
+    const { erreur } = (await r.json()) as { erreur: string };
+    expect(erreur).toContain('Cloudflare');
+    expect(erreur).toMatch(/^Réglage du serveur à faire/);
+    expect(erreur).toContain('TIKTOK_CLIENT_SECRET');
   });
 
   it('relie le compte dans le bon business : les jetons sont enregistrés chiffrés, jamais en clair', async () => {

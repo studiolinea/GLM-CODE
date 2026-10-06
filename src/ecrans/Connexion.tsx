@@ -1,7 +1,9 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { useState } from 'react';
 import { traduireErreurConnexion } from '../donnees/erreursConnexion';
+import { fr } from '../texte';
 import { EcranMessage } from './EcranMessage';
+import { LiensLegaux } from './LiensLegaux';
 
 /** Connexion par e-mail et mot de passe. Le même compte sert sur le Mac et sur le téléphone. */
 export function Connexion({ client }: { client: SupabaseClient }) {
@@ -27,15 +29,20 @@ export function Connexion({ client }: { client: SupabaseClient }) {
     try {
       if (mode === 'connexion') {
         const { error } = await client.auth.signInWithPassword({ email: adresse, password: motDePasse });
-        if (error) setErreur(traduireErreurConnexion(error.message));
+        if (error) {
+          console.warn('Connexion refusée :', error.message);
+          setErreur(traduireErreurConnexion(error.message));
+        }
       } else {
         const { data, error } = await client.auth.signUp({
           email: adresse,
           password: motDePasse,
           options: { emailRedirectTo: window.location.origin + window.location.pathname },
         });
-        if (error) setErreur(traduireErreurConnexion(error.message));
-        else if (!data.session) {
+        if (error) {
+          console.warn('Création de compte refusée :', error.message);
+          setErreur(traduireErreurConnexion(error.message));
+        } else if (!data.session) {
           setInfo(
             `Compte créé. Ouvre l’e-mail envoyé à ${adresse} et clique sur le lien de confirmation. Ensuite, reviens ici et connecte-toi.`,
           );
@@ -55,7 +62,7 @@ export function Connexion({ client }: { client: SupabaseClient }) {
     <EcranMessage>
       <p className="sous-titre">
         {inscription
-          ? 'Crée ton compte : il gardera tes chiffres, les mêmes sur le Mac et le téléphone.'
+          ? 'Crée ton compte : il gardera tes chiffres, les mêmes sur le Mac et le téléphone.'
           : 'Connecte-toi pour retrouver tes chiffres, les mêmes sur le Mac et le téléphone.'}
       </p>
       <form className="tableau formulaire" onSubmit={valider} noValidate>
@@ -82,12 +89,12 @@ export function Connexion({ client }: { client: SupabaseClient }) {
         </label>
         {erreur && (
           <p className="erreur" role="alert">
-            {erreur}
+            {fr(erreur)}
           </p>
         )}
         {info && (
           <p className="succes" role="status">
-            {info}
+            {fr(info)}
           </p>
         )}
         <button type="submit" className="bouton principal large" disabled={occupe}>
@@ -102,9 +109,10 @@ export function Connexion({ client }: { client: SupabaseClient }) {
             setInfo('');
           }}
         >
-          {inscription ? 'J’ai déjà un compte' : 'Première fois ? Créer mon compte'}
+          {inscription ? 'J’ai déjà un compte' : 'Première fois ? Créer mon compte'}
         </button>
       </form>
+      <LiensLegaux />
     </EcranMessage>
   );
 }

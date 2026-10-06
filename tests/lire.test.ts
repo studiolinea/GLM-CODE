@@ -70,6 +70,10 @@ describe('lireFichierVentes', () => {
   it('refuse un fichier dont aucune ligne n’est lisible', () => {
     const r = lireFichierVentes('numero_commande,date,montant\n1,demain,abc\n');
     expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.erreur.replace(/\s/g, ' ')).toContain('(1 ligne refusée)');
+    const deux = lireFichierVentes('numero_commande,date,montant\n1,demain,abc\n2,hier,xyz\n');
+    if (!deux.ok) expect(deux.erreur.replace(/\s/g, ' ')).toContain('(2 lignes refusées)');
+    expect(deux.ok).toBe(false);
   });
 
   it('ne garde qu’une fois une commande répétée dans le même fichier', () => {
