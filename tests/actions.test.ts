@@ -165,3 +165,52 @@ describe('sauvegarde : elle reconnaît son business', () => {
     );
   });
 });
+
+describe('sauvegarde abîmée ou piégée : refusée en entier, rien n’est modifié', () => {
+  const base = { ...donneesVides(), couverture: '2026-10-05T09:00:00.000Z' };
+  const vente = {
+    plateforme: 'stripe',
+    numeroCommande: 'ch_1',
+    instant: '2026-10-05T10:00:00.000Z',
+    montantCentimes: 1990,
+    fraisCentimes: null,
+    rembourse: false,
+    produit: 'Guide',
+  };
+  const fichier = (donnees: unknown) => JSON.stringify({ format: 'pilotage-sauvegarde', version: 1, donnees });
+  const abimee = 'Cette sauvegarde est abîmée : rien n’a été modifié.';
+
+  it('une sauvegarde correcte passe, avec la TVA et les dates venues de la base (+00:00)', () => {
+    const d = { ...base, ventes: [{ ...vente, instant: '2026-10-05T10:00:00+00:00', tvaCentimes: 332 }] };
+    expect(lireSauvegarde(fichier(d))).toEqual(d);
+  });
+
+  it.each([
+    ['une date illisible', { ventes: [{ ...vente, instant: 'à remplir' }] }],
+    ['une date sans fuseau (lue à l’heure de l’appareil)', { ventes: [{ ...vente, instant: '06/10/2026' }] }],
+    ['un montant non entier', { ventes: [{ ...vente, montantCentimes: 12.5 }] }],
+    ['un montant négatif', { ventes: [{ ...vente, montantCentimes: -5000 }] }],
+    ['des frais qui ne sont pas un nombre', { ventes: [{ ...vente, fraisCentimes: 'abc' }] }],
+    ['une vente sans plateforme', { ventes: [{ ...vente, plateforme: undefined }] }],
+    ['une vente du mode test dans de vraies données', { ventes: [{ ...vente, plateforme: 'stripe-test' }] }],
+    ['un objectif hors de 0 à 20', { reglages: { objectifParJour: 999 } }],
+    ['une vidéo avec une date illisible', { videos: [{ id: 'v', instant: 'zzz', reseau: 'tiktok' }] }],
+    ['une vidéo d’un réseau inconnu', { videos: [{ id: 'v', instant: '2026-10-05T10:00:00Z', reseau: 'myspace' }] }],
+    ['une vidéo avec un lien qui n’est pas https', { videos: [{ id: 'v', instant: '2026-10-05T10:00:00Z', reseau: 'tiktok', lien: 'javascript:alert(1)' }] }],
+    ['un voyant au statut inconnu', { etatsAlertes: { a: { statut: 'supprime', le: '2026-10-05' } } }],
+    ['une date des ventes illisible', { couverture: 'n’importe quoi' }],
+  ])('%s', (_, change) => {
+    expect(lireSauvegarde(fichier({ ...base, ...change }))).toBe(abimee);
+  });
+
+  it('les champs en trop (nom, e-mail d’un client) ne sont pas gardés', () => {
+    const d = lireSauvegarde(fichier({ ...base, ventes: [{ ...vente, nomClient: 'Jean Dupont', email: 'jean@exemple.fr' }] }));
+    expect(d).toEqual({ ...base, ventes: [vente] });
+    expect(JSON.stringify(d)).not.toContain('jean@exemple.fr');
+  });
+
+  it('les ventes du mode test restent possibles dans les données d’exemple (fichier d’essai)', () => {
+    const d = { ...base, exemple: true, ventes: [{ ...vente, plateforme: 'stripe-test' }] };
+    expect(lireSauvegarde(fichier(d))).toEqual(d);
+  });
+});
