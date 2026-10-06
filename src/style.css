@@ -1273,3 +1273,47 @@ a.bouton {
 .feuille #titre-comptes-relies {
   scroll-margin-top: 76px;
 }
+
+/* La lecture locale prolonge les voyants avec des constats vérifiables. */
+.lecture-periode {
+  margin-top: 20px;
+  padding: 18px;
+  background: var(--panneau);
+  border: 1px solid var(--bord);
+  border-radius: var(--rayon);
+}
+.lecture-origine {
+  margin: 0 0 6px;
+  color: var(--bleu);
+  font-size: 0.85rem;
+}
+.lecture-constats { margin: 14px 0; padding: 0; list-style: none; }
+.lecture-constats li { padding: 12px 0; border-top: 1px solid var(--bord); }
+.lecture-periode h3 { margin: 0; font-size: 1rem; font-weight: 600; }
+.lecture-prochaine { padding: 14px; background: var(--case); border-left: 3px solid var(--ambre); border-radius: 8px; }
+.lecture-prochaine h3 { color: var(--ambre); }
+.lecture-prochaine p { margin: 6px 0 12px; }
+.assistant-questions { display: flex; flex-wrap: wrap; gap: 8px; }
+.assistant-questions .bouton { white-space: normal; text-align: center; }
+.assistant-reponse { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--bord); }
+.assistant-texte { white-space: pre-wrap; overflow-wrap: anywhere; }
+.preparation-business { margin-top: 14px; padding: 14px; background: var(--case); border-radius: 10px; }
+.preparation-business ol { padding-left: 22px; color: var(--doux); }
+.preparation-business li + li { margin-top: 8px; }
+.preparation-business strong { color: var(--texte); }
+.preparation-suivi { margin: 12px 0; }
+.preparation-etape { display: flex; align-items: center; justify-content: space-between; gap: 8px; border-top: 1px solid var(--bord); }
+.preparation-etape strong { color: var(--ambre); }
+.poste-pilotage { display: grid; gap: 20px; margin-bottom: 24px; }
+.poste-pilotage > .lecture-periode { margin-top: 0; }
+@media (min-width: 900px) {
+  .poste-pilotage { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; }
+}
+.assistant-auto { display: flex; align-items: center; gap: 10px; min-height: 44px; cursor: pointer; }
+.assistant-auto input { width: 22px; height: 22px; accent-color: var(--ambre); }
+.assistant-plan ul { padding: 0; list-style: none; }
+.assistant-plan li { padding: 12px 0; border-top: 1px solid var(--bord); }
+@media (max-width: 899px) {
+  .poste-pilotage.priorite-ia > .assistant-ia { order: -1; }
+}
+.assistant-veille { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--bord); }

@@ -52,6 +52,9 @@ export function calculerResume(ventes: Vente[], periode: Periode, maintenant: Da
   const fraisCentimes = somme(gardees.map((v) => v.fraisCentimes ?? 0));
   const ventesSansFrais = gardees.filter((v) => v.fraisCentimes === null).length;
   const ventesSansFraisStripe = gardees.filter((v) => v.fraisCentimes === null && v.plateforme === 'stripe').length;
+  // Le modèle ne garde ni la date du remboursement Stripe ni ses mouvements de frais.
+  // Même si la charge d'origine donne des frais, le gain net après remboursement est inconnu.
+  const remboursementStripe = remboursees.some((v) => /^stripe(-test)?$/.test(v.plateforme));
   const avecTva = gardees.filter((v) => v.tvaCentimes !== undefined);
 
   return {
@@ -66,7 +69,7 @@ export function calculerResume(ventes: Vente[], periode: Periode, maintenant: Da
     fraisCentimes,
     ventesSansFrais,
     ventesSansFraisStripe,
-    gainsCentimes: ventesSansFrais > 0 ? null : ventesCentimes - fraisCentimes,
+    gainsCentimes: ventesSansFrais > 0 || remboursementStripe ? null : ventesCentimes - fraisCentimes,
     tvaCentimes: avecTva.length > 0 ? somme(avecTva.map((v) => v.tvaCentimes ?? 0)) : null,
   };
 }

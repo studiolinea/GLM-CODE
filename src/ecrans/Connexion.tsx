@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { useEffect, useRef, useState } from 'react';
 import { traduireErreurConnexion } from '../donnees/erreursConnexion';
+import { demanderRecuperation } from '../donnees/recuperation';
 import { fr } from '../texte';
 import { EcranMessage } from './EcranMessage';
 import { avecSouris } from './Feuille';
@@ -13,7 +14,8 @@ export function Connexion({ client }: { client: SupabaseClient }) {
   useEffect(() => {
     if (avecSouris()) champEmail.current?.focus();
   }, []);
-  const [mode, setMode] = useState<'connexion' | 'inscription'>('connexion');
+  const [mode, setMode] = useState<'connexion' | 'inscription' | 'recuperation'>('connexion');
+  const [visible, setVisible] = useState(false);
   const [email, setEmail] = useState('');
   const [motDePasse, setMotDePasse] = useState('');
   const [occupe, setOccupe] = useState(false);
@@ -29,11 +31,14 @@ export function Connexion({ client }: { client: SupabaseClient }) {
     if (mode === 'inscription' && motDePasse.length < 8) {
       return setErreur('Choisis un mot de passe d’au moins 8 caractères.');
     }
-    if (!motDePasse) return setErreur('Indique ton mot de passe.');
+    if (mode !== 'recuperation' && !motDePasse) return setErreur('Indique ton mot de passe.');
 
     setOccupe(true);
     try {
-      if (mode === 'connexion') {
+      if (mode === 'recuperation') {
+        await demanderRecuperation(client, adresse, window.location.origin);
+        setInfo('Si un compte correspond à cette adresse, tu recevras un lien pour choisir un nouveau mot de passe. Pense à vérifier les courriers indésirables.');
+      } else if (mode === 'connexion') {
         const { error } = await client.auth.signInWithPassword({ email: adresse, password: motDePasse });
         if (error) {
           console.warn('Connexion refusée :', error.message);
@@ -67,7 +72,7 @@ export function Connexion({ client }: { client: SupabaseClient }) {
   return (
     <EcranMessage>
       <p className="sous-titre">
-        {inscription
+        {mode === 'recuperation' ? 'Indique ton adresse e-mail pour recevoir un lien de récupération.' : inscription
           ? 'Crée ton compte : il gardera tes chiffres, les mêmes sur le Mac et le téléphone.'
           : 'Connecte-toi pour retrouver tes chiffres, les mêmes sur le Mac et le téléphone.'}
       </p>
@@ -84,16 +89,17 @@ export function Connexion({ client }: { client: SupabaseClient }) {
             onChange={(e) => setEmail(e.target.value)}
           />
         </label>
-        <label className="champ">
+        {mode !== 'recuperation' && <label className="champ">
           <span>Mot de passe{inscription ? ' (8 caractères minimum)' : ''}</span>
           <input
             id="connexion-mot-de-passe"
-            type="password"
+            type={visible ? 'text' : 'password'}
             autoComplete={inscription ? 'new-password' : 'current-password'}
             value={motDePasse}
             onChange={(e) => setMotDePasse(e.target.value)}
           />
-        </label>
+        </label>}
+        {mode !== 'recuperation' && <button type="button" className="bouton discret" aria-controls="connexion-mot-de-passe" aria-pressed={visible} onClick={() => setVisible(!visible)}>{visible ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}</button>}
         {erreur && (
           <p className="erreur" role="alert">
             {fr(erreur)}
@@ -105,19 +111,22 @@ export function Connexion({ client }: { client: SupabaseClient }) {
           </p>
         )}
         <button type="submit" className="bouton principal large" disabled={occupe}>
-          {occupe ? 'Un instant…' : inscription ? 'Créer mon compte' : 'Se connecter'}
+          {occupe ? 'Un instant…' : mode === 'recuperation' ? 'Recevoir le lien' : inscription ? 'Créer mon compte' : 'Se connecter'}
         </button>
         <button
           type="button"
           className="bouton discret large"
           onClick={() => {
-            setMode(inscription ? 'connexion' : 'inscription');
+            setMode(mode === 'connexion' ? 'inscription' : 'connexion');
             setErreur('');
             setInfo('');
+            setMotDePasse('');
+            setVisible(false);
           }}
         >
-          {inscription ? 'J’ai déjà un compte' : 'Première fois ? Créer mon compte'}
+          {mode === 'recuperation' ? 'Retour à la connexion' : inscription ? 'J’ai déjà un compte' : 'Première fois ? Créer mon compte'}
         </button>
+        {mode === 'connexion' && <button type="button" className="bouton discret large" disabled={occupe} onClick={() => { setMode('recuperation'); setErreur(''); setInfo(''); setMotDePasse(''); }}>Mot de passe oublié ?</button>}
       </form>
       <LiensLegaux />
     </EcranMessage>

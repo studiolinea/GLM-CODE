@@ -59,10 +59,11 @@ export async function toutesLesCharges(cle: string, recuperer: Recuperateur = fe
     );
     const lot = reponse.data ?? [];
     charges.push(...lot);
-    if (!reponse.has_more || lot.length === 0) break;
+    if (!reponse.has_more) return charges;
+    if (lot.length === 0) throw new Error('Historique Stripe incomplet : page suivante manquante.');
     apres = lot[lot.length - 1]!.id;
   }
-  return charges;
+  throw new Error('Historique Stripe incomplet : la limite de lecture est atteinte. Aucune vente n’a été actualisée.');
 }
 
 /**
@@ -95,9 +96,11 @@ export async function toutesLesTransactionsFrais(cle: string, recuperer: Recuper
       const lot = reponse.data ?? [];
       transactions.push(...lot);
       const dernier = lot[lot.length - 1]?.id;
-      if (!reponse.has_more || !dernier) break;
+      if (!reponse.has_more) return transactions;
+      if (!dernier) throw new Error('Historique des frais Stripe incomplet.');
       apres = dernier;
     }
+    throw new Error('Historique des frais Stripe incomplet : limite de lecture atteinte.');
   } catch (e) {
     // Sans le droit « Balance » (ou si Stripe refuse cette lecture), les frais Managed Payments restent inconnus,
     // mais les ventes arrivent quand même. Le détail va dans les journaux Cloudflare.
@@ -105,7 +108,6 @@ export async function toutesLesTransactionsFrais(cle: string, recuperer: Recuper
     if (!(e instanceof DroitsInsuffisants)) console.error('Lecture des frais Stripe impossible', e);
     return null;
   }
-  return transactions;
 }
 
 /** Partage un total entre des parts, en proportion de leur poids, sans perdre ni ajouter un centime. */
@@ -138,13 +140,14 @@ const aboutie = (c: ChargeStripe) => c.status === 'succeeded' && c.paid && (c.cu
 export function chargesVersVentes(
   charges: ChargeStripe[],
   fraisParJour: Map<string, number> | null = null,
+  managedPaymentsPossible = false,
 ): { ventes: Vente[]; ignorees: VenteIgnoree[] } {
   const ventes: Vente[] = [];
   const ignorees: VenteIgnoree[] = [];
   // Le compte est en Managed Payments dès qu'un paiement porte de la TVA retenue, ou que Stripe a facturé des frais
   // Managed Payments : ces frais concernent alors tous ses paiements, même ceux sans TVA.
   const geresParStripe =
-    (fraisParJour?.size ?? 0) > 0 ||
+    managedPaymentsPossible || (fraisParJour?.size ?? 0) > 0 ||
     charges.some((c) => typeof c.balance_transaction === 'object' && c.balance_transaction?.fee_details?.some((f) => f.type === 'withheld_tax'));
   // Les frais Managed Payments d'un jour, partagés entre les paiements de ce jour selon leur montant payé.
   const fraisGeres = new Map<string, number>();
@@ -178,7 +181,7 @@ export function chargesVersVentes(
       fraisCentimes: !solde ? null : !geresParStripe ? solde.fee : fraisAvecGeres(solde.fee - tva, fraisGeres.get(c.id)),
       ...(tvaGardee > 0 ? { tvaCentimes: tvaGardee } : {}),
       rembourse: c.refunded,
-      produit: c.description ?? '',
+      produit: '',
     });
   }
   return { ventes, ignorees };
@@ -218,12 +221,12 @@ export function transactionsVersMouvements(transactions: TransactionStripe[]): M
     fraisCentimes: nombre(t.fee),
     netCentimes: nombre(t.net),
     devise: (t.currency ?? '').toLowerCase(),
-    description: t.description ?? null,
+    description: null,
     origine: typeof t.source === 'string' ? t.source : (t.source?.id ?? null),
     detailFrais: (t.fee_details ?? []).map((f) => ({
       type: f.type ?? '',
       montantCentimes: nombre(f.amount),
-      description: f.description ?? null,
+      description: null,
     })),
   }));
 }
@@ -243,7 +246,8 @@ export const connecteurStripe: Connecteur = {
   },
   async lireVentes(cle, recuperer) {
     const [charges, frais] = await Promise.all([toutesLesCharges(cle, recuperer), toutesLesTransactionsFrais(cle, recuperer)]);
-    return chargesVersVentes(charges, frais && fraisGeresParJour(frais));
+    // L’API ne prouve pas qu’un compte sans TVA est hors Managed Payments.
+    return chargesVersVentes(charges, frais && fraisGeresParJour(frais), true);
   },
   async mouvements(cle, recuperer) {
     const reponse = await appeler<{ data?: TransactionStripe[] }>(cle, '/balance_transactions?limit=25', recuperer);

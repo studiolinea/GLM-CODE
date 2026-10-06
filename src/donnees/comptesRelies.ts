@@ -112,7 +112,7 @@ async function envoyer(chemin: string, corps: unknown, acces: string): Promise<R
   }
 }
 
-async function appelerServeur<T>(chemin: string, corps: unknown = {}): Promise<T> {
+export async function appelerServeur<T>(chemin: string, corps: unknown = {}): Promise<T> {
   let reponse = await envoyer(chemin, corps, await jeton());
   // Le serveur ne reconnaît pas la session (jeton périmé) : on la renouvelle, puis on réessaie une fois.
   if (reponse.status === 401) reponse = await envoyer(chemin, corps, await jeton(true));

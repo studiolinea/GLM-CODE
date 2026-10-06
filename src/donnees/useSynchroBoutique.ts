@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Donnees, Video } from '../modele';
 import type { Vente } from '../ventes/modele';
+import { identifiantPublicationTikTok } from '../calculs/publication';
 import { importerVentes, quitterExemple } from './actions';
 import {
   adresseConnexionTikTok,
@@ -153,9 +154,18 @@ export function appliquerVideos(d: Donnees, videos: Video[]): Donnees {
   if (videos.length === 0) return d;
   const base = quitterExemple(d);
   const parId = new Map(base.videos.map((v) => [v.id, v]));
-  for (const v of videos) parId.set(v.id, v);
+  for (const v of videos) {
+    const publication = identifiantPublicationTikTok(v);
+    if (publication) {
+      for (const connue of parId.values()) {
+        if (connue.id !== v.id && identifiantPublicationTikTok(connue) === publication) parId.delete(connue.id);
+      }
+    }
+    parId.set(v.id, v);
+  }
   return { ...base, videos: [...parId.values()].sort((a, b) => a.instant.localeCompare(b.instant)) };
 }
+
 
 const RAISONS_TIKTOK: Record<string, string> = {
   access_denied: 'Tu as refusé l’accès sur TikTok : rien n’a été relié.',

@@ -5,6 +5,11 @@ import { PERIODES, type Periode, type Resume } from '../calculs/resume';
 import type { Rythme } from '../calculs/rythme';
 import { quandParis } from '../temps';
 import { accord, fr, nombre, PHRASE_GAINS } from '../texte';
+import { analyserPeriode } from '../calculs/analyse';
+import type { EtatAlerte } from '../modele';
+import type { EtapePreparation } from '../donnees/preparation';
+import { AssistantIA } from './AssistantIA';
+import { LecturePeriode } from './LecturePeriode';
 import { CarteAlerte } from './CarteAlerte';
 import { avecSouris, ID_TITRE_ECRAN } from './Feuille';
 import { ID_SELECTEUR_BUSINESS, prendreFocus } from './focus';
@@ -32,9 +37,11 @@ const COURTS: Record<Periode, string> = { '7j': '7 J', '1m': '1 M', '3m': '3 M' 
 export function TableauDeBord({
   maintenant,
   nomBusiness,
+  businessId,
   onBusiness,
   onEnsemble,
   automatique = false,
+  sources = null,
   exemple,
   couverture,
   periode,
@@ -47,15 +54,19 @@ export function TableauDeBord({
   onRanger,
   onQuitterExemple,
   ventesEcartees = 0,
+  etatsPreparation,
+  onPreparation,
 }: {
   maintenant: Date;
   /** Le business affiché (avec la base en ligne) ; un appui ouvre « Mes business ». */
   nomBusiness?: string;
+  businessId?: string;
   onBusiness?: () => void;
   /** Ouvre la vue d'ensemble (à partir de deux business). */
   onEnsemble?: () => void;
   /** Vrai avec la base en ligne : ventes et vidéos arrivent des comptes reliés. */
   automatique?: boolean;
+  sources?: { boutique: boolean; videos: boolean } | null;
   exemple: boolean;
   couverture: string | null;
   periode: Periode;
@@ -70,8 +81,11 @@ export function TableauDeBord({
   onQuitterExemple: () => void;
   /** Ventes envoyées par la boutique mais pas comptées ; la raison de chacune est dans les réglages. */
   ventesEcartees?: number;
+  etatsPreparation: Record<string, EtatAlerte>;
+  onPreparation: (etape: EtapePreparation, fait: boolean) => void;
 }) {
   // Sans aucun fichier ni vente, on n'affiche pas de chiffres : « — ».
+  const lecture = analyserPeriode({ resume, rythme, couverture, automatique, sources });
   const sansDonnees = !couverture && resume.commandes === 0 && resume.nbRemboursements === 0;
   const euros = (centimes: number | null) => (sansDonnees || centimes === null ? '—' : formatEuros(centimes));
   // Un « — » (pas de valeur) reste gris : jamais en vert comme un vrai gain.
@@ -165,6 +179,11 @@ export function TableauDeBord({
         </div>
       )}
 
+      <div className={`poste-pilotage${automatique ? " priorite-ia" : ""}`}>
+          <LecturePeriode lecture={lecture} exemple={exemple} preparation={sansDonnees && !exemple} sources={automatique ? sources : { boutique: false, videos: false }} objectif={rythme.objectif} etatsPreparation={etatsPreparation} onPreparation={onPreparation} onAction={onAction} />
+          <AssistantIA key={businessId ?? "appareil"} businessId={businessId} periode={periode} exemple={exemple} etatsPreparation={etatsPreparation} onPreparation={onPreparation} onAction={onAction} />
+      </div>
+
       <div className="cockpit">
         <section className="tableau" aria-label="Tes chiffres">
           {rythme.objectif > 0 && <Jauge valeur={rythme.publiees} max={rythme.objectif} />}
@@ -194,7 +213,9 @@ export function TableauDeBord({
           {!sansDonnees && resume.gainsCentimes === null && (
             <p className="note alerte-note">
               {fr(
-                resume.ventesSansFraisStripe === resume.ventesSansFrais
+                resume.ventesSansFrais === 0
+                  ? 'Un remboursement Stripe est présent : ses frais et mouvements de remboursement ne sont pas disponibles. Les gains nets restent inconnus.'
+                  : resume.ventesSansFraisStripe === resume.ventesSansFrais
                   ? `Frais pas encore connus pour ${nombre(resume.ventesSansFrais, 'vente')} : Stripe compte ses frais Managed Payments la nuit suivante. Pas de gains devinés en attendant.`
                   : `Frais non fournis par la boutique pour ${nombre(resume.ventesSansFrais, 'vente')} : pas de gains devinés.`,
               )}
@@ -228,7 +249,7 @@ export function TableauDeBord({
           {alertes.length === 0 ? (
             <p className="rien">
               {automatique
-                ? 'Aucun voyant allumé. Tes ventes et tes vidéos arrivent toutes seules.'
+                ? 'Aucun voyant allumé. La lecture ci-dessous indique les données disponibles et la prochaine étape.'
                 : 'Aucun voyant allumé. Note ta prochaine vidéo avec « J’ai publié ».'}
             </p>
           ) : (
@@ -238,6 +259,7 @@ export function TableauDeBord({
               ))}
             </ul>
           )}
+
         </section>
       </div>
     </>

@@ -3,10 +3,13 @@
 // Chaque appel est fait au nom de la personne connectée : la base n'accepte que ses propres lignes.
 
 import { chiffrer, dechiffrer } from './chiffrement';
+import { analyserBusiness, etatAssistantGratuit, ErreurAssistant, QUESTIONS_IA, limiteurAssistant, type ConfigurationIA, type LimiteurAssistant, type QuestionIA } from './assistant';
+import type { Periode } from '../calculs/resume';
 import type { Video } from '../modele';
 import { CleRefusee, DroitsInsuffisants, type Connecteur, type Recuperateur } from './commun';
 import { connecteurLemonSqueezy } from './lemonsqueezy';
 import { connecteurStripe } from './stripe';
+import { executerVeille } from './veille';
 import {
   creerEtat,
   echangerCode,
@@ -20,7 +23,8 @@ import {
   type JetonsTikTok,
 } from './tiktok';
 
-export interface Env {
+export interface Env extends ConfigurationIA {
+  VEILLE_ACTIVEE?: string;
   ASSETS: { fetch(requete: Request): Promise<Response> };
   SUPABASE_URL: string;
   SUPABASE_CLE_PUBLIQUE: string;
@@ -29,6 +33,12 @@ export interface Env {
   /** Appli développeur TikTok : la clé est publique (wrangler.jsonc), le secret est posé dans Cloudflare. */
   TIKTOK_CLIENT_KEY?: string;
   TIKTOK_CLIENT_SECRET?: string;
+  /** Endpoint HTTPS compatible chat completions et modèle choisis dans Cloudflare. IA_CLE est un secret. */
+  IA_URL?: string;
+  IA_MODELE?: string;
+  IA_CLE?: string;
+  /** Absent par défaut : aucune requête IA distante tant que l’activation explicite ne vaut pas « oui ». */
+  IA_ACTIVEE?: string;
 }
 
 /** Les boutiques que l'appli sait relier. */
@@ -38,6 +48,9 @@ const BOUTIQUES: Record<string, Connecteur> = {
 };
 
 export default {
+  async scheduled(_evenement: unknown, env: Env): Promise<void> {
+    await executerVeille(env, (entree, init) => fetch(entree, init));
+  },
   async fetch(requete: Request, env: Env): Promise<Response> {
     // Sur Cloudflare, fetch refuse d'être appelé depuis un autre objet (ctx.recuperer(…)) :
     // on l'enveloppe pour qu'il soit toujours appelé seul.
@@ -97,6 +110,36 @@ async function utilisateurConnecte(ctx: Pick<Contexte, 'env' | 'jeton' | 'recupe
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const CORPS_MAX_OCTETS = 16 * 1024;
+const CLE_MAX_CARACTERES = 4096;
+class CorpsTropGrand extends Error {}
+
+/** Compte les octets réellement reçus : Content-Length peut manquer ou mentir. */
+async function lireCorps(requete: Request): Promise<Record<string, unknown>> {
+  const lecteur = requete.body?.getReader();
+  if (!lecteur) throw new SyntaxError('Corps manquant');
+  const decodeur = new TextDecoder();
+  let taille = 0;
+  let texte = '';
+  try {
+    for (;;) {
+      const { done, value } = await lecteur.read();
+      if (done) break;
+      taille += value.byteLength;
+      if (taille > CORPS_MAX_OCTETS) {
+        await lecteur.cancel().catch(() => undefined);
+        throw new CorpsTropGrand();
+      }
+      texte += decodeur.decode(value, { stream: true });
+    }
+    texte += decodeur.decode();
+  } finally {
+    lecteur.releaseLock();
+  }
+  const corps: unknown = JSON.parse(texte);
+  if (!corps || typeof corps !== 'object' || Array.isArray(corps)) throw new SyntaxError('Objet attendu');
+  return corps as Record<string, unknown>;
+}
 
 /** Les lignes d'un compte relié dans la base : ce business, cette plateforme, ce compte (vide pour une boutique). */
 function filtreCompte(ctx: Contexte, source: string, identifiant?: string): string {
@@ -109,41 +152,62 @@ function contexteLigne(ctx: Contexte, source: string, identifiant: string): stri
   return `${ctx.userId}|${ctx.businessId}|${source}|${identifiant}`;
 }
 
-export async function traiterApi(requete: Request, env: Env, recuperer: Recuperateur): Promise<Response> {
+export async function traiterApi(requete: Request, env: Env, recuperer: Recuperateur, limiter: LimiteurAssistant = limiteurAssistant): Promise<Response> {
   try {
     const adresse = new URL(requete.url);
+    const assistant = adresse.pathname === '/api/assistant/analyser';
+    const etatAssistant = adresse.pathname === '/api/assistant/etat';
     // Retour de TikTok après l'accord : simple renvoi vers l'appli, qui finit la liaison au nom de la personne.
     if (requete.method === 'GET' && adresse.pathname === '/api/tiktok/retour') return retourTikTok(adresse);
-    if (!env.CLE_CHIFFREMENT) {
+    if (!assistant && !etatAssistant && !env.CLE_CHIFFREMENT) {
       return json(503, { erreur: 'Réglage du serveur à faire : ajoute le secret « CLE_CHIFFREMENT » dans Cloudflare.' });
     }
-    const secret = env.CLE_CHIFFREMENT;
+    const secret = env.CLE_CHIFFREMENT!;
     const jeton = (requete.headers.get('Authorization') ?? '').replace(/^Bearer\s+/i, '').trim();
     let userId: string | null = null;
     try {
-      userId = jeton ? await utilisateurConnecte({ env, jeton, recuperer }) : null;
+      const verifierConnexion: Recuperateur = assistant || etatAssistant
+        ? (entree, init) => recuperer(entree, { ...init, signal: AbortSignal.timeout(10_000), redirect: 'error' })
+        : recuperer;
+      userId = jeton ? await utilisateurConnecte({ env, jeton, recuperer: verifierConnexion }) : null;
     } catch (e) {
       console.error('Vérification de la connexion impossible', e);
       return json(503, { erreur: 'La vérification de ta connexion ne répond pas. Réessaie dans un moment.' });
     }
     if (!userId) return json(401, { erreur: 'Connecte-toi d’abord.' });
+    if (etatAssistant && (requete.method === 'GET' || requete.method === 'POST')) return json(200, etatAssistantGratuit(env));
 
     const tiktok = /^\/api\/comptes\/tiktok\/(connexion|relier|synchroniser)$/.exec(adresse.pathname);
     const chemin = /^\/api\/comptes\/([a-z]+)\/(relier|synchroniser|mouvements)$/.exec(adresse.pathname);
     const connecteur = chemin && Object.hasOwn(BOUTIQUES, chemin[1]!) ? BOUTIQUES[chemin[1]!] : undefined;
-    if (requete.method !== 'POST' || !(tiktok || (chemin && connecteur))) return json(404, { erreur: 'Adresse inconnue.' });
+    if (requete.method !== 'POST' || !(assistant || tiktok || (chemin && connecteur))) return json(404, { erreur: 'Adresse inconnue.' });
 
-    let corps: Record<string, unknown> = {};
+    let corps: Record<string, unknown>;
     try {
-      corps = ((await requete.json()) ?? {}) as Record<string, unknown>;
-    } catch {
-      // corps illisible : traité comme vide
+      corps = await lireCorps(requete);
+    } catch (e) {
+      if (e instanceof CorpsTropGrand) return json(413, { erreur: 'La demande est trop volumineuse.' });
+      return json(400, { erreur: 'La demande est illisible. Réessaie depuis les réglages.' });
     }
 
     // La liaison TikTok retrouve son business dans l'« état » signé ; les autres adresses le reçoivent.
     if (tiktok?.[1] === 'relier') return await relierTikTok(corps, { env, jeton, recuperer, userId }, secret, adresse.origin);
     const businessId = typeof corps.business === 'string' && UUID.test(corps.business) ? corps.business : null;
     if (!businessId) return json(400, { erreur: 'Choisis d’abord un business.' });
+    if (assistant) {
+      const periode = corps.periode ?? '7j';
+      const question = corps.question ?? 'priorites';
+      if (typeof periode !== 'string' || !['7j', '1m', '3m'].includes(periode)
+        || typeof question !== 'string' || !QUESTIONS_IA.includes(question)) {
+        return json(400, { erreur: 'Choisis une période et une question proposées par l’assistant.' });
+      }
+      try {
+        return json(200, await analyserBusiness(env, jeton, userId, businessId, periode as Periode, question as QuestionIA, recuperer, new Date(), limiter));
+      } catch (e) {
+        if (e instanceof ErreurAssistant) return json(e.statut, { erreur: e.message });
+        return json(503, { erreur: 'L’assistant ne répond pas. Réessaie dans un moment.' });
+      }
+    }
     const ctx: Contexte = { env, jeton, recuperer, userId, businessId };
 
     // « await » : une erreur pendant la liaison ou la synchro reste attrapée juste en dessous.
@@ -166,7 +230,10 @@ async function relier(
   connecteur: Connecteur,
   secret: string,
 ): Promise<Response> {
-  const cle = String(corps.cle ?? '').trim();
+  if (typeof corps.cle !== 'string' || corps.cle.length > CLE_MAX_CARACTERES) {
+    return json(400, { erreur: 'La clé d’accès n’a pas le bon format. Vérifie la clé copiée.' });
+  }
+  const cle = corps.cle.trim();
   if (cle.length < 20) return json(400, { erreur: `Colle la clé d’accès ${connecteur.nom} en entier.` });
   const refus = connecteur.refuserCle?.(cle);
   if (refus) return json(400, { erreur: refus });

@@ -1,5 +1,5 @@
 import type { Donnees } from '../modele';
-import { calculerChangements, type Depot } from './depot';
+import { calculerChangements, versDonnees, type Depot } from './depot';
 
 /**
  * D'où vient une modification : d'une action de la personne (rien de précisé),
@@ -10,7 +10,7 @@ export type OrigineModification = 'ventes' | 'videos';
 /**
  * Envoie les changements à la base, un par un et dans l'ordre.
  * Si un envoi échoue (pas de connexion), les envois suivants déjà prévus sont abandonnés
- * et l'appli revient au dernier état confirmé par la base : rien n'est perdu en silence.
+ * et l'appli relit l'état réellement présent dans la base ; hors ligne, elle garde sa dernière copie confirmée.
  */
 export class Synchro {
   private file: Promise<void> = Promise.resolve();
@@ -46,6 +46,12 @@ export class Synchro {
           enregistre = true;
         } catch {
           this.generation++;
+          // Plusieurs requêtes peuvent avoir réussi avant l'échec : le serveur fait foi.
+          try {
+            this.etatServeur = versDonnees(await this.depot.charger(), new Date());
+          } catch {
+            // Hors ligne : seule la dernière copie confirmée reste disponible.
+          }
           this.surEchec(this.etatServeur, origine);
         }
       })
@@ -63,7 +69,7 @@ export class Synchro {
 
 /** Le message quand un enregistrement dans la base a échoué, selon ce qui l'a demandé. */
 export function messageEchecEnregistrement(origine?: OrigineModification): string {
-  if (origine === 'ventes') return 'Tes dernières ventes n’ont pas pu être enregistrées. Réessaie dans un moment.';
-  if (origine === 'videos') return 'Tes dernières vidéos n’ont pas pu être enregistrées. Réessaie dans un moment.';
-  return 'Ta dernière action n’a pas été enregistrée. Vérifie ta connexion, puis réessaie.';
+  if (origine === 'ventes') return 'L’enregistrement des ventes n’a pas été terminé. Certaines peuvent avoir été gardées : vérifie les données, puis réessaie.';
+  if (origine === 'videos') return 'L’enregistrement des vidéos n’a pas été terminé. Certaines peuvent avoir été gardées : vérifie les données, puis réessaie.';
+  return 'L’enregistrement n’a pas été terminé. Une partie peut avoir été gardée : vérifie les données, puis réessaie.';
 }

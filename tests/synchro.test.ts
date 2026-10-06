@@ -403,9 +403,9 @@ describe('erreurs d’actualisation : chaque message dit le compte concerné', (
 
 describe('enregistrement qui échoue : le message dit ce qui n’a pas été enregistré', () => {
   it('une action de la personne, ou une actualisation automatique', () => {
-    expect(messageEchecEnregistrement()).toBe('Ta dernière action n’a pas été enregistrée. Vérifie ta connexion, puis réessaie.');
-    expect(messageEchecEnregistrement('ventes')).toBe('Tes dernières ventes n’ont pas pu être enregistrées. Réessaie dans un moment.');
-    expect(messageEchecEnregistrement('videos')).toBe('Tes dernières vidéos n’ont pas pu être enregistrées. Réessaie dans un moment.');
+    expect(messageEchecEnregistrement()).toBe('L’enregistrement n’a pas été terminé. Une partie peut avoir été gardée : vérifie les données, puis réessaie.');
+    expect(messageEchecEnregistrement('ventes')).toBe('L’enregistrement des ventes n’a pas été terminé. Certaines peuvent avoir été gardées : vérifie les données, puis réessaie.');
+    expect(messageEchecEnregistrement('videos')).toBe('L’enregistrement des vidéos n’a pas été terminé. Certaines peuvent avoir été gardées : vérifie les données, puis réessaie.');
   });
 
   it('Synchro transmet l’origine du changement qui a échoué', async () => {

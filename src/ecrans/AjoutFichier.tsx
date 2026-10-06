@@ -1,9 +1,21 @@
 import { useState } from 'react';
 import { fichierEssai } from '../donnees/exemple';
 import { fr, nombre } from '../texte';
+import { lireDateHeure } from '../temps';
 import { lireFichierVentes } from '../ventes/lire';
 import type { LigneIgnoree, Vente } from '../ventes/modele';
 import { Feuille } from './Feuille';
+
+/** La borne vient de l'export confirmé par la personne, jamais de la date du fichier. */
+export function preparerImportFichier(texte: string, jusqua: string, maintenant: Date) {
+  const lecture = lireFichierVentes(texte);
+  if (!lecture.ok) return lecture;
+  if (lecture.lignesIgnorees.length > 0) return { ok: false as const, erreur: `${nombre(lecture.lignesIgnorees.length, 'ligne refusée', 'lignes refusées')} : corrige le fichier puis réessaie. Rien n’a été modifié.` };
+  const borne = lireDateHeure(jusqua);
+  if (!borne || borne.getTime() > maintenant.getTime()) return { ok: false as const, erreur: 'Indique jusqu’à quelle date et heure cet export contient toutes les ventes (heure de Paris, pas dans le futur).' };
+  if (lecture.ventes.some((v) => Date.parse(v.instant) > borne.getTime())) return { ok: false as const, erreur: 'Le fichier contient une vente après la date indiquée. Vérifie la borne de l’export : rien n’a été modifié.' };
+  return { ...lecture, couverture: borne.toISOString() };
+}
 
 export interface BilanImport {
   ajoutees: number;
@@ -44,14 +56,13 @@ export function AjoutFichier({
   onFermer: () => void;
 }) {
   const [message, setMessage] = useState<Message | null>(null);
+  const [jusqua, setJusqua] = useState('');
 
   const lireFichier = async (fichier: File) => {
-    const lecture = lireFichierVentes(await fichier.text());
+    const lecture = preparerImportFichier(await fichier.text(), jusqua, maintenant);
     if (!lecture.ok) return setMessage({ type: 'erreur', lignes: [lecture.erreur] });
 
-    // Le fichier vient d'être téléchargé : sa date est celle de l'export.
-    const date = fichier.lastModified ? new Date(Math.min(fichier.lastModified, maintenant.getTime())) : maintenant;
-    const bilan = onImporter(lecture.ventes, date.toISOString(), false);
+    const bilan = onImporter(lecture.ventes, lecture.couverture, false);
     setMessage({ type: 'succes', ...decrire(bilan, lecture.lignesIgnorees) });
   };
 
@@ -73,6 +84,11 @@ export function AjoutFichier({
         Pour l’instant, seul le format d’exemple est lu.
         {enLigne && ' Ta boutique Stripe, elle, se relie dans les réglages : pas besoin de fichier.'}
       </p>
+      <label className="champ">
+        Ventes exportées jusqu’au (heure de Paris)
+        <input type="datetime-local" value={jusqua} onChange={(e) => setJusqua(e.target.value)} />
+      </label>
+      <p className="texte-doux">Indique la fin de la période complète de l’export. La date du fichier sur ton appareil ne prouve pas jusqu’à quand les ventes sont chargées.</p>
       {/* Le champ reste dans la page (caché à l'œil) : on l'atteint aussi au clavier, avec Tab. */}
       <label className="bouton principal choix-fichier fichier-ventes">
         Choisir le fichier (.csv)
