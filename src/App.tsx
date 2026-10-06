@@ -1,5 +1,5 @@
 import type { Session, SupabaseClient } from '@supabase/supabase-js';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   businessAOuvrir,
   businessRetenu,
@@ -30,6 +30,7 @@ export function App() {
 
 function AvecCompte({ client }: { client: SupabaseClient }) {
   const [session, setSession] = useState<Session | null | undefined>(undefined);
+  const [sortie, setSortie] = useState(false);
 
   useEffect(() => {
     let actif = true;
@@ -52,6 +53,13 @@ function AvecCompte({ client }: { client: SupabaseClient }) {
     );
   }
   if (!userId) return <Connexion client={client} />;
+  if (sortie) {
+    return (
+      <EcranMessage>
+        <p className="sous-titre">Déconnexion…</p>
+      </EcranMessage>
+    );
+  }
 
   return (
     <AvecBusiness
@@ -61,8 +69,15 @@ function AvecCompte({ client }: { client: SupabaseClient }) {
       compte={{
         email,
         deconnecter: async () => {
+          // D'abord fermer les écrans du compte : une synchro qui finirait après ne réécrit plus la copie de l'appareil.
+          setSortie(true);
+          await new Promise((fin) => setTimeout(fin, 0));
           oublierCache(userId);
-          await client.auth.signOut();
+          try {
+            await client.auth.signOut();
+          } finally {
+            setSortie(false);
+          }
         },
       }}
     />
@@ -94,14 +109,20 @@ function AvecBusiness({
   const [liste, setListe] = useState<Business[] | null>(null);
   const [actuelId, setActuelId] = useState<string | null>(() => businessRetenu(userId));
   const [erreur, setErreur] = useState<string | null>(null);
+  // Une seule lecture à la fois : sinon un compte tout neuf recevrait deux « Mon premier business ».
+  const lecture = useRef<Promise<Business[]> | null>(null);
 
   const charger = useCallback(async () => {
     setErreur(null);
     try {
-      let business = await listerBusiness(client);
-      // Nouveau compte : un premier business, avec les données d'exemple.
-      if (business.length === 0) business = [await creerBusiness(client, userId, 'Mon premier business', true)];
-      setListe(business);
+      lecture.current ??= (async () => {
+        const business = await listerBusiness(client);
+        // Nouveau compte : un premier business, avec les données d'exemple.
+        return business.length > 0 ? business : [await creerBusiness(client, userId, 'Mon premier business', true)];
+      })().finally(() => {
+        lecture.current = null;
+      });
+      setListe(await lecture.current);
     } catch (e) {
       setErreur(
         `${e instanceof Error ? e.message : 'Impossible de lire tes business.'} Si le problème continue, la base n’est peut-être pas à jour (texte SQL « 05-plusieurs-business.sql »).`,

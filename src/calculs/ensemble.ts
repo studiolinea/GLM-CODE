@@ -3,7 +3,7 @@
 
 import type { Video } from '../modele';
 import { dateParis } from '../temps';
-import type { Vente } from '../ventes/modele';
+import { cleVente, type Vente } from '../ventes/modele';
 import { bornesPeriode, calculerResume, type Periode, type Resume } from './resume';
 
 export interface DonneesBusiness {
@@ -11,6 +11,8 @@ export interface DonneesBusiness {
   nom: string;
   ventes: Vente[];
   videos: Video[];
+  /** Jusqu'à quand les ventes sont lues ; null si aucune vente n'a encore été lue (boutique pas reliée). */
+  couverture?: string | null;
 }
 
 export interface LigneEnsemble {
@@ -21,6 +23,8 @@ export interface LigneEnsemble {
   videos: number;
   /** Vrai s'il n'y a encore ni vente ni vidéo dans ce business. */
   vide: boolean;
+  /** Vrai si aucune vente n'a encore été lue (boutique pas reliée) : ses ventes sont inconnues, pas « 0 € ». */
+  ventesInconnues: boolean;
 }
 
 export interface TotalEnsemble {
@@ -53,26 +57,41 @@ export function calculerEnsemble(business: DonneesBusiness[], periode: Periode, 
       const date = dateParis(new Date(v.instant));
       return date >= debut && date <= fin;
     }).length;
-    return { id: b.id, nom: b.nom, resume, videos, vide: b.ventes.length === 0 && b.videos.length === 0 };
+    return {
+      id: b.id,
+      nom: b.nom,
+      resume,
+      videos,
+      vide: b.ventes.length === 0 && b.videos.length === 0,
+      ventesInconnues: b.ventes.length === 0 && b.couverture === null,
+    };
   });
 
-  const somme = (f: (l: LigneEnsemble) => number) => lignes.reduce((t, l) => t + f(l), 0);
+  // Un même compte (Stripe, TikTok) peut être relié dans deux business : chaque vente et chaque vidéo ne compte qu'une fois.
+  const ventesUniques = [...new Map(business.flatMap((b) => b.ventes).map((v) => [cleVente(v), v])).values()];
+  const videosUniques = new Set(
+    business.flatMap((b) => b.videos).filter((v) => {
+      const date = dateParis(new Date(v.instant));
+      return date >= debut && date <= fin;
+    }).map((v) => v.id),
+  );
+  const tout = calculerResume(ventesUniques, periode, maintenant);
+
   const sansGains = lignes.filter((l) => l.resume.gainsCentimes === null);
-  const avecTva = lignes.filter((l) => l.resume.tvaCentimes !== null);
   return {
     periode,
     debut,
     fin,
     lignes,
     total: {
-      ventesCentimes: somme((l) => l.resume.ventesCentimes),
-      commandes: somme((l) => l.resume.commandes),
-      fraisCentimes: somme((l) => l.resume.fraisCentimes),
-      gainsCentimes: sansGains.length > 0 ? null : somme((l) => l.resume.gainsCentimes ?? 0),
+      ventesCentimes: tout.ventesCentimes,
+      commandes: tout.commandes,
+      fraisCentimes: tout.fraisCentimes,
+      gainsCentimes: tout.gainsCentimes,
       businessSansGains: sansGains.map((l) => l.nom),
-      tvaCentimes: avecTva.length > 0 ? avecTva.reduce((t, l) => t + (l.resume.tvaCentimes ?? 0), 0) : null,
-      remboursementsCentimes: somme((l) => l.resume.remboursementsCentimes),
-      videos: somme((l) => l.videos),
+      tvaCentimes: tout.tvaCentimes,
+      remboursementsCentimes: tout.remboursementsCentimes,
+      videos: videosUniques.size,
     },
   };
 }

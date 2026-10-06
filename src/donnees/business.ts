@@ -31,12 +31,17 @@ export async function creerBusiness(client: SupabaseClient, userId: string, nom:
   const { data, error } = await client.from('business').insert({ user_id: userId, nom: propre }).select('id, nom').single();
   if (error || !data) throw new Error('Impossible de créer ce business. Réessaie.');
   if (!premier) {
-    await client
+    const { error: erreurReglages } = await client
       .from('reglages')
       .upsert(
         { user_id: userId, business_id: data.id, objectif_par_jour: 1, couverture: null, exemple_termine: true },
         { onConflict: 'user_id,business_id' },
       );
+    if (erreurReglages) {
+      // Sans ces réglages, le nouveau business montrerait les données d'exemple : on annule sa création.
+      await client.from('business').delete().eq('id', data.id);
+      throw new Error('Impossible de créer ce business. Réessaie.');
+    }
   }
   return data as Business;
 }

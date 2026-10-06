@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Donnees } from '../modele';
 import { donneesValides, donneesVides } from './actions';
-import { versDonnees, type Depot } from './depot';
+import { exempleAAfficher, versDonnees, type Depot } from './depot';
 import { chargerDonnees, enregistrerDonnees } from './stockage';
 import { Synchro } from './synchro';
 
@@ -76,9 +76,18 @@ export function useDonnees(source: Source): EtatDonnees {
   const actuelles = useRef(donnees);
   const version = useRef(0);
   const synchro = useRef<Synchro | null>(null);
+  // Faux dès que l'écran est fermé (déconnexion, autre business) : une réponse qui arrive après n'écrit plus rien.
+  const monte = useRef(true);
+  useEffect(() => {
+    monte.current = true;
+    return () => {
+      monte.current = false;
+    };
+  }, []);
 
   const afficher = useCallback(
     (d: Donnees) => {
+      if (!monte.current) return;
       actuelles.current = d;
       setDonnees(d);
       if (cle) ecrireCache(cle, d);
@@ -100,9 +109,8 @@ export function useDonnees(source: Source): EtatDonnees {
       const compte = await depot.charger();
       // Une modification faite pendant le chargement est plus récente : on ne l'écrase pas.
       if (versionDepart !== version.current || synchro.current?.occupee) return;
-      let d = versDonnees(compte, new Date());
-      // Compte encore vide : on garde l'exemple déjà affiché (et les essais faits dessus).
-      if (d.exemple && actuelles.current?.exemple) d = actuelles.current;
+      const maintenant = new Date();
+      const d = exempleAAfficher(actuelles.current, versDonnees(compte, maintenant), maintenant);
       if (synchro.current) synchro.current.etatServeur = d;
       afficher(d);
       setErreur(null);
@@ -133,7 +141,7 @@ export function useDonnees(source: Source): EtatDonnees {
   const modifier = useCallback(
     (f: (d: Donnees) => Donnees) => {
       const avant = actuelles.current;
-      if (!avant) return;
+      if (!avant || !monte.current) return;
       const apres = f(avant);
       if (apres === avant) return;
       version.current++;

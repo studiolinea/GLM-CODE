@@ -24,14 +24,16 @@ async function toutLire<T>(client: SupabaseClient, table: string, userId: string
 
 /** Les ventes et les vidéos de chaque business, dans l'ordre de la liste. */
 export async function chargerEnsemble(client: SupabaseClient, userId: string, liste: Business[]): Promise<DonneesBusiness[]> {
-  const [ventes, videos] = await Promise.all([
+  const [ventes, videos, reglages] = await Promise.all([
     toutLire<LigneVente & { business_id: string }>(client, 'ventes', userId),
     toutLire<LigneVideo & { business_id: string }>(client, 'videos', userId),
+    toutLire<{ business_id: string; couverture: string | null }>(client, 'reglages', userId),
   ]);
   return liste.map((b) => ({
     id: b.id,
     nom: b.nom,
     ventes: ventes.filter((l) => l.business_id === b.id).map(ligneVersVente),
     videos: videos.filter((l) => l.business_id === b.id).map(ligneVersVideo),
+    couverture: reglages.find((r) => r.business_id === b.id)?.couverture ?? null,
   }));
 }

@@ -373,14 +373,21 @@ async function synchroniserTikTok(ctx: Contexte, secret: string, cles: ClesTikTo
 
   const videos: Video[] = [];
   const erreurs: string[] = [];
-  let injoignable = false;
+  let injoignables = 0;
   for (const ligne of lues.lignes) {
     const noterCe = (champs: Parameters<typeof noter>[3]) => noter(ctx, 'tiktok', ligne.identifiant, champs);
     const contexte = contexteLigne(ctx, 'tiktok', ligne.identifiant);
     try {
       const jetons = JSON.parse(await dechiffrer(ligne.cle_chiffree, secret, contexte)) as JetonsTikTok;
       const valables = await jetonsValables(jetons, cles, ctx.recuperer);
-      if (valables.renouveles) await noterCe({ cle_chiffree: await chiffrer(JSON.stringify(valables.jetons), secret, contexte) });
+      if (valables.renouveles) {
+        // TikTok vient de donner un nouvel accès : s'il n'est pas enregistré, la liaison casserait au prochain renouvellement.
+        const enregistre = await noterCe({ cle_chiffree: await chiffrer(JSON.stringify(valables.jetons), secret, contexte) });
+        if (!enregistre.ok) {
+          erreurs.push('Impossible d’enregistrer l’accès TikTok renouvelé. Réessaie dans un moment.');
+          continue;
+        }
+      }
       videos.push(...videosVersVideos(await toutesLesVideos(valables.jetons.acces, ctx.recuperer)));
       await noterCe({ derniere_synchro: new Date().toISOString(), derniere_erreur: null });
     } catch (e) {
@@ -392,11 +399,11 @@ async function synchroniserTikTok(ctx: Contexte, secret: string, cles: ClesTikTo
         await noterCe({ derniere_erreur: message });
         erreurs.push(message);
       } else {
-        injoignable = true;
+        injoignables++;
       }
     }
   }
-  if (videos.length === 0 && erreurs.length + (injoignable ? 1 : 0) === lues.lignes.length) {
+  if (videos.length === 0 && erreurs.length + injoignables === lues.lignes.length) {
     if (erreurs[0]) return json(400, { erreur: erreurs[0] });
     return json(502, { erreur: 'TikTok ne répond pas. Réessaie dans un moment.' });
   }

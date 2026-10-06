@@ -198,6 +198,17 @@ function Cockpit({
           </button>
         </div>
       )}
+      {enLigne && boutique.erreur && fenetre.type !== 'reglages' && (
+        <div className="bandeau-erreur" role="alert">
+          <span>Actualisation incomplète : {boutique.erreur}</span>
+          <button className="bouton discret" onClick={() => setFenetre({ type: 'reglages' })}>
+            Voir mes comptes reliés
+          </button>
+          <button className="bouton discret" onClick={boutique.effacerErreur} aria-label="Fermer le message">
+            ✕
+          </button>
+        </div>
+      )}
 
       <TableauDeBord
         maintenant={maintenant}
@@ -216,6 +227,7 @@ function Cockpit({
         onAction={surAction}
         onRanger={(id, statut) => modifier((d) => rangerAlerte(d, id, statut, aujourdhui))}
         onQuitterExemple={() => modifier((d) => quitterExemple(d))}
+        ventesEcartees={boutique.ignorees.length}
       />
 
       {(fenetre.type === 'saisie' || videoAModifier) && (

@@ -74,6 +74,11 @@ export async function toutesLesCharges(cle: string, recuperer: Recuperateur = fe
 export function chargesVersVentes(charges: ChargeStripe[]): { ventes: Vente[]; ignorees: VenteIgnoree[] } {
   const ventes: Vente[] = [];
   const ignorees: VenteIgnoree[] = [];
+  // Dès qu'un paiement porte de la TVA retenue, le compte est en Managed Payments : ses 3,5 % sont comptés à part
+  // pour tous ses paiements, même ceux sans TVA. Les frais restent alors inconnus partout.
+  const geresParStripe = charges.some(
+    (c) => typeof c.balance_transaction === 'object' && c.balance_transaction?.fee_details?.some((f) => f.type === 'withheld_tax'),
+  );
   for (const c of charges) {
     if (c.status !== 'succeeded' || !c.paid) {
       ignorees.push({ numero: c.id, raison: 'paiement non abouti' });
@@ -99,7 +104,7 @@ export function chargesVersVentes(charges: ChargeStripe[]): { ventes: Vente[]; i
       montantCentimes: Math.max(0, paye - tvaGardee),
       // Avec Managed Payments, ses frais de 3,5 % ne sont pas dans ce paiement : Stripe les compte à part.
       // Tant que l'appli ne les lit pas, les frais restent inconnus plutôt que faux.
-      fraisCentimes: solde && tva === 0 ? solde.fee : null,
+      fraisCentimes: solde && !geresParStripe ? solde.fee : null,
       ...(tvaGardee > 0 ? { tvaCentimes: tvaGardee } : {}),
       rembourse: c.refunded,
       produit: c.description ?? '',

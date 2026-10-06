@@ -2,6 +2,7 @@
 // Les données d'exemple ne quittent jamais l'appareil.
 
 import { REGLAGES_PAR_DEFAUT, type Donnees, type EtatAlerte, type Video } from '../modele';
+import { dateParis } from '../temps';
 import { cleVente, type Vente } from '../ventes/modele';
 import { donneesVides } from './actions';
 import { donneesExemple } from './exemple';
@@ -47,6 +48,15 @@ export function versDonnees(compte: DonneesCompte, maintenant: Date): Donnees {
     etatsAlertes: compte.etatsAlertes,
     exemple: false,
   };
+}
+
+/**
+ * Compte encore vide : on garde l'exemple déjà affiché (et les essais faits dessus) s'il date d'aujourd'hui.
+ * Plus ancien, il ne montrerait plus rien sur 7 jours : on prend l'exemple refait pour aujourd'hui.
+ */
+export function exempleAAfficher(affiche: Donnees | null, recu: Donnees, maintenant: Date): Donnees {
+  if (!recu.exemple || !affiche?.exemple || !affiche.couverture) return recu;
+  return dateParis(new Date(affiche.couverture)) === dateParis(maintenant) ? { ...affiche, reglages: recu.reglages } : recu;
 }
 
 const identiques = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);

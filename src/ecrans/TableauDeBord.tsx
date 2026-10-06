@@ -36,6 +36,7 @@ export function TableauDeBord({
   onAction,
   onRanger,
   onQuitterExemple,
+  ventesEcartees = 0,
 }: {
   maintenant: Date;
   /** Le business affiché (avec la base en ligne) ; un appui ouvre « Mes business ». */
@@ -57,6 +58,8 @@ export function TableauDeBord({
   onAction: (action: Action) => void;
   onRanger: (id: string, statut: 'fait' | 'plus-tard') => void;
   onQuitterExemple: () => void;
+  /** Ventes envoyées par la boutique mais pas comptées (autre devise…). */
+  ventesEcartees?: number;
 }) {
   // Sans aucun fichier ni vente, on n'affiche pas de chiffres : « — ».
   const sansDonnees = !couverture && resume.commandes === 0 && resume.nbRemboursements === 0;
@@ -159,6 +162,12 @@ export function TableauDeBord({
               elle n’est pas comptée dans tes ventes.
             </p>
           )}
+          {ventesEcartees > 0 && (
+            <p className="note alerte-note">
+              {ventesEcartees} vente{ventesEcartees > 1 ? 's' : ''} de ta boutique pas comptée{ventesEcartees > 1 ? 's' : ''} ici
+              (autre devise…) : le détail est dans les réglages.
+            </p>
+          )}
           <p className="note">Gains = ventes moins commissions et frais. Avant impôts et cotisations.</p>
           <p className="note">
             {couverture ? `Ventes chargées jusqu’au ${quandParis(new Date(couverture))}.` : automatique ? 'Aucune vente lue pour l’instant.' : 'Aucun fichier de ventes ajouté.'}
@@ -171,7 +180,11 @@ export function TableauDeBord({
             <span className="compteur">{alertes.length === 0 ? 'tout est éteint' : `${alertes.length} à traiter`}</span>
           </div>
           {alertes.length === 0 ? (
-            <p className="rien">Aucun voyant allumé. Note ta prochaine vidéo avec « J’ai publié ».</p>
+            <p className="rien">
+              {automatique
+                ? 'Aucun voyant allumé. Tes ventes et tes vidéos arrivent toutes seules.'
+                : 'Aucun voyant allumé. Note ta prochaine vidéo avec « J’ai publié ».'}
+            </p>
           ) : (
             <ul className="alertes">
               {alertes.map((a) => (

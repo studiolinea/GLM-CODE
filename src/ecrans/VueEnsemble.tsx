@@ -78,6 +78,16 @@ export function VueEnsemble({
               <Chiffre nom="Gains réels" valeur={euros(ensemble.total.gainsCentimes)} gains />
               <Chiffre nom="Vidéos" valeur={String(ensemble.total.videos)} />
             </div>
+            {ensemble.lignes.some((l) => l.ventesInconnues && !l.vide) && (
+              <p className="note alerte-note">
+                Aucune vente lue pour{' '}
+                {ensemble.lignes
+                  .filter((l) => l.ventesInconnues && !l.vide)
+                  .map((l) => `« ${l.nom} »`)
+                  .join(', ')}{' '}
+                : sa boutique n’est pas reliée, ses ventes ne sont pas dans le total.
+              </p>
+            )}
             {ensemble.total.businessSansGains.length > 0 && (
               <p className="note alerte-note">
                 Gains inconnus pour {ensemble.total.businessSansGains.map((n) => `« ${n} »`).join(', ')} : des frais ne
@@ -105,9 +115,9 @@ export function VueEnsemble({
                   <p className="texte-doux">Pas encore de données : relie sa boutique et ses comptes.</p>
                 ) : (
                   <div className="chiffres-ensemble">
-                    <Chiffre nom="Ventes" valeur={euros(l.resume.ventesCentimes)} />
-                    <Chiffre nom="Commandes" valeur={String(l.resume.commandes)} />
-                    <Chiffre nom="Gains réels" valeur={euros(l.resume.gainsCentimes)} gains />
+                    <Chiffre nom="Ventes" valeur={l.ventesInconnues ? '—' : euros(l.resume.ventesCentimes)} />
+                    <Chiffre nom="Commandes" valeur={l.ventesInconnues ? '—' : String(l.resume.commandes)} />
+                    <Chiffre nom="Gains réels" valeur={l.ventesInconnues ? '—' : euros(l.resume.gainsCentimes)} gains />
                     <Chiffre nom="Vidéos" valeur={String(l.videos)} />
                   </div>
                 )}

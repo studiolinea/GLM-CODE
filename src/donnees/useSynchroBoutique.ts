@@ -34,6 +34,50 @@ export interface SynchroBoutique {
   relierTikTok: () => Promise<void>;
   /** Le résultat de la liaison TikTok, au retour de la page d'accord. */
   messageTikTok: { type: 'succes' | 'erreur'; texte: string } | null;
+  /** Les ventes que la boutique a envoyées mais que l'appli n'a pas comptées (autre devise…), avec la raison. */
+  ignorees: VenteEcartee[];
+  effacerErreur: () => void;
+}
+
+export type VenteEcartee = { numero: string; raison: string };
+
+/** Une vente écartée qu'il faut signaler : pas les paiements qui n'ont simplement pas abouti. */
+const A_SIGNALER = (i: VenteEcartee) => !/non abouti|non payée/.test(i.raison);
+
+/**
+ * Lit chaque compte relié du business, l'un après l'autre. Un compte en erreur n'empêche pas les autres :
+ * son message est gardé, et la lecture continue.
+ */
+export async function lireComptesRelies(
+  businessId: string,
+  liste: CompteRelie[],
+  appels: {
+    boutique: (business: string, source: SourceBoutique) => Promise<{ ventes: Vente[]; ignorees: VenteEcartee[]; synchroniseLe: string }>;
+    tiktok: (business: string) => Promise<{ videos: Video[] }>;
+  },
+  modifier: (f: (d: Donnees) => Donnees) => void,
+): Promise<{ erreurs: string[]; ignorees: VenteEcartee[] }> {
+  const erreurs: string[] = [];
+  const ignorees: VenteEcartee[] = [];
+  const message = (e: unknown) => (e instanceof Error ? e.message : 'La synchronisation a échoué. Réessaie.');
+  for (const source of BOUTIQUES.filter((b) => liste.some((c) => c.source === b))) {
+    try {
+      const r = await appels.boutique(businessId, source);
+      ignorees.push(...(r.ignorees ?? []).filter(A_SIGNALER));
+      modifier((d) => appliquerVentesBoutique(d, r.ventes, r.synchroniseLe));
+    } catch (e) {
+      erreurs.push(message(e));
+    }
+  }
+  if (liste.some((c) => c.source === 'tiktok')) {
+    try {
+      const r = await appels.tiktok(businessId);
+      modifier((d) => appliquerVideos(d, r.videos));
+    } catch (e) {
+      erreurs.push(message(e));
+    }
+  }
+  return { erreurs, ignorees };
 }
 
 const ECART_MIN_MS = 5 * 60_000; // en revenant sur l'appli, pas plus d'une synchro toutes les 5 minutes
@@ -83,36 +127,53 @@ export function useSynchroBoutique(
   const [enCours, setEnCours] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
   const [messageTikTok, setMessageTikTok] = useState<SynchroBoutique['messageTikTok']>(null);
+  const [ignorees, setIgnorees] = useState<VenteEcartee[]>([]);
   const derniere = useRef(0);
   const retourTraite = useRef(false);
 
   const enLigne = actif && businessId !== null;
-  const synchroniser = useCallback(async () => {
-    if (!enLigne || !businessId) return;
-    derniere.current = Date.now();
-    try {
-      const liste = await listerComptes(businessId);
-      setComptes(liste);
-      const reliees = BOUTIQUES.filter((b) => liste.some((c) => c.source === b));
-      const tiktok = liste.some((c) => c.source === 'tiktok');
-      if (reliees.length === 0 && !tiktok) return;
-      setEnCours(true);
-      for (const source of reliees) {
-        const r = await synchroniserBoutique(businessId, source);
-        modifier((d) => appliquerVentesBoutique(d, r.ventes, r.synchroniseLe));
-      }
-      if (tiktok) {
-        const r = await synchroniserTikTok(businessId);
-        modifier((d) => appliquerVideos(d, r.videos));
-      }
-      setComptes(await listerComptes(businessId));
-      setErreur(null);
-    } catch (e) {
-      setErreur(e instanceof Error ? e.message : 'La synchronisation a échoué. Réessaie.');
-      listerComptes(businessId).then(setComptes, () => undefined);
-    } finally {
-      setEnCours(false);
+  // Une seule synchro à la fois ; une demande pendant une synchro en relance une juste après.
+  const enVol = useRef<Promise<void> | null>(null);
+  const relancer = useRef(false);
+  const monte = useRef(true);
+  useEffect(() => {
+    monte.current = true;
+    return () => {
+      monte.current = false;
+    };
+  }, []);
+
+  const synchroniser = useCallback((): Promise<void> => {
+    if (!enLigne || !businessId) return Promise.resolve();
+    if (enVol.current) {
+      relancer.current = true;
+      return enVol.current;
     }
+    const tour = (async () => {
+      do {
+        relancer.current = false;
+        derniere.current = Date.now();
+        try {
+          const liste = await listerComptes(businessId);
+          if (!monte.current) return;
+          setComptes(liste);
+          setEnCours(true);
+          const bilan = await lireComptesRelies(businessId, liste, { boutique: synchroniserBoutique, tiktok: synchroniserTikTok }, modifier);
+          if (!monte.current) return;
+          setIgnorees(bilan.ignorees);
+          setErreur(bilan.erreurs[0] ?? null);
+          setComptes(await listerComptes(businessId));
+        } catch (e) {
+          if (!monte.current) return;
+          setErreur(e instanceof Error ? e.message : 'La synchronisation a échoué. Réessaie.');
+        }
+      } while (relancer.current && monte.current);
+    })();
+    enVol.current = tour;
+    return tour.finally(() => {
+      enVol.current = null;
+      if (monte.current) setEnCours(false);
+    });
   }, [enLigne, businessId, modifier]);
 
   useEffect(() => {
@@ -190,5 +251,7 @@ export function useSynchroBoutique(
     mouvements,
     relierTikTok: partirSurTikTok,
     messageTikTok,
+    ignorees,
+    effacerErreur: useCallback(() => setErreur(null), []),
   };
 }

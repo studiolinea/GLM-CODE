@@ -50,6 +50,24 @@ export function ComptesRelies({ boutique }: { boutique: SynchroBoutique }) {
       </h3>
       {boutique.comptes === null && !boutique.erreur && <p className="texte-doux">Lecture de tes comptes reliés…</p>}
       {boutique.erreur && <p className="erreur">{boutique.erreur}</p>}
+      {boutique.comptes === null && boutique.erreur && (
+        <button type="button" className="bouton" onClick={() => void boutique.synchroniser()}>
+          Réessayer
+        </button>
+      )}
+      {boutique.ignorees.length > 0 && (
+        <div className="note alerte-note" role="status">
+          <p>
+            {boutique.ignorees.length} vente{boutique.ignorees.length > 1 ? 's' : ''} de ta boutique{' '}
+            {boutique.ignorees.length > 1 ? 'ne sont pas comptées' : 'n’est pas comptée'} dans tes chiffres :
+          </p>
+          {boutique.ignorees.slice(0, 5).map((i) => (
+            <p key={i.numero}>
+              • {i.numero} : {i.raison}
+            </p>
+          ))}
+        </div>
+      )}
       {/* Tant que la liste n'est pas arrivée, on n'affiche rien : sinon tout paraîtrait « pas relié ». */}
       {boutique.comptes !== null && (
         <>
