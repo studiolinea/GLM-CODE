@@ -21,6 +21,8 @@ const COURTS: Record<Periode, string> = { '7j': '7 J', '1m': '1 M', '3m': '3 M' 
 
 export function TableauDeBord({
   maintenant,
+  nomBusiness,
+  onBusiness,
   exemple,
   couverture,
   periode,
@@ -34,6 +36,9 @@ export function TableauDeBord({
   onQuitterExemple,
 }: {
   maintenant: Date;
+  /** Le business affiché (avec la base en ligne) ; un appui ouvre « Mes business ». */
+  nomBusiness?: string;
+  onBusiness?: () => void;
   exemple: boolean;
   couverture: string | null;
   periode: Periode;
@@ -60,7 +65,16 @@ export function TableauDeBord({
               PILOTAGE
               {exemple && <span className="tag">EXEMPLE</span>}
             </div>
-            <p className="sous-titre">Ma boutique · {FORMAT_JOUR.format(maintenant)}</p>
+            <p className="sous-titre">
+              {onBusiness ? (
+                <button className="choix-business" onClick={onBusiness} aria-label={`Business : ${nomBusiness}. Changer de business`}>
+                  {nomBusiness} <span aria-hidden="true">▾</span>
+                </button>
+              ) : (
+                'Ma boutique'
+              )}{' '}
+              · {FORMAT_JOUR.format(maintenant)}
+            </p>
           </div>
           {actions}
         </div>

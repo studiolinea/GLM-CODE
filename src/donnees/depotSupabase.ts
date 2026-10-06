@@ -28,11 +28,15 @@ function verifier(error: { message: string } | null): void {
   if (error) throw new Error(error.message);
 }
 
-/** Les données du compte connecté, dans la base Supabase. Les règles de sécurité limitent tout au propriétaire. */
+/**
+ * Les données d'un business du compte connecté, dans la base Supabase.
+ * Les règles de sécurité limitent tout au propriétaire ; chaque ligne porte le business auquel elle appartient.
+ */
 export class DepotSupabase implements Depot {
   constructor(
     private readonly client: SupabaseClient,
     private readonly userId: string,
+    private readonly businessId: string,
   ) {}
 
   private async toutLire<T>(table: string): Promise<T[]> {
@@ -42,6 +46,7 @@ export class DepotSupabase implements Depot {
         .from(table)
         .select('*')
         .eq('user_id', this.userId)
+        .eq('business_id', this.businessId)
         .range(debut, debut + PAGE - 1);
       verifier(error);
       lignes.push(...((data ?? []) as T[]));
@@ -66,40 +71,44 @@ export class DepotSupabase implements Depot {
 
   async appliquer(c: Changements): Promise<void> {
     const uid = this.userId;
+    const bid = this.businessId;
+    const avecBusiness = <T extends object>(ligne: T) => ({ ...ligne, business_id: bid });
 
     // D'abord les suppressions (utile pour la restauration d'une sauvegarde)…
     const parPlateforme = new Map<string, string[]>();
     for (const v of c.ventes.supprimer) parPlateforme.set(v.plateforme, [...(parPlateforme.get(v.plateforme) ?? []), v.numeroCommande]);
     for (const [plateforme, numeros] of parPlateforme) {
       for (const lot of paquets(numeros, 200)) {
-        const { error } = await this.client.from('ventes').delete().eq('user_id', uid).eq('plateforme', plateforme).in('numero_commande', lot);
+        const { error } = await this.client.from('ventes').delete().eq('user_id', uid).eq('business_id', bid).eq('plateforme', plateforme).in('numero_commande', lot);
         verifier(error);
       }
     }
     for (const lot of paquets(c.videos.supprimer, 200)) {
-      const { error } = await this.client.from('videos').delete().eq('user_id', uid).in('id', lot);
+      const { error } = await this.client.from('videos').delete().eq('user_id', uid).eq('business_id', bid).in('id', lot);
       verifier(error);
     }
     for (const lot of paquets(c.etatsAlertes.supprimer, 200)) {
-      const { error } = await this.client.from('etats_alertes').delete().eq('user_id', uid).in('alerte_id', lot);
+      const { error } = await this.client.from('etats_alertes').delete().eq('user_id', uid).eq('business_id', bid).in('alerte_id', lot);
       verifier(error);
     }
 
     // … puis les ajouts et les modifications.
-    for (const lot of paquets(c.ventes.enregistrer.map((v) => venteVersLigne(v, uid)), PAQUET)) {
-      const { error } = await this.client.from('ventes').upsert(lot, { onConflict: 'user_id,plateforme,numero_commande' });
+    for (const lot of paquets(c.ventes.enregistrer.map((v) => avecBusiness(venteVersLigne(v, uid))), PAQUET)) {
+      const { error } = await this.client.from('ventes').upsert(lot, { onConflict: 'user_id,business_id,plateforme,numero_commande' });
       verifier(error);
     }
-    for (const lot of paquets(c.videos.enregistrer.map((v) => videoVersLigne(v, uid)), PAQUET)) {
-      const { error } = await this.client.from('videos').upsert(lot, { onConflict: 'user_id,id' });
+    for (const lot of paquets(c.videos.enregistrer.map((v) => avecBusiness(videoVersLigne(v, uid))), PAQUET)) {
+      const { error } = await this.client.from('videos').upsert(lot, { onConflict: 'user_id,business_id,id' });
       verifier(error);
     }
-    for (const lot of paquets(c.etatsAlertes.enregistrer.map((e) => etatVersLigne(e.id, e.etat, uid)), PAQUET)) {
-      const { error } = await this.client.from('etats_alertes').upsert(lot, { onConflict: 'user_id,alerte_id' });
+    for (const lot of paquets(c.etatsAlertes.enregistrer.map((e) => avecBusiness(etatVersLigne(e.id, e.etat, uid))), PAQUET)) {
+      const { error } = await this.client.from('etats_alertes').upsert(lot, { onConflict: 'user_id,business_id,alerte_id' });
       verifier(error);
     }
     if (c.reglages) {
-      const { error } = await this.client.from('reglages').upsert(reglagesVersLigne(c.reglages, uid), { onConflict: 'user_id' });
+      const { error } = await this.client
+        .from('reglages')
+        .upsert(avecBusiness(reglagesVersLigne(c.reglages, uid)), { onConflict: 'user_id,business_id' });
       verifier(error);
     }
   }

@@ -19,6 +19,8 @@ export interface ClesTikTok {
 
 /** Ce que le serveur garde, chiffré, pour lire les vidéos sans redemander l'accord. */
 export interface JetonsTikTok {
+  /** L'identifiant du compte TikTok pour cette appli : distingue les comptes d'un même business. */
+  openId: string;
   acces: string;
   renouvellement: string;
   /** Instants ISO de fin de validité. */
@@ -47,21 +49,22 @@ async function signature(contenu: string, secret: string): Promise<string> {
   return base64url(new Uint8Array(await crypto.subtle.sign('HMAC', cle, encodeur.encode(contenu))));
 }
 
-export async function creerEtat(userId: string, secret: string, maintenant = Date.now()): Promise<string> {
-  const contenu = base64url(encodeur.encode(JSON.stringify({ u: userId, e: maintenant + DUREE_ETAT_MS })));
+/** L'état garde aussi le business à relier : le retour de TikTok va dans le bon business. */
+export async function creerEtat(userId: string, businessId: string, secret: string, maintenant = Date.now()): Promise<string> {
+  const contenu = base64url(encodeur.encode(JSON.stringify({ u: userId, b: businessId, e: maintenant + DUREE_ETAT_MS })));
   return `${contenu}.${await signature(contenu, secret)}`;
 }
 
-/** Vrai si l'état est intact, pas expiré, et fait pour cette personne. */
-export async function verifierEtat(etat: string, userId: string, secret: string, maintenant = Date.now()): Promise<boolean> {
+/** Le business de l'état s'il est intact, pas expiré, et fait pour cette personne ; sinon null. */
+export async function verifierEtat(etat: string, userId: string, secret: string, maintenant = Date.now()): Promise<string | null> {
   const [contenu, signe] = etat.split('.');
-  if (!contenu || !signe || signe !== (await signature(contenu, secret))) return false;
+  if (!contenu || !signe || signe !== (await signature(contenu, secret))) return null;
   try {
     const brut = atob(contenu.replace(/-/g, '+').replace(/_/g, '/'));
-    const { u, e } = JSON.parse(brut) as { u?: unknown; e?: unknown };
-    return u === userId && typeof e === 'number' && e > maintenant;
+    const { u, b, e } = JSON.parse(brut) as { u?: unknown; b?: unknown; e?: unknown };
+    return u === userId && typeof b === 'string' && typeof e === 'number' && e > maintenant ? b : null;
   } catch {
-    return false;
+    return null;
   }
 }
 
@@ -83,12 +86,18 @@ interface ReponseJetons {
   expires_in?: number;
   refresh_token?: string;
   refresh_expires_in?: number;
+  open_id?: string;
   scope?: string;
   error?: string;
   error_description?: string;
 }
 
-async function demanderJetons(champs: Record<string, string>, recuperer: Recuperateur, maintenant: number): Promise<JetonsTikTok> {
+async function demanderJetons(
+  champs: Record<string, string>,
+  recuperer: Recuperateur,
+  maintenant: number,
+  openIdConnu = '',
+): Promise<JetonsTikTok> {
   const reponse = await recuperer(`${API}/oauth/token/`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Cache-Control': 'no-cache' },
@@ -105,6 +114,7 @@ async function demanderJetons(champs: Record<string, string>, recuperer: Recuper
     throw new DroitsInsuffisants('Accès aux vidéos refusé');
   }
   return {
+    openId: corps.open_id ?? openIdConnu,
     acces: corps.access_token,
     renouvellement: corps.refresh_token,
     accesExpire: new Date(maintenant + (corps.expires_in ?? 0) * 1000).toISOString(),
@@ -151,6 +161,7 @@ export async function jetonsValables(
     },
     recuperer,
     maintenant,
+    jetons.openId,
   );
   return { jetons: nouveaux, renouveles: true };
 }

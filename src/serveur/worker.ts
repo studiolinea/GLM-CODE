@@ -3,6 +3,7 @@
 // Chaque appel est fait au nom de la personne connectée : la base n'accepte que ses propres lignes.
 
 import { chiffrer, dechiffrer } from './chiffrement';
+import type { Video } from '../modele';
 import { CleRefusee, DroitsInsuffisants, type Connecteur, type Recuperateur } from './commun';
 import { connecteurLemonSqueezy } from './lemonsqueezy';
 import { connecteurStripe } from './stripe';
@@ -58,10 +59,13 @@ interface Contexte {
   env: Env;
   jeton: string;
   recuperer: Recuperateur;
+  userId: string;
+  /** Le business concerné : chaque compte relié appartient à un business du compte connecté. */
+  businessId: string;
 }
 
 /** Appel à la base, au nom de la personne connectée (les règles de sécurité s'appliquent). */
-function base(ctx: Contexte, chemin: string, init: RequestInit = {}): Promise<Response> {
+function base(ctx: Pick<Contexte, 'env' | 'jeton' | 'recuperer'>, chemin: string, init: RequestInit = {}): Promise<Response> {
   return ctx.recuperer(`${ctx.env.SUPABASE_URL}/rest/v1/${chemin}`, {
     ...init,
     headers: {
@@ -73,13 +77,21 @@ function base(ctx: Contexte, chemin: string, init: RequestInit = {}): Promise<Re
   });
 }
 
-async function utilisateurConnecte(ctx: Contexte): Promise<string | null> {
+async function utilisateurConnecte(ctx: Pick<Contexte, 'env' | 'jeton' | 'recuperer'>): Promise<string | null> {
   const reponse = await ctx.recuperer(`${ctx.env.SUPABASE_URL}/auth/v1/user`, {
     headers: { apikey: ctx.env.SUPABASE_CLE_PUBLIQUE, Authorization: `Bearer ${ctx.jeton}` },
   });
   if (!reponse.ok) return null;
   const utilisateur = (await reponse.json()) as { id?: string };
   return utilisateur.id ?? null;
+}
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Les lignes d'un compte relié dans la base : ce business, cette plateforme, ce compte (vide pour une boutique). */
+function filtreCompte(ctx: Contexte, source: string, identifiant?: string): string {
+  const filtre = `business_id=eq.${ctx.businessId}&source=eq.${source}`;
+  return identifiant === undefined ? filtre : `${filtre}&identifiant=eq.${encodeURIComponent(identifiant)}`;
 }
 
 export async function traiterApi(requete: Request, env: Env, recuperer: Recuperateur): Promise<Response> {
@@ -90,24 +102,35 @@ export async function traiterApi(requete: Request, env: Env, recuperer: Recupera
     if (!env.CLE_CHIFFREMENT) {
       return json(503, { erreur: 'Le serveur n’est pas encore configuré : il manque la clé de chiffrement dans Cloudflare.' });
     }
+    const secret = env.CLE_CHIFFREMENT;
     const jeton = (requete.headers.get('Authorization') ?? '').replace(/^Bearer\s+/i, '').trim();
-    const ctx: Contexte = { env, jeton, recuperer };
-    const userId = jeton ? await utilisateurConnecte(ctx) : null;
+    const userId = jeton ? await utilisateurConnecte({ env, jeton, recuperer }) : null;
     if (!userId) return json(401, { erreur: 'Connecte-toi d’abord.' });
 
     const tiktok = /^\/api\/comptes\/tiktok\/(connexion|relier|synchroniser)$/.exec(adresse.pathname);
-    if (tiktok && requete.method === 'POST') {
-      return await routeTikTok(tiktok[1]!, requete, ctx, userId, env.CLE_CHIFFREMENT, adresse.origin);
-    }
-
     const chemin = /^\/api\/comptes\/([a-z]+)\/(relier|synchroniser|mouvements)$/.exec(adresse.pathname);
     const connecteur = chemin ? BOUTIQUES[chemin[1]!] : undefined;
-    if (requete.method !== 'POST' || !chemin || !connecteur) return json(404, { erreur: 'Adresse inconnue.' });
-    const source = chemin[1]!;
+    if (requete.method !== 'POST' || !(tiktok || (chemin && connecteur))) return json(404, { erreur: 'Adresse inconnue.' });
+
+    let corps: Record<string, unknown> = {};
+    try {
+      corps = ((await requete.json()) ?? {}) as Record<string, unknown>;
+    } catch {
+      // corps illisible : traité comme vide
+    }
+
+    // La liaison TikTok retrouve son business dans l'« état » signé ; les autres adresses le reçoivent.
+    if (tiktok?.[1] === 'relier') return await relierTikTok(corps, { env, jeton, recuperer, userId }, secret, adresse.origin);
+    const businessId = typeof corps.business === 'string' && UUID.test(corps.business) ? corps.business : null;
+    if (!businessId) return json(400, { erreur: 'Choisis d’abord un business.' });
+    const ctx: Contexte = { env, jeton, recuperer, userId, businessId };
+
     // « await » : une erreur pendant la liaison ou la synchro reste attrapée juste en dessous.
-    if (chemin[2] === 'relier') return await relier(requete, ctx, userId, source, connecteur, env.CLE_CHIFFREMENT);
-    if (chemin[2] === 'synchroniser') return await synchroniser(ctx, source, connecteur, env.CLE_CHIFFREMENT);
-    return await mouvements(ctx, source, connecteur, env.CLE_CHIFFREMENT);
+    if (tiktok) return await routeTikTok(tiktok[1]!, ctx, secret, adresse.origin);
+    const source = chemin![1]!;
+    if (chemin![2] === 'relier') return await relier(corps, ctx, source, connecteur!, secret);
+    if (chemin![2] === 'synchroniser') return await synchroniser(ctx, source, connecteur!, secret);
+    return await mouvements(ctx, source, connecteur!, secret);
   } catch (e) {
     // Le détail va dans les journaux Cloudflare ; la personne voit un message simple.
     console.error('Erreur du serveur', e);
@@ -116,19 +139,13 @@ export async function traiterApi(requete: Request, env: Env, recuperer: Recupera
 }
 
 async function relier(
-  requete: Request,
+  corps: Record<string, unknown>,
   ctx: Contexte,
-  userId: string,
   source: string,
   connecteur: Connecteur,
   secret: string,
 ): Promise<Response> {
-  let cle = '';
-  try {
-    cle = String(((await requete.json()) as { cle?: unknown }).cle ?? '').trim();
-  } catch {
-    // corps illisible : traité comme une clé vide
-  }
+  const cle = String(corps.cle ?? '').trim();
   if (cle.length < 20) return json(400, { erreur: `Colle la clé d’accès ${connecteur.nom} en entier.` });
   const refus = connecteur.refuserCle?.(cle);
   if (refus) return json(400, { erreur: refus });
@@ -144,24 +161,26 @@ async function relier(
     return json(502, { erreur: `${connecteur.nom} ne répond pas. Réessaie dans un moment.` });
   }
 
-  const echec = await enregistrerCompte(ctx, userId, source, await chiffrer(cle, secret), libelle);
+  const echec = await enregistrerCompte(ctx, source, '', await chiffrer(cle, secret), libelle);
   return echec ?? json(200, { libelle });
 }
 
 /** Enregistre (ou remplace) le compte relié. Renvoie la réponse d'erreur, ou null si tout va bien. */
 async function enregistrerCompte(
   ctx: Contexte,
-  userId: string,
   source: string,
+  identifiant: string,
   cleChiffree: string,
   libelle: string,
 ): Promise<Response | null> {
-  const enregistrement = await base(ctx, 'comptes_relies?on_conflict=user_id,source', {
+  const enregistrement = await base(ctx, 'comptes_relies?on_conflict=user_id,business_id,source,identifiant', {
     method: 'POST',
     headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
     body: JSON.stringify({
-      user_id: userId,
+      user_id: ctx.userId,
+      business_id: ctx.businessId,
       source,
+      identifiant,
       cle_chiffree: cleChiffree,
       libelle,
       relie_le: new Date().toISOString(),
@@ -180,13 +199,28 @@ async function enregistrerCompte(
   return json(502, { erreur: 'Impossible d’enregistrer le compte relié. Réessaie.' });
 }
 
-/** Note sur le compte relié la date de synchro ou l'erreur, pour l'afficher dans les réglages. */
+/** Note sur le compte relié la date de synchro, l'erreur ou une nouvelle clé chiffrée. */
 function noter(
   ctx: Contexte,
   source: string,
+  identifiant: string,
   champs: { derniere_synchro?: string; derniere_erreur?: string | null; cle_chiffree?: string },
 ) {
-  return base(ctx, `comptes_relies?source=eq.${source}`, { method: 'PATCH', body: JSON.stringify(champs) });
+  return base(ctx, `comptes_relies?${filtreCompte(ctx, source, identifiant)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(champs),
+  });
+}
+
+/** Les clés enregistrées de ce business pour cette plateforme (une par compte relié). */
+async function clesEnregistrees(
+  ctx: Contexte,
+  source: string,
+  identifiant?: string,
+): Promise<{ lignes: { identifiant: string; cle_chiffree: string }[] } | { reponse: Response }> {
+  const lecture = await base(ctx, `comptes_relies?${filtreCompte(ctx, source, identifiant)}&select=identifiant,cle_chiffree`);
+  if (!lecture.ok) return { reponse: json(502, { erreur: 'Impossible de lire le compte relié. Réessaie.' }) };
+  return { lignes: (await lecture.json()) as { identifiant: string; cle_chiffree: string }[] };
 }
 
 /** La clé enregistrée de la boutique, déchiffrée ; sinon la réponse d'erreur à renvoyer. */
@@ -196,14 +230,14 @@ async function cleEnregistree(
   nom: string,
   secret: string,
 ): Promise<{ cle: string } | { reponse: Response }> {
-  const lecture = await base(ctx, `comptes_relies?source=eq.${source}&select=cle_chiffree`);
-  if (!lecture.ok) return { reponse: json(502, { erreur: 'Impossible de lire la boutique reliée. Réessaie.' }) };
-  const lignes = (await lecture.json()) as { cle_chiffree: string }[];
-  if (!lignes[0]) return { reponse: json(404, { erreur: `Aucun compte ${nom} relié.` }) };
+  const lues = await clesEnregistrees(ctx, source, '');
+  if ('reponse' in lues) return lues;
+  const ligne = lues.lignes[0];
+  if (!ligne) return { reponse: json(404, { erreur: `Aucun compte ${nom} relié.` }) };
   try {
-    return { cle: await dechiffrer(lignes[0].cle_chiffree, secret) };
+    return { cle: await dechiffrer(ligne.cle_chiffree, secret) };
   } catch {
-    await noter(ctx, source, { derniere_erreur: 'Clé illisible : relie la boutique à nouveau.' });
+    await noter(ctx, source, '', { derniere_erreur: 'Clé illisible : relie la boutique à nouveau.' });
     return {
       reponse: json(409, { erreur: 'La clé enregistrée est illisible. Déconnecte la boutique, puis relie-la à nouveau.' }),
     };
@@ -223,12 +257,12 @@ async function synchroniser(ctx: Contexte, source: string, connecteur: Connecteu
   try {
     const { ventes, ignorees } = await connecteur.lireVentes(lue.cle, ctx.recuperer);
     const synchroniseLe = new Date().toISOString();
-    await noter(ctx, source, { derniere_synchro: synchroniseLe, derniere_erreur: null });
+    await noter(ctx, source, '', { derniere_synchro: synchroniseLe, derniere_erreur: null });
     return json(200, { ventes, ignorees, synchroniseLe });
   } catch (e) {
     if (e instanceof CleRefusee || e instanceof DroitsInsuffisants) {
       const message = messageCleEnregistree(e, connecteur);
-      await noter(ctx, source, { derniere_erreur: message });
+      await noter(ctx, source, '', { derniere_erreur: message });
       return json(400, { erreur: message });
     }
     return json(502, { erreur: `${connecteur.nom} ne répond pas. Réessaie dans un moment.` });
@@ -249,9 +283,12 @@ async function mouvements(ctx: Contexte, source: string, connecteur: Connecteur,
 }
 
 // ── TikTok : liaison par accord sur le site de TikTok, puis lecture des vidéos ──
+// Un business peut relier plusieurs comptes TikTok : chacun est repéré par son « open_id ».
 
 const MESSAGE_DROITS_TIKTOK =
   'TikTok n’a pas donné l’accès à tes vidéos : relie ton compte à nouveau et accepte l’accès à tes vidéos publiques.';
+const MESSAGE_TIKTOK_PAS_CONFIGURE =
+  'TikTok n’est pas encore configuré sur le serveur : il manque la clé TikTok dans Cloudflare.';
 
 function clesTikTok(env: Env): ClesTikTok | null {
   return env.TIKTOK_CLIENT_KEY && env.TIKTOK_CLIENT_SECRET
@@ -274,87 +311,79 @@ function retourTikTok(adresse: URL): Response {
   return new Response(null, { status: 302, headers: { Location: vers.toString(), 'Cache-Control': 'no-store' } });
 }
 
-async function routeTikTok(
-  action: string,
-  requete: Request,
-  ctx: Contexte,
-  userId: string,
-  secret: string,
-  origine: string,
-): Promise<Response> {
+async function routeTikTok(action: string, ctx: Contexte, secret: string, origine: string): Promise<Response> {
   const cles = clesTikTok(ctx.env);
-  if (!cles) {
-    return json(503, { erreur: 'TikTok n’est pas encore configuré sur le serveur : il manque la clé TikTok dans Cloudflare.' });
-  }
-  const adresseRetour = `${origine}/api/tiktok/retour`;
+  if (!cles) return json(503, { erreur: MESSAGE_TIKTOK_PAS_CONFIGURE });
   if (action === 'connexion') {
-    return json(200, { url: urlAutorisation(cles.clientKey, adresseRetour, await creerEtat(userId, secret)) });
+    const etat = await creerEtat(ctx.userId, ctx.businessId, secret);
+    return json(200, { url: urlAutorisation(cles.clientKey, `${origine}/api/tiktok/retour`, etat) });
   }
-  if (action === 'relier') return relierTikTok(requete, ctx, userId, secret, cles, adresseRetour);
   return synchroniserTikTok(ctx, secret, cles);
 }
 
 async function relierTikTok(
-  requete: Request,
-  ctx: Contexte,
-  userId: string,
+  corps: Record<string, unknown>,
+  sansBusiness: Omit<Contexte, 'businessId'>,
   secret: string,
-  cles: ClesTikTok,
-  adresseRetour: string,
+  origine: string,
 ): Promise<Response> {
-  let corps: { code?: unknown; etat?: unknown } = {};
-  try {
-    corps = (await requete.json()) as typeof corps;
-  } catch {
-    // corps illisible : traité comme un lien périmé
-  }
+  const cles = clesTikTok(sansBusiness.env);
+  if (!cles) return json(503, { erreur: MESSAGE_TIKTOK_PAS_CONFIGURE });
   const code = String(corps.code ?? '');
-  if (!code || !(await verifierEtat(String(corps.etat ?? ''), userId, secret))) {
-    return json(400, { erreur: 'Ce lien TikTok n’est plus valable. Appuie à nouveau sur « Relier mon compte TikTok ».' });
+  const businessId = code ? await verifierEtat(String(corps.etat ?? ''), sansBusiness.userId, secret) : null;
+  if (!businessId) {
+    return json(400, { erreur: 'Ce lien TikTok n’est plus valable. Appuie à nouveau sur « Relier un compte TikTok ».' });
   }
+  const ctx: Contexte = { ...sansBusiness, businessId };
   let jetons: JetonsTikTok;
   let libelle: string;
   try {
-    jetons = await echangerCode(code, cles, adresseRetour, ctx.recuperer);
+    jetons = await echangerCode(code, cles, `${origine}/api/tiktok/retour`, ctx.recuperer);
     libelle = await nomTikTok(jetons.acces, ctx.recuperer);
   } catch (e) {
     if (e instanceof DroitsInsuffisants) return json(400, { erreur: MESSAGE_DROITS_TIKTOK });
     if (e instanceof CleRefusee) {
-      return json(400, { erreur: 'TikTok a refusé la liaison. Réessaie avec le bouton « Relier mon compte TikTok ».' });
+      return json(400, { erreur: 'TikTok a refusé la liaison. Réessaie avec le bouton « Relier un compte TikTok ».' });
     }
     return json(502, { erreur: 'TikTok ne répond pas. Réessaie dans un moment.' });
   }
-  const echec = await enregistrerCompte(ctx, userId, 'tiktok', await chiffrer(JSON.stringify(jetons), secret), libelle);
+  const echec = await enregistrerCompte(ctx, 'tiktok', jetons.openId, await chiffrer(JSON.stringify(jetons), secret), libelle);
   return echec ?? json(200, { libelle });
 }
 
+/** Lit les vidéos de chaque compte TikTok du business. Un compte en erreur n'empêche pas les autres. */
 async function synchroniserTikTok(ctx: Contexte, secret: string, cles: ClesTikTok): Promise<Response> {
-  const lue = await cleEnregistree(ctx, 'tiktok', 'TikTok', secret);
-  if ('reponse' in lue) return lue.reponse;
-  let jetons: JetonsTikTok;
-  try {
-    jetons = JSON.parse(lue.cle) as JetonsTikTok;
-  } catch {
-    return json(409, { erreur: 'La liaison TikTok enregistrée est illisible. Déconnecte TikTok, puis relie-le à nouveau.' });
+  const lues = await clesEnregistrees(ctx, 'tiktok');
+  if ('reponse' in lues) return lues.reponse;
+  if (lues.lignes.length === 0) return json(404, { erreur: 'Aucun compte TikTok relié.' });
+
+  const videos: Video[] = [];
+  const erreurs: string[] = [];
+  let injoignable = false;
+  for (const ligne of lues.lignes) {
+    const noterCe = (champs: Parameters<typeof noter>[3]) => noter(ctx, 'tiktok', ligne.identifiant, champs);
+    try {
+      const jetons = JSON.parse(await dechiffrer(ligne.cle_chiffree, secret)) as JetonsTikTok;
+      const valables = await jetonsValables(jetons, cles, ctx.recuperer);
+      if (valables.renouveles) await noterCe({ cle_chiffree: await chiffrer(JSON.stringify(valables.jetons), secret) });
+      videos.push(...videosVersVideos(await toutesLesVideos(valables.jetons.acces, ctx.recuperer)));
+      await noterCe({ derniere_synchro: new Date().toISOString(), derniere_erreur: null });
+    } catch (e) {
+      if (e instanceof CleRefusee || e instanceof DroitsInsuffisants || e instanceof SyntaxError) {
+        const message =
+          e instanceof DroitsInsuffisants
+            ? MESSAGE_DROITS_TIKTOK
+            : 'TikTok ne reconnaît plus la liaison : déconnecte ce compte TikTok, puis relie-le à nouveau.';
+        await noterCe({ derniere_erreur: message });
+        erreurs.push(message);
+      } else {
+        injoignable = true;
+      }
+    }
   }
-  try {
-    const valables = await jetonsValables(jetons, cles, ctx.recuperer);
-    if (valables.renouveles) {
-      await noter(ctx, 'tiktok', { cle_chiffree: await chiffrer(JSON.stringify(valables.jetons), secret) });
-    }
-    const videos = videosVersVideos(await toutesLesVideos(valables.jetons.acces, ctx.recuperer));
-    const synchroniseLe = new Date().toISOString();
-    await noter(ctx, 'tiktok', { derniere_synchro: synchroniseLe, derniere_erreur: null });
-    return json(200, { videos, synchroniseLe });
-  } catch (e) {
-    if (e instanceof CleRefusee || e instanceof DroitsInsuffisants) {
-      const message =
-        e instanceof DroitsInsuffisants
-          ? MESSAGE_DROITS_TIKTOK
-          : 'TikTok ne reconnaît plus la liaison : déconnecte TikTok, puis relie-le à nouveau.';
-      await noter(ctx, 'tiktok', { derniere_erreur: message });
-      return json(400, { erreur: message });
-    }
+  if (videos.length === 0 && erreurs.length + (injoignable ? 1 : 0) === lues.lignes.length) {
+    if (erreurs[0]) return json(400, { erreur: erreurs[0] });
     return json(502, { erreur: 'TikTok ne répond pas. Réessaie dans un moment.' });
   }
+  return json(200, { videos, synchroniseLe: new Date().toISOString() });
 }

@@ -11,7 +11,9 @@ import {
   relierTikTok,
   synchroniserBoutique,
   synchroniserTikTok,
+  mouvementsBoutique,
   type CompteRelie,
+  type MouvementBoutique,
   type RetourTikTok,
   type SourceBoutique,
   type SourceCompte,
@@ -25,7 +27,9 @@ export interface SynchroBoutique {
   synchroniser: () => Promise<void>;
   /** Renvoie le libellé de la boutique ; lève une erreur avec un message clair sinon. */
   relier: (source: SourceBoutique, cle: string) => Promise<string>;
-  deconnecter: (source: SourceCompte) => Promise<void>;
+  deconnecter: (source: SourceCompte, identifiant?: string) => Promise<void>;
+  /** Les derniers mouvements d'argent de la boutique (pour vérifier les frais et la TVA). */
+  mouvements: (source: SourceBoutique) => Promise<MouvementBoutique[]>;
   /** Part sur la page d'accord de TikTok ; lève une erreur avec un message clair si c'est impossible. */
   relierTikTok: () => Promise<void>;
   /** Le résultat de la liaison TikTok, au retour de la page d'accord. */
@@ -73,6 +77,7 @@ export function useSynchroBoutique(
   modifier: (f: (d: Donnees) => Donnees) => void,
   actif: boolean,
   retourTikTok: RetourTikTok | null = null,
+  businessId: string | null = null,
 ): SynchroBoutique {
   const [comptes, setComptes] = useState<CompteRelie[] | null>(null);
   const [enCours, setEnCours] = useState(false);
@@ -81,36 +86,37 @@ export function useSynchroBoutique(
   const derniere = useRef(0);
   const retourTraite = useRef(false);
 
+  const enLigne = actif && businessId !== null;
   const synchroniser = useCallback(async () => {
-    if (!actif) return;
+    if (!enLigne || !businessId) return;
     derniere.current = Date.now();
     try {
-      const liste = await listerComptes();
+      const liste = await listerComptes(businessId);
       setComptes(liste);
       const reliees = BOUTIQUES.filter((b) => liste.some((c) => c.source === b));
       const tiktok = liste.some((c) => c.source === 'tiktok');
       if (reliees.length === 0 && !tiktok) return;
       setEnCours(true);
       for (const source of reliees) {
-        const r = await synchroniserBoutique(source);
+        const r = await synchroniserBoutique(businessId, source);
         modifier((d) => appliquerVentesBoutique(d, r.ventes, r.synchroniseLe));
       }
       if (tiktok) {
-        const r = await synchroniserTikTok();
+        const r = await synchroniserTikTok(businessId);
         modifier((d) => appliquerVideos(d, r.videos));
       }
-      setComptes(await listerComptes());
+      setComptes(await listerComptes(businessId));
       setErreur(null);
     } catch (e) {
       setErreur(e instanceof Error ? e.message : 'La synchronisation a échoué. Réessaie.');
-      listerComptes().then(setComptes, () => undefined);
+      listerComptes(businessId).then(setComptes, () => undefined);
     } finally {
       setEnCours(false);
     }
-  }, [actif, modifier]);
+  }, [enLigne, businessId, modifier]);
 
   useEffect(() => {
-    if (!actif || !retourTikTok || retourTraite.current) return;
+    if (!enLigne || !retourTikTok || retourTraite.current) return;
     retourTraite.current = true;
     // Le code de TikTok ne sert qu'une fois : on l'enlève de l'adresse tout de suite.
     window.history.replaceState(null, '', window.location.pathname);
@@ -129,36 +135,48 @@ export function useSynchroBoutique(
       (e: unknown) =>
         setMessageTikTok({ type: 'erreur', texte: e instanceof Error ? e.message : 'La liaison TikTok a échoué. Réessaie.' }),
     );
-  }, [actif, retourTikTok, synchroniser]);
+  }, [enLigne, retourTikTok, synchroniser]);
 
   useEffect(() => {
-    if (!actif) return;
+    if (!enLigne) return;
     void synchroniser();
     const surRetour = () => {
       if (document.visibilityState === 'visible' && Date.now() - derniere.current > ECART_MIN_MS) void synchroniser();
     };
     document.addEventListener('visibilitychange', surRetour);
     return () => document.removeEventListener('visibilitychange', surRetour);
-  }, [actif, synchroniser]);
+  }, [enLigne, synchroniser]);
 
   const relier = useCallback(
     async (source: SourceBoutique, cle: string) => {
-      const libelle = await relierBoutique(source, cle);
+      if (!businessId) throw new Error('Choisis d’abord un business.');
+      const libelle = await relierBoutique(businessId, source, cle);
       await synchroniser();
       return libelle;
     },
-    [synchroniser],
+    [businessId, synchroniser],
   );
 
-  const deconnecter = useCallback(async (source: SourceCompte) => {
-    await deconnecterCompte(source);
-    setComptes(await listerComptes());
-    setErreur(null);
-  }, []);
+  const deconnecter = useCallback(
+    async (source: SourceCompte, identifiant = '') => {
+      if (!businessId) return;
+      await deconnecterCompte(businessId, source, identifiant);
+      setComptes(await listerComptes(businessId));
+      setErreur(null);
+    },
+    [businessId],
+  );
+
+  const mouvements = useCallback(
+    (source: SourceBoutique) =>
+      businessId ? mouvementsBoutique(businessId, source) : Promise.reject(new Error('Choisis d’abord un business.')),
+    [businessId],
+  );
 
   const partirSurTikTok = useCallback(async () => {
-    window.location.assign(await adresseConnexionTikTok());
-  }, []);
+    if (!businessId) throw new Error('Choisis d’abord un business.');
+    window.location.assign(await adresseConnexionTikTok(businessId));
+  }, [businessId]);
 
   return {
     comptes,
@@ -167,6 +185,7 @@ export function useSynchroBoutique(
     synchroniser,
     relier,
     deconnecter,
+    mouvements,
     relierTikTok: partirSurTikTok,
     messageTikTok,
   };

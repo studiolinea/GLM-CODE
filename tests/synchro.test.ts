@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { donneesVides, enregistrerVideo, importerVentes, quitterExemple, rangerAlerte, supprimerVideo } from '../src/donnees/actions';
 import { calculerChangements, versDonnees, type Changements, type Depot, type DonneesCompte } from '../src/donnees/depot';
 import { donneesExemple } from '../src/donnees/exemple';
+import { businessAOuvrir, nomValide } from '../src/donnees/business';
 import { ligneVersVente, ligneVersVideo, venteVersLigne, videoVersLigne } from '../src/donnees/lignes';
 import { Synchro } from '../src/donnees/synchro';
 import type { Donnees, Video } from '../src/modele';
@@ -221,5 +222,24 @@ describe('ventes reçues de la boutique reliée', () => {
     const { appliquerVentesBoutique } = await import('../src/donnees/useSynchroBoutique');
     const exemple = donneesExemple(maintenant);
     expect(appliquerVentesBoutique(exemple, [], maintenant.toISOString())).toBe(exemple);
+  });
+});
+
+describe('plusieurs business', () => {
+  it('un nom propre, ni vide ni trop long', () => {
+    expect(nomValide('  Guide   detailing ')).toBe('Guide detailing');
+    expect(nomValide('   ')).toBeNull();
+    expect(nomValide('x'.repeat(61))).toBeNull();
+  });
+
+  it('rouvre le business retenu s’il existe encore, sinon le premier', () => {
+    const liste = [
+      { id: 'a', nom: 'Premier' },
+      { id: 'b', nom: 'Deuxième' },
+    ];
+    expect(businessAOuvrir(liste, 'b')?.nom).toBe('Deuxième');
+    expect(businessAOuvrir(liste, 'disparu')?.nom).toBe('Premier');
+    expect(businessAOuvrir(liste, null)?.nom).toBe('Premier');
+    expect(businessAOuvrir([], 'a')).toBeNull();
   });
 });

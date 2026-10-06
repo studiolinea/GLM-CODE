@@ -12,6 +12,8 @@
 - Tout est calculé en **heure de Paris** (`src/temps.ts`). Les montants sont en **centimes** (`src/argent.ts`).
 - `src/calculs/` et `src/alertes/` ne dépendent ni des écrans ni d'internet : chaque règle a ses tests
   dans `tests/`. Lancer `npm run verifier` avant chaque commit.
+- Plusieurs business par compte (maison mère : Studiolinea) : chaque ligne de la base porte `business_id`, et chaque
+  compte relié appartient à un business (plusieurs TikTok possibles). Sur l'appareil seul, un seul business.
 - Données : sans `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY`, tout reste sur l'appareil ; avec, tout passe par le
   compte en ligne (`src/donnees/depot.ts`, `synchro.ts`, `depotSupabase.ts`). Les données d'exemple ne vont jamais
   dans la base. Ne jamais mettre une clé secrète (« service_role », « secret ») dans le code ou le `.env`.
