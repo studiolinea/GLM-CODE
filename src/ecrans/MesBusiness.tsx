@@ -7,7 +7,15 @@ import { Feuille } from './Feuille';
 type Message = { type: 'succes' | 'erreur'; texte: string };
 
 /** « Mes business » : le tableau de tous les business, pour ouvrir, renommer, supprimer ou en créer un. */
-export function MesBusiness({ business, onFermer }: { business: ChoixBusiness; onFermer: () => void }) {
+export function MesBusiness({
+  business,
+  onEnsemble,
+  onFermer,
+}: {
+  business: ChoixBusiness;
+  onEnsemble: () => void;
+  onFermer: () => void;
+}) {
   const [nouveau, setNouveau] = useState('');
   const [occupe, setOccupe] = useState(false);
   const [message, setMessage] = useState<Message | null>(null);
@@ -33,6 +41,13 @@ export function MesBusiness({ business, onFermer }: { business: ChoixBusiness; o
         Chaque business a ses ventes, ses vidéos, ses voyants et ses comptes reliés. Appuie sur « Ouvrir » pour passer
         de l’un à l’autre.
       </p>
+      {business.liste.length > 1 && (
+        <div className="pied" style={{ justifyContent: 'flex-start' }}>
+          <button type="button" className="bouton contour" onClick={onEnsemble}>
+            Voir la vue d’ensemble
+          </button>
+        </div>
+      )}
 
       <ul className="tableau-business" aria-label="Tes business">
         {business.liste.map((b) => (

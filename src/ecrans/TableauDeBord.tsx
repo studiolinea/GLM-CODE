@@ -23,6 +23,7 @@ export function TableauDeBord({
   maintenant,
   nomBusiness,
   onBusiness,
+  onEnsemble,
   automatique = false,
   exemple,
   couverture,
@@ -40,6 +41,8 @@ export function TableauDeBord({
   /** Le business affiché (avec la base en ligne) ; un appui ouvre « Mes business ». */
   nomBusiness?: string;
   onBusiness?: () => void;
+  /** Ouvre la vue d'ensemble (à partir de deux business). */
+  onEnsemble?: () => void;
   /** Vrai avec la base en ligne : ventes et vidéos arrivent des comptes reliés. */
   automatique?: boolean;
   exemple: boolean;
@@ -77,6 +80,11 @@ export function TableauDeBord({
                 <span className="selecteur-business-action" aria-hidden="true">
                   Changer ▾
                 </span>
+              </button>
+            )}
+            {onEnsemble && (
+              <button className="bouton discret lien-ensemble" onClick={onEnsemble}>
+                Vue d’ensemble de mes business
               </button>
             )}
             <p className="sous-titre">

@@ -215,8 +215,11 @@ comptes TikTok, Instagram et sa boutique. Pilotage devient donc multi-business, 
 - Le premier business montre les données d'exemple ; les suivants commencent vides.
 - Base : table `business`, et `business_id` sur toutes les tables (supabase/05-plusieurs-business.sql). Une clé
   étrangère (business, propriétaire) empêche d'écrire dans le business de quelqu'un d'autre.
-- Reste : une **vue d'ensemble** qui additionne tous les business. En mode test, TikTok accepte 10 comptes au
-  maximum : au-delà, il faudra faire valider l'appli TikTok (vidéo de démonstration).
+- **Vue d'ensemble** (fait le 6 octobre) : à partir de deux business, « Vue d'ensemble de mes business » sous le
+  sélecteur. Total de la période (ventes, commandes, gains réels, vidéos, TVA retenue), puis une carte par business
+  avec « Ouvrir ». Si un business a des frais inconnus, pas de total des gains : l'appli dit lequel.
+- En mode test, TikTok accepte 10 comptes au maximum : au-delà, il faudra faire valider l'appli TikTok (vidéo de
+  démonstration).
 
 ## Idées pour plus tard (hors de ce plan)
 

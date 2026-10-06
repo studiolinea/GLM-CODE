@@ -709,6 +709,25 @@ a.bouton {
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
+.total-ensemble {
+  margin: 14px 0 12px;
+  padding: 12px;
+  background: var(--case);
+  border: 1px solid var(--ambre);
+  border-radius: 12px;
+}
+.chiffres-ensemble {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 8px;
+}
+.chiffres-ensemble .lecture b {
+  font-size: 1.05rem;
+}
+.lien-ensemble {
+  margin: 0 0 4px;
+}
 .tableau-business {
   display: grid;
   gap: 8px;
