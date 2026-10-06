@@ -60,22 +60,105 @@ export async function supprimerBusiness(client: SupabaseClient, id: string): Pro
   if (error) throw new Error('Impossible de supprimer ce business. Réessaie.');
 }
 
-// Le business ouvert en dernier, retenu sur l'appareil.
+// La liste des business et le dernier ouvert, retenus sur l'appareil : sans réseau, l'appli s'ouvre quand même.
 const cleChoix = (userId: string) => `pilotage:business:${userId}`;
 
-export function businessRetenu(userId: string): string | null {
+export interface MemoireBusiness {
+  /** Le business ouvert en dernier. */
+  actuel: string | null;
+  /** La dernière liste lue en ligne (vide si elle n'a jamais été lue sur cet appareil). */
+  liste: Business[];
+}
+
+const estBusiness = (b: unknown): b is Business =>
+  typeof b === 'object' && b !== null && typeof (b as Business).id === 'string' && typeof (b as Business).nom === 'string';
+
+/** Relit ce qui est gardé : l'objet { actuel, liste }, ou l'ancien format (l'identifiant du business, seul). */
+export function lireMemoireBusiness(texte: string | null): MemoireBusiness {
+  if (!texte) return { actuel: null, liste: [] };
+  let brut: unknown;
   try {
-    return localStorage.getItem(cleChoix(userId));
+    brut = JSON.parse(texte);
+  } catch {
+    return { actuel: texte, liste: [] };
+  }
+  if (typeof brut !== 'object' || brut === null) return { actuel: null, liste: [] };
+  const { actuel, liste } = brut as { actuel?: unknown; liste?: unknown };
+  return {
+    actuel: typeof actuel === 'string' ? actuel : null,
+    liste: Array.isArray(liste) ? liste.filter(estBusiness).map(({ id, nom }) => ({ id, nom })) : [],
+  };
+}
+
+export function memoireBusiness(userId: string): MemoireBusiness {
+  try {
+    return lireMemoireBusiness(localStorage.getItem(cleChoix(userId)));
+  } catch {
+    return { actuel: null, liste: [] };
+  }
+}
+
+function ecrireMemoire(userId: string, changement: Partial<MemoireBusiness>): void {
+  try {
+    localStorage.setItem(cleChoix(userId), JSON.stringify({ ...memoireBusiness(userId), ...changement }));
+  } catch {
+    // Pas grave : on rouvrira le premier business, et sans réseau l'appli attendra la connexion.
+  }
+}
+
+export function businessRetenu(userId: string): string | null {
+  return memoireBusiness(userId).actuel;
+}
+
+export function retenirBusiness(userId: string, id: string): void {
+  ecrireMemoire(userId, { actuel: id });
+}
+
+/** Garde la liste lue en ligne, pour ouvrir l'appli sans réseau. */
+export function retenirListe(userId: string, liste: Business[]): void {
+  ecrireMemoire(userId, { liste: liste.map(({ id, nom }) => ({ id, nom })) });
+}
+
+/** Efface la liste et le choix gardés sur l'appareil (à la déconnexion). */
+export function oublierBusiness(userId: string): void {
+  try {
+    localStorage.removeItem(cleChoix(userId));
+  } catch {
+    // Rien à faire.
+  }
+}
+
+// Le dernier compte connecté sur cet appareil : sans réseau, sa session ne peut pas être renouvelée,
+// mais l'appli peut quand même montrer la copie de ses données.
+const CLE_COMPTE = 'pilotage:dernier-compte';
+
+export interface CompteRetenu {
+  userId: string;
+  email: string;
+}
+
+export function compteRetenu(): CompteRetenu | null {
+  try {
+    const brut = JSON.parse(localStorage.getItem(CLE_COMPTE) ?? 'null') as Partial<CompteRetenu> | null;
+    return brut && typeof brut.userId === 'string' && brut.userId ? { userId: brut.userId, email: String(brut.email ?? '') } : null;
   } catch {
     return null;
   }
 }
 
-export function retenirBusiness(userId: string, id: string): void {
+export function retenirCompte(compte: CompteRetenu): void {
   try {
-    localStorage.setItem(cleChoix(userId), id);
+    localStorage.setItem(CLE_COMPTE, JSON.stringify(compte));
   } catch {
-    // Pas grave : on rouvrira le premier business.
+    // Pas grave : sans réseau, il faudra attendre la connexion.
+  }
+}
+
+export function oublierCompte(): void {
+  try {
+    localStorage.removeItem(CLE_COMPTE);
+  } catch {
+    // Rien à faire.
   }
 }
 

@@ -41,6 +41,11 @@ function ecrireCache(cle: string, d: Donnees): void {
   }
 }
 
+/** Vrai si cet appareil garde une copie lisible de ce business : sans réseau, on peut l'ouvrir. */
+export function copieExiste(cle: string): boolean {
+  return lireCache(cle) !== null;
+}
+
 /** Efface la copie d'un seul business sur l'appareil (par exemple quand il est supprimé). */
 export function oublierCopie(cle: string): void {
   try {
@@ -61,6 +66,9 @@ export function oublierCache(userId: string): void {
     // Rien à faire.
   }
 }
+
+/** La base ne répond pas, mais l'appli montre la copie de l'appareil. */
+export const MESSAGE_HORS_LIGNE = 'Pas de connexion : les chiffres affichés sont peut-être anciens.';
 
 const MESSAGE_APPAREIL =
   'Attention : cet appareil n’enregistre pas tes données (navigation privée ?). Elles seront perdues en fermant la page.';
@@ -104,6 +112,8 @@ export function useDonnees(source: Source): EtatDonnees {
 
   const recharger = useCallback(async () => {
     if (!depot || synchro.current?.occupee) return;
+    // Sans réseau, la base réessaie plusieurs secondes avant d'abandonner : on prévient tout de suite.
+    if (navigator.onLine === false && actuelles.current) setErreur(MESSAGE_HORS_LIGNE);
     const versionDepart = version.current;
     try {
       const compte = await depot.charger();
@@ -115,11 +125,7 @@ export function useDonnees(source: Source): EtatDonnees {
       afficher(d);
       setErreur(null);
     } catch {
-      setErreur(
-        actuelles.current
-          ? 'Pas de connexion : les chiffres affichés sont peut-être anciens.'
-          : 'Impossible de charger tes données. Vérifie ta connexion internet.',
-      );
+      setErreur(actuelles.current ? MESSAGE_HORS_LIGNE : 'Impossible de charger tes données. Vérifie ta connexion internet.');
     }
   }, [depot, afficher]);
 
@@ -130,12 +136,18 @@ export function useDonnees(source: Source): EtatDonnees {
       setErreur('Pas de connexion, réessaie : ta dernière action n’a pas été enregistrée.');
     });
     void recharger();
-    // En revenant sur l'appli (par exemple après avoir noté une vidéo sur l'autre appareil), on recharge.
+    // En revenant sur l'appli (par exemple après avoir noté une vidéo sur l'autre appareil), ou quand le réseau
+    // revient, on recharge.
     const surRetour = () => {
       if (document.visibilityState === 'visible') void recharger();
     };
+    const surReseau = () => void recharger();
     document.addEventListener('visibilitychange', surRetour);
-    return () => document.removeEventListener('visibilitychange', surRetour);
+    window.addEventListener('online', surReseau);
+    return () => {
+      document.removeEventListener('visibilitychange', surRetour);
+      window.removeEventListener('online', surReseau);
+    };
   }, [depot, afficher, recharger]);
 
   const modifier = useCallback(

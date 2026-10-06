@@ -12,3 +12,11 @@ createRoot(document.getElementById('racine')!).render(
     <App />
   </StrictMode>,
 );
+
+// La version en ligne garde son enveloppe sur l'appareil (public/sw.js) : elle s'ouvre même sans réseau.
+// Pas pendant le développement, ni sans https.
+if (import.meta.env.PROD && location.protocol === 'https:' && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').catch((e: unknown) => console.warn('Service worker non enregistré :', e));
+  });
+}

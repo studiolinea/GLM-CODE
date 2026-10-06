@@ -56,6 +56,17 @@ limitée en lecture (`rk_…`), jamais la clé secrète complète (`sk_…`).
   Adresse de retour déclarée chez TikTok : `https://pilotage.studiolinea-pro.workers.dev/api/tiktok/retour`.
   Pages demandées par TikTok : `/confidentialite` et `/conditions`.
 
+## Sans réseau
+
+- L'appli garde sur l'appareil une copie des chiffres de chaque business, la liste des business et le dernier
+  business ouvert. Sans réseau, elle s'ouvre avec cette copie et le dit : « Pas de connexion : les chiffres affichés
+  sont peut-être anciens. » La déconnexion efface tout ce qui était gardé.
+- La version en ligne (https) installe un petit « service worker » ([public/sw.js](public/sw.js)) : il garde la page
+  et ses fichiers construits pour que l'appli s'ouvre même sans réseau. Il ne garde jamais les données, et ne touche
+  ni au serveur de l'appli (`/api/…`) ni à Supabase. La construction (`vite.config.ts`) lui donne la liste des fichiers
+  et un numéro de version : à chaque nouvelle version, l'ancienne copie est effacée.
+- La règle de sécurité (`public/_headers`) l'autorise avec `worker-src 'self'`.
+
 ## Commandes
 
 ```bash

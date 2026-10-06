@@ -1,7 +1,7 @@
 # En-têtes de sécurité des pages de l'appli (lus par Cloudflare, jamais servis).
 # Les réponses du serveur (/api/…) ne passent pas par ce fichier : elles ont leurs en-têtes dans src/serveur/worker.ts.
 /*
-  Content-Security-Policy: default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self'; manifest-src 'self'; connect-src 'self' https://onzisrzwlzbhtvmzuwrf.supabase.co; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; object-src 'none'; upgrade-insecure-requests
+  Content-Security-Policy: default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self'; manifest-src 'self'; worker-src 'self'; connect-src 'self' https://onzisrzwlzbhtvmzuwrf.supabase.co; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; object-src 'none'; upgrade-insecure-requests
   X-Content-Type-Options: nosniff
   X-Frame-Options: DENY
   Referrer-Policy: no-referrer
