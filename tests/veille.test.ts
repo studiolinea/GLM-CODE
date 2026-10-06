@@ -69,3 +69,14 @@ it('la limite de lectures échoue proprement et ne déclenche pas le modèle', a
   expect(await executerVeille(env, s.recuperer, maintenant, { ...t, synchroniser: saturation })).toEqual({ active: true, traite: false });
   expect(t.analyser).not.toHaveBeenCalled(); expect(s.recuperer.mock.calls.length).toBe(45);
 });
+
+it.each(['sb_secret_factice', 'service-role-jwt-factice'])('veille compatible avec les en-têtes privilégiés (%s)', async (cle) => {
+  const s = scenario();
+  await executerVeille({ ...env, SUPABASE_CLE_SERVEUR: cle }, s.recuperer, maintenant, services());
+  expect(s.recuperer.mock.calls.length).toBeGreaterThan(0);
+  for (const [, init] of s.recuperer.mock.calls) {
+    const h = new Headers(init?.headers);
+    expect(h.get('apikey')).toBe(cle);
+    expect(h.get('Authorization')).toBe(cle.startsWith('sb_secret_') ? null : `Bearer ${cle}`);
+  }
+});

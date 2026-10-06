@@ -1,4 +1,5 @@
 import { analyserBusiness, etatAssistantGratuit, type ConfigurationIA } from './assistant';
+import { entetesSupabaseServeur } from './authSupabase';
 import { chiffrer, dechiffrer } from './chiffrement';
 import type { Recuperateur } from './commun';
 import { connecteurStripe } from './stripe';
@@ -24,7 +25,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 /** Cette clé privilégiée ne passe que dans le Worker planifié, jamais dans les réponses ou le navigateur. */
 function base(env: ConfigurationVeille, recuperer: Recuperateur, table: string, parametres: Record<string, string>, init: RequestInit = {}) {
   return recuperer(`${env.SUPABASE_URL}/rest/v1/${table}?${new URLSearchParams(parametres)}`, {
-    ...init, headers: { apikey: env.SUPABASE_CLE_SERVEUR!, Authorization: `Bearer ${env.SUPABASE_CLE_SERVEUR!}`,
+    ...init, headers: { ...entetesSupabaseServeur(env.SUPABASE_CLE_SERVEUR!),
       'Content-Type': 'application/json', ...(init.headers ?? {}) },
   });
 }
