@@ -509,6 +509,9 @@ a.bouton {
   justify-content: center;
   background: rgba(0, 0, 0, 0.65);
 }
+.feuille:focus {
+  outline: none;
+}
 .feuille {
   width: 100%;
   max-width: 520px;

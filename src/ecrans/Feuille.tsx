@@ -13,13 +13,16 @@ export function Feuille({ titre, onFermer, children }: { titre: string; onFermer
       if (e.key === 'Escape') fermer.current();
     };
     document.addEventListener('keydown', surTouche);
-    ref.current?.querySelector<HTMLElement>('input, button')?.focus();
+    // Avec une souris, on se place sur le premier champ. Sur téléphone, non : le clavier monterait tout seul.
+    const souris = typeof window.matchMedia === 'function' && window.matchMedia('(pointer: fine)').matches;
+    const premier = souris ? ref.current?.querySelector<HTMLElement>('input, button') : null;
+    (premier ?? ref.current)?.focus();
     return () => document.removeEventListener('keydown', surTouche);
   }, []);
 
   return (
     <div className="voile" onMouseDown={(e) => e.target === e.currentTarget && onFermer()}>
-      <div className="feuille" role="dialog" aria-modal="true" aria-labelledby={idTitre} ref={ref}>
+      <div className="feuille" role="dialog" aria-modal="true" aria-labelledby={idTitre} ref={ref} tabIndex={-1}>
         <h2 id={idTitre}>{titre}</h2>
         {children}
       </div>
