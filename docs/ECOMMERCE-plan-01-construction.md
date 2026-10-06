@@ -180,6 +180,16 @@ Kévin veut que l'appli récupère les données toute seule, sans saisie ni fich
 Ordre : choisir la boutique en tenant compte de ce branchement (étape 7) → créer les comptes TikTok et
 Instagram du business → brancher les trois sources.
 
+**Où on en est (6 octobre) :**
+- Boutique : Stripe reliée en mode test, ventes automatiques (voir étape 7).
+- TikTok : compte développeur de Kévin créé, appli « Pilotage » en mode test (« Sandbox ») avec Login Kit et les
+  autorisations `user.info.basic` + `video.list`. Dans Pilotage, la carte TikTok des réglages relie le compte (accord
+  donné sur TikTok, jetons chiffrés côté serveur, renouvelés tout seuls) et les vidéos arrivent avec leurs vues.
+  Reste : créer le compte TikTok du business (son nom n'est pas encore choisi), l'ajouter dans « Target Users »
+  chez TikTok, puis appuyer sur « Relier mon compte TikTok ». Les vidéos notées à la main avec « J'ai publié »
+  restent ; une même vidéo notée à la main et lue sur TikTok compterait deux fois (à régler si ça arrive).
+- Instagram : à faire (compte professionnel + appli développeur Meta).
+
 **Prêt pour le grand public (demande de Kévin) :** les branchements se font **compte par compte**, dans les
 réglages. Section « Mes comptes reliés » : pour chaque source (boutique, TikTok, Instagram, puis Shopify plus
 tard), l'état (relié ou non), un bouton « Relier » et un bouton « Déconnecter ». Chaque personne ne relie que
