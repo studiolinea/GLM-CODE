@@ -121,11 +121,12 @@ function faux() {
   return { recuperer, ligne, appels };
 }
 
-const appel = (chemin: string, corps?: unknown, jeton = 'jeton-ok') =>
+const BUSINESS = '0b0e5a4e-1f2c-4d3b-9a8e-123456789abc';
+const appel = (chemin: string, corps?: Record<string, unknown>, jeton = 'jeton-ok') =>
   new Request(`https://pilotage.test${chemin}`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${jeton}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify(corps ?? {}),
+    body: JSON.stringify({ business: BUSINESS, ...(corps ?? {}) }),
   });
 
 describe('serveur : comptes reliés Lemon Squeezy', () => {
@@ -133,6 +134,19 @@ describe('serveur : comptes reliés Lemon Squeezy', () => {
     const f = faux();
     const r = await traiterApi(appel('/api/comptes/lemonsqueezy/relier', { cle: CLE_LS }, 'mauvais'), env, f.recuperer);
     expect(r.status).toBe(401);
+  });
+
+  it('chaque compte relié appartient à un business : sans business, rien n’est fait', async () => {
+    const f = faux();
+    const r = await traiterApi(appel('/api/comptes/lemonsqueezy/relier', { cle: CLE_LS, business: 'pas-un-business' }), env, f.recuperer);
+    expect(r.status).toBe(400);
+    expect(f.ligne.cle_chiffree).toBeUndefined();
+  });
+
+  it('la boutique est enregistrée dans le business demandé', async () => {
+    const f = faux();
+    await traiterApi(appel('/api/comptes/lemonsqueezy/relier', { cle: CLE_LS }), env, f.recuperer);
+    expect(f.ligne).toMatchObject({ business_id: BUSINESS, source: 'lemonsqueezy', identifiant: '' });
   });
 
   it('refuse de travailler sans clé de chiffrement configurée', async () => {

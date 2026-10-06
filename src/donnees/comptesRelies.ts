@@ -17,6 +17,8 @@ export const BOUTIQUES: SourceBoutique[] = ['stripe', 'lemonsqueezy'];
 
 export interface CompteRelie {
   source: SourceCompte;
+  /** Distingue plusieurs comptes d'un même réseau dans un business (vide pour une boutique). */
+  identifiant: string;
   /** Par exemple le nom de la boutique. */
   libelle: string;
   relieLe: string;
@@ -58,13 +60,17 @@ async function appelerServeur<T>(chemin: string, corps: unknown = {}): Promise<T
   return contenu as T;
 }
 
-export async function listerComptes(): Promise<CompteRelie[]> {
+/** Les comptes reliés d'un business. */
+export async function listerComptes(businessId: string): Promise<CompteRelie[]> {
   const { data, error } = await base()
     .from('comptes_relies')
-    .select('source, libelle, relie_le, derniere_synchro, derniere_erreur');
+    .select('source, identifiant, libelle, relie_le, derniere_synchro, derniere_erreur')
+    .eq('business_id', businessId)
+    .order('relie_le');
   if (error) throw new Error('Impossible de lire tes comptes reliés. Réessaie.');
   return (data ?? []).map((l) => ({
     source: l.source as SourceCompte,
+    identifiant: (l.identifiant as string | null) ?? '',
     libelle: l.libelle as string,
     relieLe: l.relie_le as string,
     derniereSynchro: (l.derniere_synchro as string | null) ?? null,
@@ -73,26 +79,28 @@ export async function listerComptes(): Promise<CompteRelie[]> {
 }
 
 /** Relie une boutique avec sa clé d'accès. Renvoie son libellé (par exemple le nom de la boutique). */
-export async function relierBoutique(source: SourceBoutique, cle: string): Promise<string> {
-  const { libelle } = await appelerServeur<{ libelle: string }>(`/api/comptes/${source}/relier`, { cle });
+export async function relierBoutique(business: string, source: SourceBoutique, cle: string): Promise<string> {
+  const { libelle } = await appelerServeur<{ libelle: string }>(`/api/comptes/${source}/relier`, { business, cle });
   return libelle;
 }
 
-export function synchroniserBoutique(source: SourceBoutique): Promise<ResultatSynchro> {
-  return appelerServeur<ResultatSynchro>(`/api/comptes/${source}/synchroniser`);
+export function synchroniserBoutique(business: string, source: SourceBoutique): Promise<ResultatSynchro> {
+  return appelerServeur<ResultatSynchro>(`/api/comptes/${source}/synchroniser`, { business });
 }
 
 /** Les derniers mouvements d'argent enregistrés par la boutique, pour vérifier les frais et la TVA. */
-export async function mouvementsBoutique(source: SourceBoutique): Promise<MouvementBoutique[]> {
-  const { mouvements } = await appelerServeur<{ mouvements: MouvementBoutique[] }>(`/api/comptes/${source}/mouvements`);
+export async function mouvementsBoutique(business: string, source: SourceBoutique): Promise<MouvementBoutique[]> {
+  const { mouvements } = await appelerServeur<{ mouvements: MouvementBoutique[] }>(`/api/comptes/${source}/mouvements`, {
+    business,
+  });
   return mouvements;
 }
 
 // ── TikTok ──
 
 /** Demande au serveur l'adresse de la page d'accord de TikTok. */
-export async function adresseConnexionTikTok(): Promise<string> {
-  const { url } = await appelerServeur<{ url: string }>('/api/comptes/tiktok/connexion');
+export async function adresseConnexionTikTok(business: string): Promise<string> {
+  const { url } = await appelerServeur<{ url: string }>('/api/comptes/tiktok/connexion', { business });
   return url;
 }
 
@@ -102,8 +110,8 @@ export async function relierTikTok(code: string, etat: string): Promise<string> 
   return libelle;
 }
 
-export function synchroniserTikTok(): Promise<{ videos: Video[]; synchroniseLe: string }> {
-  return appelerServeur('/api/comptes/tiktok/synchroniser');
+export function synchroniserTikTok(business: string): Promise<{ videos: Video[]; synchroniseLe: string }> {
+  return appelerServeur('/api/comptes/tiktok/synchroniser', { business });
 }
 
 /** Ce que TikTok a renvoyé dans l'adresse de l'appli, après l'accord ou le refus. */
@@ -118,7 +126,12 @@ export function lireRetourTikTok(recherche: string): RetourTikTok | null {
 }
 
 /** Efface le compte relié et sa clé. Les ventes déjà chargées restent. */
-export async function deconnecterCompte(source: SourceCompte): Promise<void> {
-  const { error } = await base().from('comptes_relies').delete().eq('source', source);
+export async function deconnecterCompte(business: string, source: SourceCompte, identifiant = ''): Promise<void> {
+  const { error } = await base()
+    .from('comptes_relies')
+    .delete()
+    .eq('business_id', business)
+    .eq('source', source)
+    .eq('identifiant', identifiant);
   if (error) throw new Error('Impossible de déconnecter ce compte. Réessaie.');
 }

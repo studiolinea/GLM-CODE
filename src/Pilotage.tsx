@@ -10,12 +10,14 @@ import {
   rangerAlerte,
   supprimerVideo,
 } from './donnees/actions';
+import type { ChoixBusiness } from './App';
 import { lireRetourTikTok } from './donnees/comptesRelies';
 import { donneesExemple } from './donnees/exemple';
 import { useDonnees, type Source } from './donnees/useDonnees';
 import { useSynchroBoutique } from './donnees/useSynchroBoutique';
 import { AjoutFichier, type BilanImport } from './ecrans/AjoutFichier';
 import { EcranMessage } from './ecrans/EcranMessage';
+import { MesBusiness } from './ecrans/MesBusiness';
 import { Reglages, type Compte } from './ecrans/Reglages';
 import { SaisieVideo } from './ecrans/SaisieVideo';
 import { TableauDeBord } from './ecrans/TableauDeBord';
@@ -27,7 +29,8 @@ type Fenetre =
   | { type: 'saisie' }
   | { type: 'modifier'; videoId: string }
   | { type: 'import' }
-  | { type: 'reglages' };
+  | { type: 'reglages' }
+  | { type: 'business' };
 
 /** L'heure actuelle, remise à jour toutes les 30 secondes (les alertes en dépendent). */
 function useMaintenant(): Date {
@@ -39,7 +42,7 @@ function useMaintenant(): Date {
   return maintenant;
 }
 
-export function Pilotage({ source, compte }: { source: Source; compte?: Compte }) {
+export function Pilotage({ source, compte, business }: { source: Source; compte?: Compte; business?: ChoixBusiness }) {
   const { donnees, modifier, erreur, effacerErreur, recharger } = useDonnees(source);
 
   if (!donnees) {
@@ -69,6 +72,7 @@ export function Pilotage({ source, compte }: { source: Source; compte?: Compte }
       effacerErreur={effacerErreur}
       enLigne={source.type === 'compte'}
       compte={compte}
+      business={business}
     />
   );
 }
@@ -80,6 +84,7 @@ function Cockpit({
   effacerErreur,
   enLigne,
   compte,
+  business,
 }: {
   donnees: NonNullable<ReturnType<typeof useDonnees>['donnees']>;
   modifier: ReturnType<typeof useDonnees>['modifier'];
@@ -87,12 +92,13 @@ function Cockpit({
   effacerErreur: () => void;
   enLigne: boolean;
   compte?: Compte;
+  business?: ChoixBusiness;
 }) {
   const maintenant = useMaintenant();
   // Au retour de la page d'accord de TikTok, l'adresse porte le code : on finit la liaison dans les réglages.
   const [retourTikTok] = useState(() => (enLigne ? lireRetourTikTok(window.location.search) : null));
   // Les ventes de la boutique reliée arrivent toutes seules (seulement avec la base en ligne).
-  const boutique = useSynchroBoutique(modifier, enLigne, retourTikTok);
+  const boutique = useSynchroBoutique(modifier, enLigne, retourTikTok, business?.actuel.id ?? null);
   const [periode, setPeriode] = useState<Periode>('7j');
   const [fenetre, setFenetre] = useState<Fenetre>(() => (retourTikTok ? { type: 'reglages' } : { type: 'aucune' }));
 
@@ -161,6 +167,8 @@ function Cockpit({
 
       <TableauDeBord
         maintenant={maintenant}
+        nomBusiness={business?.actuel.nom}
+        onBusiness={business ? () => setFenetre({ type: 'business' }) : undefined}
         exemple={donnees.exemple}
         couverture={donnees.couverture}
         periode={periode}
@@ -193,6 +201,8 @@ function Cockpit({
       {fenetre.type === 'import' && (
         <AjoutFichier maintenant={maintenant} exemple={donnees.exemple} onImporter={importer} onFermer={fermer} />
       )}
+
+      {fenetre.type === 'business' && business && <MesBusiness business={business} onFermer={fermer} />}
 
       {fenetre.type === 'reglages' && (
         <Reglages

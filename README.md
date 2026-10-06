@@ -21,10 +21,14 @@ avec les chiffres qui le prouvent.
 | 7. Lire les ventes de la boutique | en cours : boutique Stripe reliée en mode test le 6 octobre ; reste à vérifier la TVA et les frais avec un paiement test |
 | 8. Vérifier avec de vraies ventes | à faire |
 | 9. Tout automatique | boutique Stripe reliée (mode test) ; TikTok prêt à relier (appli TikTok en mode test, à relier avec le compte du business quand il existera) ; Instagram à faire |
+| 10. Plusieurs business | ✅ le 6 octobre : « Mes business » en haut de l'écran, chaque business a ses chiffres et ses comptes reliés (plusieurs TikTok possibles) ; vue d'ensemble à faire |
 
 ## La base en ligne (Supabase)
 
-- Tables et règles de sécurité : [supabase/schema.sql](supabase/schema.sql), à coller dans Supabase > SQL Editor.
+- Tables et règles de sécurité : [supabase/schema.sql](supabase/schema.sql), à coller dans Supabase > SQL Editor,
+  puis les fichiers numérotés dans l'ordre (02, 03, 04, 05). Tous peuvent être relancés sans risque.
+- Plusieurs business par compte ([supabase/05-plusieurs-business.sql](supabase/05-plusieurs-business.sql)) :
+  chaque vente, vidéo, réglage, voyant et compte relié porte le business auquel il appartient.
 - L'appli lit l'adresse du projet et sa clé publique dans `VITE_SUPABASE_URL` et `VITE_SUPABASE_ANON_KEY`
   (fichier `.env`, valeurs publiques seulement, jamais la clé secrète).
 - Sans ces deux valeurs, l'appli garde les données sur l'appareil (c'est le cas de la version de test,

@@ -198,6 +198,20 @@ ses propres comptes et ne voit que ses propres données (déjà garanti par les 
 des applis développeur par TikTok et Meta (obligatoire pour d'autres comptes que le sien), page de
 confidentialité.
 
+## Étape 10 (demandée par Kévin le 6 octobre) — Plusieurs business
+
+Kévin veut lancer beaucoup de business (15, 20…) sous sa maison mère **Studiolinea**, chacun avec ses propres
+comptes TikTok, Instagram et sa boutique. Pilotage devient donc multi-business, avant les premières vraies données.
+
+- En haut de l'écran, le nom du business ouvert : un appui ouvre « Mes business » (changer, renommer, créer).
+- Chaque business a ses ventes, ses vidéos, ses voyants, son objectif de vidéos et ses comptes reliés.
+- Un business peut relier plusieurs comptes TikTok : leurs vidéos s'additionnent.
+- Le premier business montre les données d'exemple ; les suivants commencent vides.
+- Base : table `business`, et `business_id` sur toutes les tables (supabase/05-plusieurs-business.sql). Une clé
+  étrangère (business, propriétaire) empêche d'écrire dans le business de quelqu'un d'autre.
+- Reste : une **vue d'ensemble** qui additionne tous les business. En mode test, TikTok accepte 10 comptes au
+  maximum : au-delà, il faudra faire valider l'appli TikTok (vidéo de démonstration).
+
 ## Idées pour plus tard (hors de ce plan)
 
 - **Reprendre des éléments de l'appli dashboard du projet Inicia** (projet Supabase mis en pause le 5 octobre

@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { formatEuros } from '../argent';
-import { mouvementsBoutique, type MouvementBoutique, type SourceBoutique } from '../donnees/comptesRelies';
+import type { CompteRelie, MouvementBoutique, SourceBoutique } from '../donnees/comptesRelies';
 import type { SynchroBoutique } from '../donnees/useSynchroBoutique';
 import { quandParis } from '../temps';
 
@@ -122,7 +122,7 @@ function Boutique({ fiche, boutique }: { fiche: FicheBoutique; boutique: Synchro
                   Déconnecter la boutique
                 </button>
               </div>
-              {fiche.verification && <Verification source={fiche.source} />}
+              {fiche.verification && <Verification source={fiche.source} boutique={boutique} />}
             </>
           ) : (
             <div role="alert">
@@ -197,7 +197,7 @@ function somme(centimes: number | null, devise: string): string {
 }
 
 /** Ce que la boutique a enregistré, mouvement par mouvement : sert à vérifier les frais et la TVA. */
-function Verification({ source }: { source: SourceBoutique }) {
+function Verification({ source, boutique }: { source: SourceBoutique; boutique: SynchroBoutique }) {
   const [ouvert, setOuvert] = useState(false);
   const [liste, setListe] = useState<MouvementBoutique[] | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
@@ -208,7 +208,7 @@ function Verification({ source }: { source: SourceBoutique }) {
     setErreur(null);
     setEnCours(true);
     try {
-      setListe(await mouvementsBoutique(source));
+      setListe(await boutique.mouvements(source));
     } catch (e) {
       setErreur(e instanceof Error ? e.message : 'La lecture a échoué. Réessaie.');
     } finally {
@@ -272,12 +272,14 @@ function Verification({ source }: { source: SourceBoutique }) {
   );
 }
 
-/** TikTok se relie par un accord donné sur le site de TikTok : pas de clé à copier. */
+/**
+ * TikTok se relie par un accord donné sur le site de TikTok : pas de clé à copier.
+ * Un business peut relier plusieurs comptes TikTok ; leurs vidéos s'additionnent.
+ */
 function CompteTikTok({ boutique }: { boutique: SynchroBoutique }) {
-  const relie = boutique.comptes?.find((c) => c.source === 'tiktok');
+  const relies = boutique.comptes?.filter((c) => c.source === 'tiktok') ?? [];
   const [occupe, setOccupe] = useState(false);
   const [message, setMessage] = useState<{ type: 'succes' | 'erreur'; texte: string } | null>(null);
-  const [confirmer, setConfirmer] = useState(false);
   const affiche = message ?? boutique.messageTikTok;
 
   const relier = async () => {
@@ -291,79 +293,101 @@ function CompteTikTok({ boutique }: { boutique: SynchroBoutique }) {
     }
   };
 
+  return (
+    <div className="compte-relie">
+      <div className="compte-entete">
+        <span className="compte-nom">TikTok</span>
+        <span className={`puce ${relies.length > 0 ? 'puce-on' : ''}`}>
+          {relies.length === 0 ? 'Pas relié' : relies.length === 1 ? 'Relié' : `${relies.length} comptes`}
+        </span>
+      </div>
+      {relies.length === 0 ? (
+        <p className="texte-doux">Relie ton compte : tes vidéos et leurs vues arriveront toutes seules, sans rien noter.</p>
+      ) : (
+        <>
+          {relies.map((c) => (
+            <CompteTikTokRelie key={c.identifiant} compte={c} boutique={boutique} onMessage={setMessage} />
+          ))}
+          <div className="pied" style={{ justifyContent: 'flex-start' }}>
+            <button type="button" className="bouton" disabled={boutique.enCours} onClick={() => void boutique.synchroniser()}>
+              Synchroniser maintenant
+            </button>
+          </div>
+        </>
+      )}
+      <p className="note">
+        TikTok te demandera ton accord. Pilotage lit seulement tes vidéos publiques et leurs vues : il ne publie rien.
+        Pendant le mode test, seul un compte ajouté dans « Target Users » chez TikTok peut se relier.
+      </p>
+      <div className="pied" style={{ justifyContent: 'flex-start' }}>
+        <button
+          type="button"
+          className={`bouton ${relies.length === 0 ? 'principal' : 'contour'}`}
+          disabled={occupe}
+          onClick={() => void relier()}
+        >
+          {occupe ? 'Ouverture de TikTok…' : relies.length === 0 ? 'Relier un compte TikTok' : 'Ajouter un autre compte TikTok'}
+        </button>
+      </div>
+      {affiche && (
+        <p className={affiche.type} role="status">
+          {affiche.texte}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function CompteTikTokRelie({
+  compte,
+  boutique,
+  onMessage,
+}: {
+  compte: CompteRelie;
+  boutique: SynchroBoutique;
+  onMessage: (m: { type: 'succes' | 'erreur'; texte: string }) => void;
+}) {
+  const [confirmer, setConfirmer] = useState(false);
+  const [occupe, setOccupe] = useState(false);
+
   const deconnecter = async () => {
     setOccupe(true);
     try {
-      await boutique.deconnecter('tiktok');
-      setConfirmer(false);
-      setMessage({ type: 'succes', texte: 'TikTok déconnecté. Tes vidéos déjà chargées restent.' });
+      await boutique.deconnecter('tiktok', compte.identifiant);
+      onMessage({ type: 'succes', texte: `« ${compte.libelle} » déconnecté. Ses vidéos déjà chargées restent.` });
     } catch (e) {
-      setMessage({ type: 'erreur', texte: e instanceof Error ? e.message : 'La déconnexion a échoué. Réessaie.' });
-    } finally {
+      onMessage({ type: 'erreur', texte: e instanceof Error ? e.message : 'La déconnexion a échoué. Réessaie.' });
       setOccupe(false);
     }
   };
 
   return (
-    <div className="compte-relie">
-      <div className="compte-entete">
-        <span className="compte-nom">TikTok</span>
-        <span className={`puce ${relie ? 'puce-on' : ''}`}>{relie ? 'Relié' : 'Pas relié'}</span>
-      </div>
-      {relie ? (
-        <>
-          <p className="texte-doux">
-            « {relie.libelle} » ·{' '}
-            {boutique.enCours
-              ? 'synchronisation…'
-              : relie.derniereSynchro
-                ? `vidéos à jour le ${quandParis(new Date(relie.derniereSynchro))}`
-                : 'pas encore synchronisé'}
-          </p>
-          {relie.derniereErreur && <p className="erreur">{relie.derniereErreur}</p>}
-          {!confirmer ? (
-            <div className="pied" style={{ justifyContent: 'flex-start' }}>
-              <button type="button" className="bouton" disabled={boutique.enCours} onClick={() => void boutique.synchroniser()}>
-                Synchroniser maintenant
-              </button>
-              <button type="button" className="bouton discret" onClick={() => setConfirmer(true)}>
-                Déconnecter TikTok
-              </button>
-            </div>
-          ) : (
-            <div role="alert">
-              <p className="erreur">Déconnecter TikTok ? L’accès sera effacé. Tes vidéos déjà chargées restent.</p>
-              <div className="pied" style={{ justifyContent: 'flex-start' }}>
-                <button type="button" className="bouton danger" disabled={occupe} onClick={() => void deconnecter()}>
-                  Oui, déconnecter
-                </button>
-                <button type="button" className="bouton discret" onClick={() => setConfirmer(false)}>
-                  Annuler
-                </button>
-              </div>
-            </div>
-          )}
-        </>
+    <div className="compte-reseau">
+      <p className="texte-doux">
+        « {compte.libelle} » ·{' '}
+        {boutique.enCours
+          ? 'synchronisation…'
+          : compte.derniereSynchro
+            ? `vidéos à jour le ${quandParis(new Date(compte.derniereSynchro))}`
+            : 'pas encore synchronisé'}
+      </p>
+      {compte.derniereErreur && <p className="erreur">{compte.derniereErreur}</p>}
+      {!confirmer ? (
+        <button type="button" className="bouton discret" onClick={() => setConfirmer(true)}>
+          Déconnecter ce compte
+        </button>
       ) : (
-        <>
-          <p className="texte-doux">
-            Relie ton compte : tes vidéos et leurs vues arriveront toutes seules, sans rien noter.
-          </p>
-          <p className="note">
-            TikTok te demandera ton accord. Pilotage lit seulement tes vidéos publiques et leurs vues : il ne publie
-            rien. Pendant le mode test, seul un compte ajouté dans « Target Users » chez TikTok peut se relier.
-          </p>
+        <div role="alert">
+          <p className="erreur">Déconnecter « {compte.libelle} » ? L’accès sera effacé. Ses vidéos déjà chargées restent.</p>
           <div className="pied" style={{ justifyContent: 'flex-start' }}>
-            <button type="button" className="bouton principal" disabled={occupe} onClick={() => void relier()}>
-              {occupe ? 'Ouverture de TikTok…' : 'Relier mon compte TikTok'}
+            <button type="button" className="bouton danger" disabled={occupe} onClick={() => void deconnecter()}>
+              Oui, déconnecter
+            </button>
+            <button type="button" className="bouton discret" onClick={() => setConfirmer(false)}>
+              Annuler
             </button>
           </div>
-        </>
-      )}
-      {affiche && (
-        <p className={affiche.type} role="status">
-          {affiche.texte}
-        </p>
+        </div>
       )}
     </div>
   );

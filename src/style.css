@@ -655,6 +655,37 @@ a.bouton {
   color: var(--vert);
 }
 
+.compte-reseau {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--bord);
+}
+.compte-reseau .texte-doux {
+  margin: 0 0 4px;
+}
+
+/* Le business affiché, en haut : un appui ouvre « Mes business » */
+.choix-business {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ambre);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.choix-business:focus-visible {
+  outline: 2px solid var(--ambre);
+  outline-offset: 2px;
+}
+.liste-business {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
 /* Vérification des frais et de la TVA : les mouvements d'argent de la boutique */
 .verification {
   margin-top: 10px;

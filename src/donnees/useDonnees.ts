@@ -6,7 +6,10 @@ import { chargerDonnees, enregistrerDonnees } from './stockage';
 import { Synchro } from './synchro';
 
 /** Où sont gardées les données : sur l'appareil seulement, ou dans le compte en ligne. */
-export type Source = { type: 'appareil' } | { type: 'compte'; depot: Depot; userId: string };
+export type Source =
+  | { type: 'appareil' }
+  /** `cle` distingue la copie gardée sur l'appareil : une par compte et par business. */
+  | { type: 'compte'; depot: Depot; cle: string };
 
 export interface EtatDonnees {
   /** null tant que les données ne sont pas encore arrivées. */
@@ -18,28 +21,33 @@ export interface EtatDonnees {
 }
 
 // Copie du compte sur l'appareil : l'appli s'ouvre tout de suite, même avant la réponse de la base.
-const cleCache = (userId: string) => `pilotage:compte:${userId}`;
+const PREFIXE_CACHE = 'pilotage:compte:';
+const cleCache = (cle: string) => `${PREFIXE_CACHE}${cle}`;
 
-function lireCache(userId: string): Donnees | null {
+function lireCache(cle: string): Donnees | null {
   try {
-    const texte = localStorage.getItem(cleCache(userId));
+    const texte = localStorage.getItem(cleCache(cle));
     return texte ? donneesValides(JSON.parse(texte)) : null;
   } catch {
     return null;
   }
 }
 
-function ecrireCache(userId: string, d: Donnees): void {
+function ecrireCache(cle: string, d: Donnees): void {
   try {
-    localStorage.setItem(cleCache(userId), JSON.stringify(d));
+    localStorage.setItem(cleCache(cle), JSON.stringify(d));
   } catch {
     // Pas grave : la base en ligne reste la référence.
   }
 }
 
+/** Efface les copies d'un compte sur l'appareil (tous ses business), par exemple à la déconnexion. */
 export function oublierCache(userId: string): void {
   try {
-    localStorage.removeItem(cleCache(userId));
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const cle = localStorage.key(i);
+      if (cle?.startsWith(cleCache(userId))) localStorage.removeItem(cle);
+    }
   } catch {
     // Rien à faire.
   }
@@ -50,10 +58,10 @@ const MESSAGE_APPAREIL =
 
 export function useDonnees(source: Source): EtatDonnees {
   const depot = source.type === 'compte' ? source.depot : null;
-  const userId = source.type === 'compte' ? source.userId : null;
+  const cle = source.type === 'compte' ? source.cle : null;
 
   const [donnees, setDonnees] = useState<Donnees | null>(() =>
-    source.type === 'appareil' ? chargerDonnees(new Date()) : lireCache(source.userId),
+    source.type === 'appareil' ? chargerDonnees(new Date()) : lireCache(source.cle),
   );
   const [erreur, setErreur] = useState<string | null>(null);
   const actuelles = useRef(donnees);
@@ -64,9 +72,9 @@ export function useDonnees(source: Source): EtatDonnees {
     (d: Donnees) => {
       actuelles.current = d;
       setDonnees(d);
-      if (userId) ecrireCache(userId, d);
+      if (cle) ecrireCache(cle, d);
     },
-    [userId],
+    [cle],
   );
 
   // Sur l'appareil : vérifier dès l'ouverture que l'enregistrement fonctionne.
