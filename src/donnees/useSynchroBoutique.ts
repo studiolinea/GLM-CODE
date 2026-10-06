@@ -123,7 +123,9 @@ export function useSynchroBoutique(
     if ('erreur' in retourTikTok) {
       setMessageTikTok({
         type: 'erreur',
-        texte: RAISONS_TIKTOK[retourTikTok.erreur] ?? 'TikTok n’a pas pu relier ton compte. Réessaie.',
+        texte: Object.hasOwn(RAISONS_TIKTOK, retourTikTok.erreur)
+          ? RAISONS_TIKTOK[retourTikTok.erreur]!
+          : 'TikTok n’a pas pu relier ton compte. Réessaie.',
       });
       return;
     }

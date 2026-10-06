@@ -120,7 +120,7 @@ export type RetourTikTok = { code: string; etat: string } | { erreur: string };
 export function lireRetourTikTok(recherche: string): RetourTikTok | null {
   const p = new URLSearchParams(recherche);
   if (p.get('tiktok') !== 'retour') return null;
-  const code = p.get('code');
+  const code = p.get('code_tiktok');
   const etat = p.get('etat');
   return code && etat ? { code, etat } : { erreur: p.get('erreur') ?? 'inconnue' };
 }

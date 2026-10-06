@@ -17,6 +17,13 @@ describe('chiffrement des clés d’accès', () => {
   it('refuse de déchiffrer avec un autre secret', async () => {
     await expect(dechiffrer(await chiffrer('cle', SECRET), 'autre-secret')).rejects.toThrow();
   });
+
+  it('v2 : une clé chiffrée copiée dans la ligne d’un autre compte devient illisible', async () => {
+    const chez = (u: string) => `${u}|biz|stripe|`;
+    const pourB = await chiffrer('rk_live_cle_de_b', SECRET, chez('compte-b'));
+    expect(await dechiffrer(pourB, SECRET, chez('compte-b'))).toBe('rk_live_cle_de_b');
+    await expect(dechiffrer(pourB, SECRET, chez('compte-a'))).rejects.toThrow();
+  });
 });
 
 const commande = (id: string, attributes: CommandeLemonSqueezy['attributes']): CommandeLemonSqueezy => ({ id, attributes });
@@ -168,7 +175,7 @@ describe('serveur : comptes reliés Lemon Squeezy', () => {
     expect(r.status).toBe(200);
     expect(await r.json()).toEqual({ libelle: 'Detailing Pro' });
     expect(f.ligne.libelle).toBe('Detailing Pro');
-    expect(f.ligne.cle_chiffree).toMatch(/^v1:/);
+    expect(f.ligne.cle_chiffree).toMatch(/^v2:/);
     expect(f.ligne.cle_chiffree).not.toContain(CLE_LS);
   });
 

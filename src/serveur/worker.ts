@@ -48,10 +48,18 @@ export default {
   },
 };
 
+/** En-têtes de toutes les réponses du serveur : jamais gardées en cache, jamais affichées dans une autre page. */
+const ENTETES_API = {
+  'Cache-Control': 'no-store',
+  'X-Content-Type-Options': 'nosniff',
+  'Referrer-Policy': 'no-referrer',
+  'Content-Security-Policy': "default-src 'none'; frame-ancestors 'none'",
+};
+
 function json(statut: number, corps: unknown): Response {
   return new Response(JSON.stringify(corps), {
     status: statut,
-    headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' },
+    headers: { 'Content-Type': 'application/json; charset=utf-8', ...ENTETES_API },
   });
 }
 
@@ -94,6 +102,11 @@ function filtreCompte(ctx: Contexte, source: string, identifiant?: string): stri
   return identifiant === undefined ? filtre : `${filtre}&identifiant=eq.${encodeURIComponent(identifiant)}`;
 }
 
+/** Lie chaque clé chiffrée à sa ligne : copiée dans une autre ligne (ou un autre compte), elle devient illisible. */
+function contexteLigne(ctx: Contexte, source: string, identifiant: string): string {
+  return `${ctx.userId}|${ctx.businessId}|${source}|${identifiant}`;
+}
+
 export async function traiterApi(requete: Request, env: Env, recuperer: Recuperateur): Promise<Response> {
   try {
     const adresse = new URL(requete.url);
@@ -109,7 +122,7 @@ export async function traiterApi(requete: Request, env: Env, recuperer: Recupera
 
     const tiktok = /^\/api\/comptes\/tiktok\/(connexion|relier|synchroniser)$/.exec(adresse.pathname);
     const chemin = /^\/api\/comptes\/([a-z]+)\/(relier|synchroniser|mouvements)$/.exec(adresse.pathname);
-    const connecteur = chemin ? BOUTIQUES[chemin[1]!] : undefined;
+    const connecteur = chemin && Object.hasOwn(BOUTIQUES, chemin[1]!) ? BOUTIQUES[chemin[1]!] : undefined;
     if (requete.method !== 'POST' || !(tiktok || (chemin && connecteur))) return json(404, { erreur: 'Adresse inconnue.' });
 
     let corps: Record<string, unknown> = {};
@@ -161,7 +174,7 @@ async function relier(
     return json(502, { erreur: `${connecteur.nom} ne répond pas. Réessaie dans un moment.` });
   }
 
-  const echec = await enregistrerCompte(ctx, source, '', await chiffrer(cle, secret), libelle);
+  const echec = await enregistrerCompte(ctx, source, '', await chiffrer(cle, secret, contexteLigne(ctx, source, '')), libelle);
   return echec ?? json(200, { libelle });
 }
 
@@ -235,7 +248,7 @@ async function cleEnregistree(
   const ligne = lues.lignes[0];
   if (!ligne) return { reponse: json(404, { erreur: `Aucun compte ${nom} relié.` }) };
   try {
-    return { cle: await dechiffrer(ligne.cle_chiffree, secret) };
+    return { cle: await dechiffrer(ligne.cle_chiffree, secret, contexteLigne(ctx, source, '')) };
   } catch {
     await noter(ctx, source, '', { derniere_erreur: 'Clé illisible : relie la boutique à nouveau.' });
     return {
@@ -303,12 +316,12 @@ function retourTikTok(adresse: URL): Response {
   const code = adresse.searchParams.get('code');
   const etat = adresse.searchParams.get('state');
   if (code && etat) {
-    vers.searchParams.set('code', code);
+    vers.searchParams.set('code_tiktok', code);
     vers.searchParams.set('etat', etat);
   } else {
     vers.searchParams.set('erreur', adresse.searchParams.get('error') ?? 'inconnue');
   }
-  return new Response(null, { status: 302, headers: { Location: vers.toString(), 'Cache-Control': 'no-store' } });
+  return new Response(null, { status: 302, headers: { Location: vers.toString(), ...ENTETES_API } });
 }
 
 async function routeTikTok(action: string, ctx: Contexte, secret: string, origine: string): Promise<Response> {
@@ -347,7 +360,8 @@ async function relierTikTok(
     }
     return json(502, { erreur: 'TikTok ne répond pas. Réessaie dans un moment.' });
   }
-  const echec = await enregistrerCompte(ctx, 'tiktok', jetons.openId, await chiffrer(JSON.stringify(jetons), secret), libelle);
+  const contexte = contexteLigne(ctx, 'tiktok', jetons.openId);
+  const echec = await enregistrerCompte(ctx, 'tiktok', jetons.openId, await chiffrer(JSON.stringify(jetons), secret, contexte), libelle);
   return echec ?? json(200, { libelle });
 }
 
@@ -362,10 +376,11 @@ async function synchroniserTikTok(ctx: Contexte, secret: string, cles: ClesTikTo
   let injoignable = false;
   for (const ligne of lues.lignes) {
     const noterCe = (champs: Parameters<typeof noter>[3]) => noter(ctx, 'tiktok', ligne.identifiant, champs);
+    const contexte = contexteLigne(ctx, 'tiktok', ligne.identifiant);
     try {
-      const jetons = JSON.parse(await dechiffrer(ligne.cle_chiffree, secret)) as JetonsTikTok;
+      const jetons = JSON.parse(await dechiffrer(ligne.cle_chiffree, secret, contexte)) as JetonsTikTok;
       const valables = await jetonsValables(jetons, cles, ctx.recuperer);
-      if (valables.renouveles) await noterCe({ cle_chiffree: await chiffrer(JSON.stringify(valables.jetons), secret) });
+      if (valables.renouveles) await noterCe({ cle_chiffree: await chiffrer(JSON.stringify(valables.jetons), secret, contexte) });
       videos.push(...videosVersVideos(await toutesLesVideos(valables.jetons.acces, ctx.recuperer)));
       await noterCe({ derniere_synchro: new Date().toISOString(), derniere_erreur: null });
     } catch (e) {
