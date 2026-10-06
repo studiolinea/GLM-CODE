@@ -141,6 +141,8 @@ function Boutique({ fiche, boutique }: { fiche: FicheBoutique; boutique: Synchro
   const [confirmer, setConfirmer] = useState(false);
   const [deplie, setDeplie] = useState(false);
   const champ = useRef<HTMLInputElement>(null);
+  const ligneRepliee = useRef<HTMLButtonElement>(null);
+  const revenirSurLaLigne = useRef(false);
   const enLiaison = liaison?.enCours ?? false;
   const affiche = message ?? liaison?.message ?? null;
   const erreurActualisation = boutique.connexionExpiree ? undefined : boutique.erreursComptes[fiche.source];
@@ -148,9 +150,23 @@ function Boutique({ fiche, boutique }: { fiche: FicheBoutique; boutique: Synchro
   const resumeTest = ventesTest ? resumeVentesTest(ventesTest) : null;
 
   // Carte dépliée au clavier ou à la souris : le curseur va dans le champ de la clé.
+  // Repliée avec « Annuler » : il revient sur la ligne repliée (le bouton « Annuler » a disparu).
   useEffect(() => {
     if (deplie && avecSouris()) champ.current?.focus();
+    if (!deplie && revenirSurLaLigne.current) {
+      revenirSurLaLigne.current = false;
+      if (avecSouris()) ligneRepliee.current?.focus({ preventScroll: true });
+    }
   }, [deplie]);
+
+  // « Annuler » : la carte se replie, sans garder la clé ni les messages.
+  const annuler = () => {
+    revenirSurLaLigne.current = true;
+    setCle('');
+    setMessage(null);
+    boutique.effacerLiaison(fiche.source);
+    setDeplie(false);
+  };
 
   const relier = async () => {
     setMessage(null);
@@ -182,6 +198,7 @@ function Boutique({ fiche, boutique }: { fiche: FicheBoutique; boutique: Synchro
   if (fiche.repliable && !relie && !deplie && !affiche && !enLiaison) {
     return (
       <button
+        ref={ligneRepliee}
         type="button"
         id={`carte-${fiche.source}`}
         className="compte-relie compte-replie"
@@ -263,6 +280,11 @@ function Boutique({ fiche, boutique }: { fiche: FicheBoutique; boutique: Synchro
             <button type="submit" className="bouton principal" disabled={enLiaison}>
               {enLiaison ? 'Vérification…' : 'Relier'}
             </button>
+            {fiche.repliable && (
+              <button type="button" className="bouton discret" disabled={enLiaison} onClick={annuler}>
+                Annuler
+              </button>
+            )}
           </div>
         </form>
       )}

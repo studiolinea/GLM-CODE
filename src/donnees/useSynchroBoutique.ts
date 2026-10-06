@@ -46,6 +46,8 @@ export interface SynchroBoutique {
   /** Relie une boutique avec sa clé. Le résultat (succès ou erreur) se lit dans `liaisons`. Renvoie vrai si c'est relié. */
   relier: (source: SourceBoutique, cle: string) => Promise<boolean>;
   liaisons: Partial<Record<SourceBoutique, Liaison>>;
+  /** Oublie le résultat de la dernière liaison (la carte est repliée avec « Annuler »). */
+  effacerLiaison: (source: SourceBoutique) => void;
   deconnecter: (source: SourceCompte, identifiant?: string) => Promise<void>;
   /** Les derniers mouvements d'argent de la boutique (pour vérifier les frais et la TVA). */
   mouvements: (source: SourceBoutique) => Promise<MouvementBoutique[]>;
@@ -324,6 +326,7 @@ export function useSynchroBoutique(
     synchroniser,
     relier,
     liaisons,
+    effacerLiaison: useCallback((source: SourceBoutique) => setLiaisons((l) => ({ ...l, [source]: undefined })), []),
     deconnecter,
     mouvements,
     relierTikTok: partirSurTikTok,
