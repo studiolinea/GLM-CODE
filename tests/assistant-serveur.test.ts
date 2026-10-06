@@ -338,3 +338,16 @@ it.each(['sb_secret_factice', 'service-role-jwt-factice'])('sépare session util
     expect(h.get('Authorization')).toBe(cle.startsWith('sb_secret_') ? null : `Bearer ${cle}`);
   }
 });
+
+it.each(['/auth/v1/user', '/rest/v1/business', '/rest/v1/rpc/reserver_analyse_assistant', '/openai/v1/chat/completions'])('refuse une redirection de %s sans la suivre', async (chemin) => {
+  const normal = faux();
+  const recuperer = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    expect(init?.redirect).not.toBe('error');
+    if (new URL(String(input)).pathname === chemin) return new Response('', { status: 307, headers: { Location: 'https://tiers-interdit.test' } });
+    return normal(input, init);
+  });
+  expect((await traiterApi(appel(), env, recuperer)).status).toBe(503);
+  expect(recuperer.mock.calls.some(([u]) => String(u).includes('tiers-interdit'))).toBe(false);
+  const provider = recuperer.mock.calls.some(([u]) => String(u).includes('api.groq.com'));
+  expect(provider).toBe(chemin === '/openai/v1/chat/completions');
+});

@@ -1,3 +1,4 @@
+import { recupererSansRedirection } from './redirections';
 // Le petit serveur de l'appli, sur Cloudflare.
 // Il sert les pages de l'appli, et répond aux adresses /api/… pour les comptes reliés.
 // Chaque appel est fait au nom de la personne connectée : la base n'accepte que ses propres lignes.
@@ -167,7 +168,7 @@ export async function traiterApi(requete: Request, env: Env, recuperer: Recupera
     let userId: string | null = null;
     try {
       const verifierConnexion: Recuperateur = assistant || etatAssistant
-        ? (entree, init) => recuperer(entree, { ...init, signal: AbortSignal.timeout(10_000), redirect: 'error' })
+        ? (entree, init) => recupererSansRedirection(entree, { ...init, signal: AbortSignal.timeout(10_000) }, recuperer)
         : recuperer;
       userId = jeton ? await utilisateurConnecte({ env, jeton, recuperer: verifierConnexion }) : null;
     } catch (e) {

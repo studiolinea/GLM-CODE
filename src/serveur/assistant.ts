@@ -1,3 +1,4 @@
+import { recupererSansRedirection } from './redirections';
 import { entetesSupabaseServeur } from "./authSupabase";
 
 // L’IA reçoit uniquement des totaux calculés ici, jamais les lignes des boutiques.
@@ -119,13 +120,15 @@ export async function analyserBusiness(
   const cloudflare = env.IA_MODE === 'cloudflare-gratuit';
   const controleur = new AbortController();
   const minuteur = setTimeout(() => controleur.abort(), DELAI_MAX_MS);
+  const recuperateurInitial = recuperer;
+  recuperer = (entree, init) => recupererSansRedirection(entree, init, recuperateurInitial);
   const headers = jeton === env.SUPABASE_CLE_SERVEUR
     ? entetesSupabaseServeur(jeton)
     : { apikey: env.SUPABASE_CLE_PUBLIQUE, Authorization: `Bearer ${jeton}` };
   const filtre = { user_id: `eq.${userId}`, business_id: `eq.${businessId}` };
   const base = (table: string, parametres: Record<string, string>) => recuperer(
     `${env.SUPABASE_URL}/rest/v1/${table}?${new URLSearchParams(parametres)}`,
-    { headers, signal: controleur.signal, redirect: 'error' },
+    { headers, signal: controleur.signal },
   );
   try {
     const business = await lireJSON(await base('business', { user_id: filtre.user_id, id: `eq.${businessId}`, select: 'id', limit: '1' }));
@@ -237,7 +240,7 @@ export async function analyserBusiness(
     let message: Record<string, unknown>;
     {
       const reservation = await recuperer(`${env.SUPABASE_URL}/rest/v1/rpc/reserver_analyse_assistant`, {
-        method: 'POST', redirect: 'error', signal: controleur.signal,
+        method: 'POST', signal: controleur.signal,
         headers: { ...entetesSupabaseServeur(env.SUPABASE_CLE_SERVEUR!), 'Content-Type': 'application/json' },
         body: JSON.stringify({ p_jour: maintenant.toISOString().slice(0, 10), p_user_id: userId, p_business_id: businessId }),
       });
@@ -272,7 +275,7 @@ export async function analyserBusiness(
       }
     } else {
       const reponse = await recuperer(URL_GROQ_GRATUIT, {
-        method: 'POST', redirect: 'error', signal: controleur.signal,
+        method: 'POST', signal: controleur.signal,
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${env.IA_CLE}` },
         body: JSON.stringify({ model: modele, ...requeteIA }),
       });
