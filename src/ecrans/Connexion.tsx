@@ -1,12 +1,18 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { traduireErreurConnexion } from '../donnees/erreursConnexion';
 import { fr } from '../texte';
 import { EcranMessage } from './EcranMessage';
+import { avecSouris } from './Feuille';
 import { LiensLegaux } from './LiensLegaux';
 
 /** Connexion par e-mail et mot de passe. Le même compte sert sur le Mac et sur le téléphone. */
 export function Connexion({ client }: { client: SupabaseClient }) {
+  const champEmail = useRef<HTMLInputElement>(null);
+  // Sur ordinateur, le curseur va directement dans l'e-mail. Sur téléphone, non : le clavier monterait tout seul.
+  useEffect(() => {
+    if (avecSouris()) champEmail.current?.focus();
+  }, []);
   const [mode, setMode] = useState<'connexion' | 'inscription'>('connexion');
   const [email, setEmail] = useState('');
   const [motDePasse, setMotDePasse] = useState('');
@@ -69,6 +75,7 @@ export function Connexion({ client }: { client: SupabaseClient }) {
         <label className="champ">
           <span>Adresse e-mail</span>
           <input
+            ref={champEmail}
             id="connexion-email"
             type="email"
             autoComplete="email"
