@@ -39,6 +39,13 @@ export function apportLibelle(libelle: string, plateforme: string): string | nul
   return libelle.trim() ? `« ${libelle.trim()} »` : null;
 }
 
+/** « Boutique Stripe reliée (mode test). », « Boutique Lemon Squeezy reliée (« Ma boutique »). », « Boutique Stripe reliée. » */
+export function messageBoutiqueReliee(source: SourceBoutique, libelle: string): string {
+  const nom = NOMS_COMPTES[source];
+  const apport = apportLibelle(libelle, nom);
+  return `Boutique ${nom} reliée${apport ? ` (${apport})` : ''}.`;
+}
+
 export const MESSAGE_PAS_DE_CONNEXION = 'Pas de connexion, réessaie.';
 export const MESSAGE_CONNEXION_EXPIREE = 'Ta connexion a expiré : reconnecte-toi.';
 

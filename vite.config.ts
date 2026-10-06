@@ -8,7 +8,11 @@ import react from '@vitejs/plugin-react';
 /**
  * Le service worker (public/sw.js) reçoit, à chaque construction, la liste des fichiers à garder sur l'appareil
  * et un numéro de version tiré de leurs noms : une nouvelle version de l'appli remplace l'ancienne copie.
+ * Les pages « Conditions » et « Confidentialité » sont gardées aussi (elles s'ouvrent sans réseau) ; leur contenu
+ * compte dans la version, pour qu'une page modifiée remplace l'ancienne copie.
  */
+const PAGES_LEGALES = ['conditions.html', 'confidentialite.html'];
+
 function serviceWorker(): Plugin {
   let dossier = 'dist';
   return {
@@ -23,8 +27,10 @@ function serviceWorker(): Plugin {
       const construits = Object.keys(bundle)
         .filter((f) => f.startsWith('assets/') && !f.endsWith('.woff'))
         .sort();
-      const fichiers = [...construits, 'icone.svg', 'manifest.webmanifest'];
-      const version = createHash('sha256').update(construits.join('\n')).digest('hex').slice(0, 12);
+      const fichiers = [...construits, 'icone.svg', 'manifest.webmanifest', ...PAGES_LEGALES];
+      const empreinte = createHash('sha256').update(construits.join('\n'));
+      for (const page of PAGES_LEGALES) empreinte.update(await readFile(join(dossier, page)));
+      const version = empreinte.digest('hex').slice(0, 12);
       const modele = await readFile(chemin, 'utf8');
       const rempli = modele
         .replace("'__VERSION__'", JSON.stringify(version))

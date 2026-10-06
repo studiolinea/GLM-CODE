@@ -78,7 +78,7 @@ describe('commandes Lemon Squeezy → ventes', () => {
     ]);
     expect(ventes).toEqual([]);
     expect(ignorees.map((i) => i.numero)).toEqual(['5', '6']);
-    expect(ignorees[1]!.raison).toContain('euros');
+    expect(ignorees[1]!.raison).toBe('vente en USD (seules les ventes en euros sont lues)');
   });
 
   it('deux boutiques avec la même commande n°1 : deux ventes, et leur numéro ne change pas quand une boutique s’ajoute', () => {
@@ -337,6 +337,8 @@ describe('paiements Stripe → ventes', () => {
     const { ventes, ignorees } = chargesVersVentes([charge('ch_6', { status: 'failed', paid: false }), charge('ch_7', { currency: 'usd' })]);
     expect(ventes).toEqual([]);
     expect(ignorees.map((i) => i.numero)).toEqual(['ch_6', 'ch_7']);
+    // Le code de la devise en majuscules, et un seul « : » dans « • ch_7 : … »
+    expect(ignorees[1]!.raison).toBe('vente en USD (seules les ventes en euros sont lues)');
   });
 });
 

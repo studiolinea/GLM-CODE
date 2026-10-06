@@ -12,18 +12,20 @@ export interface BilanImport {
   exempleRetire: boolean;
 }
 
-type Message = { type: 'succes' | 'erreur'; lignes: string[] };
+/** `refusees` : les lignes du fichier qui n'ont pas été lues, à part (en orange) : ce n'est pas un succès. */
+type Message = { type: 'succes' | 'erreur'; lignes: string[]; refusees?: string[] };
 
-function decrire(bilan: BilanImport, lignesIgnorees: LigneIgnoree[]): string[] {
+function decrire(bilan: BilanImport, lignesIgnorees: LigneIgnoree[]): Pick<Message, 'lignes' | 'refusees'> {
   const lignes = [
     `${nombre(bilan.ajoutees, 'vente ajoutée', 'ventes ajoutées')}, ${nombre(bilan.misesAJour, 'mise à jour', 'mises à jour')}, ${nombre(bilan.inchangees, 'déjà connue', 'déjà connues')}.`,
   ];
   if (bilan.exempleRetire) lignes.push('Les données d’exemple ont été retirées.');
+  const refusees: string[] = [];
   if (lignesIgnorees.length > 0) {
-    lignes.push(`${nombre(lignesIgnorees.length, 'ligne refusée', 'lignes refusées')} :`);
-    for (const l of lignesIgnorees.slice(0, 5)) lignes.push(`• ligne ${l.ligne} : ${l.raison}`);
+    refusees.push(`${nombre(lignesIgnorees.length, 'ligne refusée', 'lignes refusées')} :`);
+    for (const l of lignesIgnorees.slice(0, 5)) refusees.push(`• ligne ${l.ligne} : ${l.raison}`);
   }
-  return lignes;
+  return { lignes, refusees };
 }
 
 /** « Fichier de ventes » : lire l'export de la boutique et l'ajouter aux ventes connues. */
@@ -50,17 +52,15 @@ export function AjoutFichier({
     // Le fichier vient d'être téléchargé : sa date est celle de l'export.
     const date = fichier.lastModified ? new Date(Math.min(fichier.lastModified, maintenant.getTime())) : maintenant;
     const bilan = onImporter(lecture.ventes, date.toISOString(), false);
-    setMessage({ type: 'succes', lignes: decrire(bilan, lecture.lignesIgnorees) });
+    setMessage({ type: 'succes', ...decrire(bilan, lecture.lignesIgnorees) });
   };
 
   const essayer = () => {
     const lecture = lireFichierVentes(fichierEssai(maintenant));
     if (!lecture.ok) return setMessage({ type: 'erreur', lignes: [lecture.erreur] });
     const bilan = onImporter(lecture.ventes, maintenant.toISOString(), true);
-    setMessage({
-      type: 'succes',
-      lignes: [...decrire(bilan, lecture.lignesIgnorees), 'Ce sont des ventes d’essai : tout reste marqué comme exemple.'],
-    });
+    const { lignes, refusees } = decrire(bilan, lecture.lignesIgnorees);
+    setMessage({ type: 'succes', lignes: [...lignes, 'Ce sont des ventes d’essai : tout reste marqué comme exemple.'], refusees });
   };
 
   return (
@@ -89,12 +89,23 @@ export function AjoutFichier({
         />
       </label>
       {message && (
-        <div className={`${message.type} bilan-fichier`} role="status">
-          {message.lignes.map((l, i) => (
-            <p key={i} style={{ margin: '0 0 4px' }}>
-              {fr(l)}
-            </p>
-          ))}
+        <div className="bilan-fichier" role="status">
+          <div className={message.type}>
+            {message.lignes.map((l, i) => (
+              <p key={i} style={{ margin: '0 0 4px' }}>
+                {fr(l)}
+              </p>
+            ))}
+          </div>
+          {message.refusees && message.refusees.length > 0 && (
+            <div className="avertissement">
+              {message.refusees.map((l, i) => (
+                <p key={i} style={{ margin: '0 0 4px' }}>
+                  {fr(l)}
+                </p>
+              ))}
+            </div>
+          )}
         </div>
       )}
       {exemple && (

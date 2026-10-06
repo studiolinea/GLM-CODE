@@ -8,7 +8,8 @@ import type { Vente } from '../ventes/modele';
 const somme = (ventes: Vente[], champ: (v: Vente) => number) => ventes.reduce((total, v) => total + champ(v), 0);
 
 /**
- * « 1 vente en mode test reçue, pas comptée dans tes vrais chiffres : 19,90 €, frais 1,25 €, TVA 3,32 €. »
+ * « 2 ventes en mode test reçues (dont 1 remboursée), pas comptées dans tes vrais chiffres : 39,80 €, frais 2,50 €,
+ * TVA 6,64 €. » Les remboursements sont dits juste après le nombre de ventes, pour ne pas sembler porter sur la TVA.
  * Les frais sont « inconnus » dès qu'une vente ne les donne pas ; la TVA n'est écrite que si la boutique la donne.
  * Renvoie null s'il n'y a aucune vente de test.
  */
@@ -21,7 +22,13 @@ export function resumeVentesTest(ventes: Vente[]): string | null {
   );
   const avecTva = ventes.filter((v) => v.tvaCentimes !== undefined);
   if (avecTva.length > 0) morceaux.push(`TVA ${formatEuros(somme(avecTva, (v) => v.tvaCentimes ?? 0))}`);
-  const remboursees = ventes.filter((v) => v.rembourse).length;
-  const dont = remboursees > 0 ? ` (dont ${nombre(remboursees, 'remboursée')})` : '';
-  return `${nombre(n, 'vente')} en mode test ${accord(n, 'reçue')}, pas ${accord(n, 'comptée')} dans tes vrais chiffres : ${morceaux.join(', ')}${dont}.`;
+  const dont = remboursements(n, ventes.filter((v) => v.rembourse).length);
+  return `${nombre(n, 'vente')} en mode test ${accord(n, 'reçue')}${dont}, pas ${accord(n, 'comptée')} dans tes vrais chiffres : ${morceaux.join(', ')}.`;
+}
+
+/** « (remboursée) » pour une seule vente, « (toutes remboursées) », « (dont 1 remboursée) », ou rien. */
+function remboursements(n: number, remboursees: number): string {
+  if (remboursees === 0) return '';
+  if (remboursees === n) return n === 1 ? ' (remboursée)' : ' (toutes remboursées)';
+  return ` (dont ${nombre(remboursees, 'remboursée')})`;
 }

@@ -79,6 +79,7 @@ button {
   display: flex;
   align-items: center;
   gap: 10px;
+  margin: 0;
   font-family: var(--police-titre);
   font-weight: 700;
   font-size: 1.2rem;
@@ -132,9 +133,10 @@ button {
   border: 1px solid var(--bord);
   border-radius: 9px;
 }
+/* 44 px au moins : la taille conseillée pour un doigt */
 .rapport {
   min-width: 52px;
-  min-height: 38px;
+  min-height: 44px;
   background: none;
   border: 0;
   border-radius: 6px;
@@ -807,6 +809,12 @@ a.bouton {
   color: var(--vert);
   font-size: 0.92rem;
 }
+/* Ce qui demande de l'attention sans être une erreur (lignes refusées d'un fichier) : orange, comme les voyants à traiter */
+.avertissement {
+  margin: 0 0 12px;
+  color: var(--ambre);
+  font-size: 0.92rem;
+}
 .texte-doux {
   color: var(--doux);
   font-size: 0.9rem;
@@ -973,6 +981,17 @@ a.bouton {
 .selecteur-business:focus-visible {
   outline: 2px solid var(--ambre);
   outline-offset: 2px;
+}
+/* Le curseur posé par l'appli après une action au clavier : titre de l'écran, titre « Voyants », voyant suivant */
+.marque:focus-visible,
+.titre-section h2:focus-visible,
+.alerte:focus-visible {
+  outline: 2px solid var(--ambre);
+  outline-offset: 3px;
+}
+.marque:focus-visible,
+.titre-section h2:focus-visible {
+  border-radius: 4px;
 }
 .selecteur-business-texte {
   display: grid;

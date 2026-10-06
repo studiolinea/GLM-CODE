@@ -3,6 +3,7 @@
 // les chiffres hors ligne viennent de la copie que l'appli garde elle-même sur l'appareil.
 // - /api/… (le serveur de l'appli), Supabase et tout autre site : jamais touchés, toujours le réseau.
 // - La page : le réseau d'abord ; sans réponse, la copie gardée à l'installation.
+// - Les pages « Conditions » et « Confidentialité » : pareil, elles s'ouvrent donc aussi sans réseau.
 // - /assets/… (noms avec empreinte, qui ne changent jamais) : la copie gardée d'abord.
 //
 // La construction (vite.config.ts) remplace VERSION et FICHIERS : un nouveau nom de cache à chaque version,
@@ -52,9 +53,31 @@ function page(evenement) {
         new Promise((_, refus) => setTimeout(() => refus(new Error('trop lent')), ATTENTE_PAGE_MS)),
       ]);
     } catch {
-      return (await caches.match(PAGE, { cacheName: CACHE })) ?? reseau;
+      return (await pageGardee(evenement.request)) ?? reseau;
     }
   })();
+}
+
+// Sans réseau : la page demandée si elle a été gardée à l'installation (« Conditions », « Confidentialité »),
+// sinon la page de l'appli. On ne cherche que dans le cache de CETTE version. Cloudflare sert une page à deux
+// adresses (/conditions et /conditions.html) : on essaie les deux.
+async function pageGardee(requete) {
+  const url = new URL(requete.url);
+  const adresses = [url.href];
+  if (!url.pathname.endsWith('/') && !url.pathname.endsWith('.html')) adresses.push(new URL(`${url.pathname}.html`, url).href);
+  for (const a of adresses) {
+    const copie = await caches.match(a, { cacheName: CACHE, ignoreSearch: true });
+    if (copie) return sansRedirection(copie);
+  }
+  const appli = await caches.match(PAGE, { cacheName: CACHE });
+  return appli && sansRedirection(appli);
+}
+
+// Une page gardée après une redirection (Cloudflare renvoie /conditions.html vers /conditions) ne peut pas servir
+// telle quelle à l'ouverture d'une page : le navigateur la refuserait. On donne le même contenu, sans la redirection.
+function sansRedirection(reponse) {
+  if (!reponse.redirected) return reponse;
+  return new Response(reponse.body, { status: reponse.status, statusText: reponse.statusText, headers: reponse.headers });
 }
 
 async function fichierConstruit(requete) {

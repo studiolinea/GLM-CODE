@@ -4,10 +4,11 @@ import { calculerChangements, versDonnees, type Changements, type Depot, type Do
 import { donneesExemple } from '../src/donnees/exemple';
 import { businessAOuvrir, nomValide } from '../src/donnees/business';
 import { resumeVentesTest } from '../src/calculs/ventesTest';
-import { avecNomCompte, ConnexionExpiree } from '../src/donnees/comptesRelies';
+import { avecNomCompte, ConnexionExpiree, messageBoutiqueReliee } from '../src/donnees/comptesRelies';
 import { ligneVersVente, ligneVersVideo, venteVersLigne, videoVersLigne } from '../src/donnees/lignes';
 import { messageEchecEnregistrement, Synchro } from '../src/donnees/synchro';
 import type { Donnees, Video } from '../src/modele';
+import { majuscule } from '../src/texte';
 import type { Vente } from '../src/ventes/modele';
 
 const maintenant = new Date('2026-10-05T16:00:00Z');
@@ -278,8 +279,23 @@ describe('ventes du mode test : on dit ce qui a été reçu, sans le compter', (
   });
 
   it('plusieurs ventes : vrai pluriel, et les sommes', () => {
+    expect(resumeVentesTest([test('ch_1'), test('ch_2')])).toBe(
+      '2 ventes en mode test reçues, pas comptées dans tes vrais chiffres : 39,80 €, frais 2,50 €, TVA 6,64 €.',
+    );
+  });
+
+  it('les remboursements sont dits après le nombre de ventes, jamais après la TVA', () => {
     expect(resumeVentesTest([test('ch_1'), test('ch_2', { rembourse: true })])).toBe(
-      '2 ventes en mode test reçues, pas comptées dans tes vrais chiffres : 39,80 €, frais 2,50 €, TVA 6,64 € (dont 1 remboursée).',
+      '2 ventes en mode test reçues (dont 1 remboursée), pas comptées dans tes vrais chiffres : 39,80 €, frais 2,50 €, TVA 6,64 €.',
+    );
+    expect(resumeVentesTest([test('ch_1'), test('ch_2', { rembourse: true }), test('ch_3', { rembourse: true })])).toBe(
+      '3 ventes en mode test reçues (dont 2 remboursées), pas comptées dans tes vrais chiffres : 59,70 €, frais 3,75 €, TVA 9,96 €.',
+    );
+    expect(resumeVentesTest([test('ch_1', { rembourse: true }), test('ch_2', { rembourse: true })])).toBe(
+      '2 ventes en mode test reçues (toutes remboursées), pas comptées dans tes vrais chiffres : 39,80 €, frais 2,50 €, TVA 6,64 €.',
+    );
+    expect(resumeVentesTest([test('ch_1', { rembourse: true })])).toBe(
+      '1 vente en mode test reçue (remboursée), pas comptée dans tes vrais chiffres : 19,90 €, frais 1,25 €, TVA 3,32 €.',
     );
   });
 
@@ -305,6 +321,21 @@ describe('ventes du mode test : on dit ce qui a été reçu, sans le compter', (
     );
     expect(bilan.ventesTest.stripe?.map((v) => v.numeroCommande)).toEqual(['ch_t']);
     expect(d.ventes.map((v) => v.numeroCommande)).toEqual(['ch_r']);
+  });
+});
+
+describe('boutique reliée : une phrase claire, avec le nom de la boutique', () => {
+  it('« Boutique Stripe reliée (mode test). », et le nom de la boutique Lemon Squeezy entre guillemets', () => {
+    expect(messageBoutiqueReliee('stripe', 'Stripe (mode test)')).toBe('Boutique Stripe reliée (mode test).');
+    expect(messageBoutiqueReliee('stripe', 'Stripe')).toBe('Boutique Stripe reliée.');
+    expect(messageBoutiqueReliee('lemonsqueezy', 'Ma boutique')).toBe('Boutique Lemon Squeezy reliée (« Ma boutique »).');
+    expect(messageBoutiqueReliee('lemonsqueezy', 'Lemon Squeezy (mode test)')).toBe('Boutique Lemon Squeezy reliée (mode test).');
+  });
+
+  it('la ligne d’état commence par une majuscule', () => {
+    expect(majuscule('mode test · ventes à jour le 06/10 à 07h27')).toBe('Mode test · ventes à jour le 06/10 à 07h27');
+    expect(majuscule('« Ma boutique » · pas encore lue')).toBe('« Ma boutique » · pas encore lue');
+    expect(majuscule('')).toBe('');
   });
 });
 

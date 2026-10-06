@@ -4,15 +4,14 @@ import type { Vente } from '../ventes/modele';
 import { importerVentes, quitterExemple } from './actions';
 import {
   adresseConnexionTikTok,
-  apportLibelle,
   avecNomCompte,
   BOUTIQUES,
   ConnexionExpiree,
   deconnecterCompte,
   listerComptes,
   MESSAGE_CONNEXION_EXPIREE,
+  messageBoutiqueReliee,
   mouvementsBoutique,
-  NOMS_COMPTES,
   relierBoutique,
   relierTikTok,
   synchroniserBoutique,
@@ -47,6 +46,8 @@ export interface SynchroBoutique {
   /** Relie une boutique avec sa clé. Le résultat (succès ou erreur) se lit dans `liaisons`. Renvoie vrai si c'est relié. */
   relier: (source: SourceBoutique, cle: string) => Promise<boolean>;
   liaisons: Partial<Record<SourceBoutique, Liaison>>;
+  /** Oublie le résultat de la dernière liaison (la carte est repliée avec « Annuler »). */
+  effacerLiaison: (source: SourceBoutique) => void;
   deconnecter: (source: SourceCompte, identifiant?: string) => Promise<void>;
   /** Les derniers mouvements d'argent de la boutique (pour vérifier les frais et la TVA). */
   mouvements: (source: SourceBoutique) => Promise<MouvementBoutique[]>;
@@ -281,8 +282,7 @@ export function useSynchroBoutique(
       try {
         const libelle = await relierBoutique(businessId, source, cle);
         await synchroniser();
-        const apport = apportLibelle(libelle, NOMS_COMPTES[source]);
-        finir({ type: 'succes', texte: apport ? `Boutique reliée : ${apport}.` : 'Boutique reliée.' });
+        finir({ type: 'succes', texte: messageBoutiqueReliee(source, libelle) });
         return true;
       } catch (e) {
         if (e instanceof ConnexionExpiree && monte.current) setConnexionExpiree(true);
@@ -326,6 +326,7 @@ export function useSynchroBoutique(
     synchroniser,
     relier,
     liaisons,
+    effacerLiaison: useCallback((source: SourceBoutique) => setLiaisons((l) => ({ ...l, [source]: undefined })), []),
     deconnecter,
     mouvements,
     relierTikTok: partirSurTikTok,

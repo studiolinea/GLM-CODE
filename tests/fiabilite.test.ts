@@ -279,7 +279,7 @@ describe('S1 lireComptesRelies', () => {
           ventes: [],
           ignorees: [
             { numero: 'ch_1', raison: 'paiement non abouti' },
-            { numero: 'ch_2', raison: 'devise usd : seules les ventes en euros sont lues' },
+            { numero: 'ch_2', raison: 'vente en USD (seules les ventes en euros sont lues)' },
           ],
           synchroniseLe: '2026-10-06T08:00:00.000Z',
         }),
