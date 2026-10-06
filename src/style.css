@@ -1178,3 +1178,74 @@ a.bouton {
     animation: none;
   }
 }
+
+/* ───── Bandeaux d'information (business supprimé, TikTok relié) : même forme que le bandeau d'erreur ───── */
+.bandeau-info {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  column-gap: 6px;
+  margin: 0 0 14px;
+  padding: 4px 4px 4px 14px;
+  border: 1px solid var(--cran);
+  border-radius: 12px;
+  color: var(--texte);
+  font-size: 0.9rem;
+}
+.bandeau-succes {
+  border-color: rgba(70, 223, 136, 0.6);
+  color: var(--vert);
+}
+/* Plusieurs erreurs réunies dans un seul bandeau : une ligne chacune */
+.bandeau-ligne {
+  display: block;
+}
+.bandeau-ligne + .bandeau-ligne {
+  margin-top: 6px;
+}
+
+/* Une question avant une action qui ne s'annule pas (restaurer, revoir l'exemple) */
+.confirmation {
+  margin-top: 14px;
+}
+
+/* Une boutique pas reliée et peu utilisée : une seule ligne, qui se déplie au toucher */
+.compte-replie {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  width: 100%;
+  min-height: 44px;
+  color: var(--texte);
+  text-align: left;
+  cursor: pointer;
+}
+.compte-replie .compte-nom {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.compte-deplier {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  color: var(--ambre);
+  font-weight: 600;
+}
+.compte-replie:focus-visible {
+  outline: 2px solid var(--ambre);
+  outline-offset: 2px;
+}
+
+/* Mes business et vue d'ensemble : le message d'une action, et l'état de chaque business */
+.ligne-business .succes {
+  margin: 8px 0 0;
+}
+.ligne-business .ligne-business-etat {
+  margin: 2px 0 0;
+}
+/* Réglages ouverts sur une carte : elle s'arrête sous l'en-tête collant de la fenêtre, pas dessous */
+.feuille .compte-relie,
+.feuille #titre-comptes-relies {
+  scroll-margin-top: 76px;
+}

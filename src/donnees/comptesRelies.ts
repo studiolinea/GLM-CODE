@@ -2,6 +2,7 @@
 // La liste se lit directement dans la base (chacun ne voit que les siens) ;
 // relier et synchroniser passent par le serveur de l'appli, qui garde les clés chiffrées.
 
+import { isAuthRetryableFetchError } from '@supabase/supabase-js';
 import type { Video } from '../modele';
 import type { MouvementBoutique } from '../serveur/commun';
 import type { Vente } from '../ventes/modele';
@@ -14,6 +15,45 @@ export type SourceCompte = 'stripe' | 'lemonsqueezy' | 'tiktok' | 'instagram';
 /** Les boutiques que l'appli sait relier, dans l'ordre d'affichage. */
 export type SourceBoutique = 'stripe' | 'lemonsqueezy';
 export const BOUTIQUES: SourceBoutique[] = ['stripe', 'lemonsqueezy'];
+
+/** Le nom de chaque compte, tel que Kévin le connaît (dans les messages : « Stripe : … »). */
+export const NOMS_COMPTES: Record<SourceCompte, string> = {
+  stripe: 'Stripe',
+  lemonsqueezy: 'Lemon Squeezy',
+  tiktok: 'TikTok',
+  instagram: 'Instagram',
+};
+
+/** « Stripe : la clé est refusée. » Un message qui commence déjà par le nom du compte reste tel quel. */
+export function avecNomCompte(source: SourceCompte, message: string): string {
+  const nom = NOMS_COMPTES[source];
+  return message.startsWith(nom) ? message : `${nom} : ${message}`;
+}
+
+/**
+ * Ce que le libellé du compte apporte en plus du nom de la plateforme : « Stripe » → rien,
+ * « Stripe (mode test) » → « mode test », le nom d'une boutique Lemon Squeezy → « « Ma boutique » ».
+ */
+export function apportLibelle(libelle: string, plateforme: string): string | null {
+  if (libelle.startsWith(plateforme)) return libelle.slice(plateforme.length).replace(/[()]/g, '').trim() || null;
+  return libelle.trim() ? `« ${libelle.trim()} »` : null;
+}
+
+export const MESSAGE_PAS_DE_CONNEXION = 'Pas de connexion, réessaie.';
+export const MESSAGE_CONNEXION_EXPIREE = 'Ta connexion a expiré : reconnecte-toi.';
+
+/** La session n'a pas pu être renouvelée : il faut se reconnecter. */
+export class ConnexionExpiree extends Error {
+  constructor() {
+    super(MESSAGE_CONNEXION_EXPIREE);
+    this.name = 'ConnexionExpiree';
+  }
+}
+
+/** Une erreur de la base qui vient d'une coupure de réseau (et pas d'un refus de la base). */
+function erreurReseau(error: { message?: string } | null): boolean {
+  return !!error && /failed to fetch|networkerror|load failed|fetch failed/i.test(error.message ?? '');
+}
 
 export interface CompteRelie {
   source: SourceCompte;
@@ -37,19 +77,39 @@ function base() {
   return client;
 }
 
-async function appelerServeur<T>(chemin: string, corps: unknown = {}): Promise<T> {
-  const { data } = await base().auth.getSession();
-  if (!data.session) throw new Error('Connecte-toi d’abord.');
-  let reponse: Response;
+/**
+ * Le jeton de la session, pour prouver au serveur qui appelle. Avec `renouveler`, ou sans session gardée,
+ * on demande une session neuve. Si c'est impossible : « Pas de connexion » (réseau), ou ConnexionExpiree.
+ */
+async function jeton(renouveler = false): Promise<string> {
+  const auth = base().auth;
+  if (!renouveler) {
+    const { data } = await auth.getSession();
+    if (data.session) return data.session.access_token;
+  }
+  const { data, error } = await auth.refreshSession();
+  if (data.session) return data.session.access_token;
+  if (error && isAuthRetryableFetchError(error)) throw new Error(MESSAGE_PAS_DE_CONNEXION);
+  throw new ConnexionExpiree();
+}
+
+async function envoyer(chemin: string, corps: unknown, acces: string): Promise<Response> {
   try {
-    reponse = await fetch(chemin, {
+    return await fetch(chemin, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${data.session.access_token}`, 'Content-Type': 'application/json' },
+      headers: { Authorization: `Bearer ${acces}`, 'Content-Type': 'application/json' },
       body: JSON.stringify(corps),
     });
   } catch {
-    throw new Error('Pas de connexion, réessaie.');
+    throw new Error(MESSAGE_PAS_DE_CONNEXION);
   }
+}
+
+async function appelerServeur<T>(chemin: string, corps: unknown = {}): Promise<T> {
+  let reponse = await envoyer(chemin, corps, await jeton());
+  // Le serveur ne reconnaît pas la session (jeton périmé) : on la renouvelle, puis on réessaie une fois.
+  if (reponse.status === 401) reponse = await envoyer(chemin, corps, await jeton(true));
+  if (reponse.status === 401) throw new ConnexionExpiree();
   let contenu: { erreur?: string } & Partial<T>;
   try {
     contenu = (await reponse.json()) as typeof contenu;
@@ -67,7 +127,7 @@ export async function listerComptes(businessId: string): Promise<CompteRelie[]> 
     .select('source, identifiant, libelle, relie_le, derniere_synchro, derniere_erreur')
     .eq('business_id', businessId)
     .order('relie_le');
-  if (error) throw new Error('Impossible de lire tes comptes reliés. Réessaie.');
+  if (error) throw new Error(erreurReseau(error) ? MESSAGE_PAS_DE_CONNEXION : 'Impossible de lire tes comptes reliés. Réessaie.');
   return (data ?? []).map((l) => ({
     source: l.source as SourceCompte,
     identifiant: (l.identifiant as string | null) ?? '',

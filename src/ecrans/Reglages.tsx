@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { nomFichierSauvegarde, ouvrirSauvegarde, questionRestauration, versSauvegarde, type Sauvegarde } from '../donnees/actions';
 import type { SynchroBoutique } from '../donnees/useSynchroBoutique';
 import type { Donnees } from '../modele';
 import { dateParis } from '../temps';
 import { accord, fr } from '../texte';
-import { ComptesRelies } from './ComptesRelies';
+import { ComptesRelies, ID_CARTES, type CarteCompte } from './ComptesRelies';
 import { Feuille, telecharger } from './Feuille';
 import { IconeMoins, IconePlus } from './Icones';
 import { LiensLegaux } from './LiensLegaux';
@@ -24,6 +24,7 @@ export function Reglages({
   compte,
   business,
   boutique,
+  cible,
   onObjectif,
   onSaisieManuelle,
   onImportManuel,
@@ -39,6 +40,8 @@ export function Reglages({
   business?: { id: string; nom: string };
   /** Les comptes reliés (boutique, réseaux), seulement avec la base en ligne. */
   boutique?: SynchroBoutique;
+  /** La carte à montrer à l'ouverture (depuis un voyant, au retour de TikTok…). */
+  cible?: CarteCompte;
   onObjectif: (objectifParJour: number) => void;
   /** En secours seulement (en ligne, tout arrive des comptes reliés). */
   onSaisieManuelle?: () => void;
@@ -47,17 +50,26 @@ export function Reglages({
   onRemettreExemple: () => void;
   onFermer: () => void;
 }) {
-  const [objectif, setObjectif] = useState(donnees.reglages.objectifParJour);
+  // L'objectif affiché est toujours celui enregistré : si l'enregistrement échoue, l'appli revient en arrière, et lui aussi.
+  const objectif = donnees.reglages.objectifParJour;
   const [message, setMessage] = useState<{ type: 'succes' | 'erreur'; texte: string } | null>(null);
   const [confirmer, setConfirmer] = useState(false);
   // La sauvegarde choisie, en attente de confirmation.
   const [aRestaurer, setARestaurer] = useState<Sauvegarde | null>(null);
 
-  const changerObjectif = (n: number) => {
-    const borne = Math.min(OBJECTIF_MAX, Math.max(0, n));
-    setObjectif(borne);
-    onObjectif(borne);
-  };
+  // Ouverts depuis un voyant ou au retour de TikTok : on va jusqu'à la carte concernée, dès qu'elle est affichée.
+  const defile = useRef(false);
+  const comptesArrives = boutique?.comptes !== null;
+  useEffect(() => {
+    if (!cible || defile.current || !comptesArrives) return;
+    const carte = document.getElementById(ID_CARTES[cible]);
+    if (!carte) return;
+    defile.current = true;
+    const reduit = typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    carte.scrollIntoView({ block: 'start', behavior: reduit ? 'auto' : 'smooth' });
+  }, [cible, comptesArrives]);
+
+  const changerObjectif = (n: number) => onObjectif(Math.min(OBJECTIF_MAX, Math.max(0, n)));
 
   const choisirSauvegarde = async (fichier: File) => {
     setMessage(null);
@@ -73,7 +85,6 @@ export function Reglages({
   const restaurer = () => {
     if (!aRestaurer) return;
     onRestaurer(aRestaurer.donnees);
-    setObjectif(aRestaurer.donnees.reglages.objectifParJour);
     setARestaurer(null);
     setMessage({ type: 'succes', texte: 'Sauvegarde restaurée.' });
   };
@@ -116,7 +127,7 @@ export function Reglages({
       {boutique && (
         <>
           <hr className="separateur" />
-          <ComptesRelies boutique={boutique} />
+          <ComptesRelies boutique={boutique} onReconnecter={compte ? () => void compte.deconnecter() : undefined} />
           {(onSaisieManuelle || onImportManuel) && (
             <>
               <hr className="separateur" />
@@ -191,7 +202,7 @@ export function Reglages({
       </div>
 
       {aRestaurer && (
-        <div role="alert" style={{ marginTop: 14 }}>
+        <div role="alert" className="confirmation">
           <p className="erreur">{fr(questionRestauration(aRestaurer.business, business))}</p>
           <div className="pied" style={{ justifyContent: 'flex-start' }}>
             <button type="button" className="bouton danger" onClick={restaurer}>
@@ -205,7 +216,7 @@ export function Reglages({
       )}
 
       {confirmer && (
-        <div role="alert" style={{ marginTop: 14 }}>
+        <div role="alert" className="confirmation">
           <p className="erreur">
             Tes données seront remplacées par l’exemple. Fais une sauvegarde avant si tu veux les garder.
           </p>

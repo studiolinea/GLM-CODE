@@ -4,45 +4,84 @@ import type { Vente } from '../ventes/modele';
 import { importerVentes, quitterExemple } from './actions';
 import {
   adresseConnexionTikTok,
+  apportLibelle,
+  avecNomCompte,
   BOUTIQUES,
+  ConnexionExpiree,
   deconnecterCompte,
   listerComptes,
+  MESSAGE_CONNEXION_EXPIREE,
+  mouvementsBoutique,
+  NOMS_COMPTES,
   relierBoutique,
   relierTikTok,
   synchroniserBoutique,
   synchroniserTikTok,
-  mouvementsBoutique,
   type CompteRelie,
   type MouvementBoutique,
   type RetourTikTok,
   type SourceBoutique,
   type SourceCompte,
 } from './comptesRelies';
+import type { OrigineModification } from './synchro';
+
+export type MessageCompte = { type: 'succes' | 'erreur'; texte: string };
+
+/** Où en est la liaison d'une boutique. Gardé ici (pas dans la carte) : le résultat reste si la fenêtre a été fermée. */
+export interface Liaison {
+  enCours: boolean;
+  message: MessageCompte | null;
+}
 
 export interface SynchroBoutique {
   /** null tant que la liste n'est pas arrivée. */
   comptes: CompteRelie[] | null;
   enCours: boolean;
+  /** Ce qui n'a pas marché à la dernière actualisation, compte par compte (« Stripe : … »), ou null. */
   erreur: string | null;
+  /** Le message d'erreur de chaque compte, pour l'afficher sur sa carte dans les réglages. */
+  erreursComptes: Partial<Record<SourceCompte, string>>;
+  /** Vrai si la session n'a pas pu être renouvelée : il faut se reconnecter. */
+  connexionExpiree: boolean;
   synchroniser: () => Promise<void>;
-  /** Renvoie le libellé de la boutique ; lève une erreur avec un message clair sinon. */
-  relier: (source: SourceBoutique, cle: string) => Promise<string>;
+  /** Relie une boutique avec sa clé. Le résultat (succès ou erreur) se lit dans `liaisons`. Renvoie vrai si c'est relié. */
+  relier: (source: SourceBoutique, cle: string) => Promise<boolean>;
+  liaisons: Partial<Record<SourceBoutique, Liaison>>;
   deconnecter: (source: SourceCompte, identifiant?: string) => Promise<void>;
   /** Les derniers mouvements d'argent de la boutique (pour vérifier les frais et la TVA). */
   mouvements: (source: SourceBoutique) => Promise<MouvementBoutique[]>;
   /** Part sur la page d'accord de TikTok ; lève une erreur avec un message clair si c'est impossible. */
   relierTikTok: () => Promise<void>;
   /** Le résultat de la liaison TikTok, au retour de la page d'accord. */
-  messageTikTok: { type: 'succes' | 'erreur'; texte: string } | null;
+  messageTikTok: MessageCompte | null;
+  effacerMessageTikTok: () => void;
   /** Les ventes que la boutique a envoyées mais que l'appli n'a pas comptées (autre devise…), avec la raison. */
   ignorees: VenteEcartee[];
+  /** Les ventes du mode test reçues à la dernière actualisation, par boutique : jamais dans les vrais chiffres. */
+  ventesTest: Partial<Record<SourceBoutique, Vente[]>>;
   effacerErreur: () => void;
 }
 
 export type VenteEcartee = { numero: string; raison: string };
 
+type Modifier = (f: (d: Donnees) => Donnees, origine?: OrigineModification) => void;
+
+/** Une vente envoyée par la boutique en mode test (plateforme « stripe-test », « lemonsqueezy-test »). */
+export const estVenteTest = (v: Vente) => v.plateforme.endsWith('-test');
+
 /** Une vente écartée qu'il faut signaler : pas les paiements qui n'ont simplement pas abouti. */
 const A_SIGNALER = (i: VenteEcartee) => !/non abouti|non payée/.test(i.raison);
+
+export interface BilanComptes {
+  /** Un message par compte en erreur, avec le nom du compte (« Stripe : … »). */
+  erreurs: string[];
+  /** Le message de chaque compte en erreur, sans son nom (il est déjà sur la carte). */
+  parCompte: Partial<Record<SourceCompte, string>>;
+  /** Vrai si la session a expiré pendant la lecture. */
+  expiree: boolean;
+  ignorees: VenteEcartee[];
+  ventesTest: Partial<Record<SourceBoutique, Vente[]>>;
+}
 
 /**
  * Lit chaque compte relié du business, l'un après l'autre. Un compte en erreur n'empêche pas les autres :
@@ -55,29 +94,35 @@ export async function lireComptesRelies(
     boutique: (business: string, source: SourceBoutique) => Promise<{ ventes: Vente[]; ignorees: VenteEcartee[]; synchroniseLe: string }>;
     tiktok: (business: string) => Promise<{ videos: Video[] }>;
   },
-  modifier: (f: (d: Donnees) => Donnees) => void,
-): Promise<{ erreurs: string[]; ignorees: VenteEcartee[] }> {
-  const erreurs: string[] = [];
-  const ignorees: VenteEcartee[] = [];
-  const message = (e: unknown) => (e instanceof Error ? e.message : 'L’actualisation a échoué. Réessaie.');
+  modifier: Modifier,
+): Promise<BilanComptes> {
+  const bilan: BilanComptes = { erreurs: [], parCompte: {}, expiree: false, ignorees: [], ventesTest: {} };
+  const noter = (source: SourceCompte, e: unknown) => {
+    const message = e instanceof Error ? e.message : 'L’actualisation a échoué. Réessaie.';
+    if (e instanceof ConnexionExpiree) bilan.expiree = true;
+    bilan.parCompte[source] = message;
+    bilan.erreurs.push(avecNomCompte(source, message));
+  };
   for (const source of BOUTIQUES.filter((b) => liste.some((c) => c.source === b))) {
     try {
       const r = await appels.boutique(businessId, source);
-      ignorees.push(...(r.ignorees ?? []).filter(A_SIGNALER));
-      modifier((d) => appliquerVentesBoutique(d, r.ventes, r.synchroniseLe));
+      bilan.ignorees.push(...(r.ignorees ?? []).filter(A_SIGNALER));
+      const tests = r.ventes.filter(estVenteTest);
+      if (tests.length > 0) bilan.ventesTest[source] = tests;
+      modifier((d) => appliquerVentesBoutique(d, r.ventes, r.synchroniseLe), 'ventes');
     } catch (e) {
-      erreurs.push(message(e));
+      noter(source, e);
     }
   }
   if (liste.some((c) => c.source === 'tiktok')) {
     try {
       const r = await appels.tiktok(businessId);
-      modifier((d) => appliquerVideos(d, r.videos));
+      modifier((d) => appliquerVideos(d, r.videos), 'videos');
     } catch (e) {
-      erreurs.push(message(e));
+      noter('tiktok', e);
     }
   }
-  return { erreurs, ignorees };
+  return bilan;
 }
 
 const ECART_MIN_MS = 5 * 60_000; // en revenant sur l'appli, pas plus d'une synchro toutes les 5 minutes
@@ -88,9 +133,8 @@ const ECART_MIN_MS = 5 * 60_000; // en revenant sur l'appli, pas plus d'une sync
  * - les ventes du mode test ne s'ajoutent qu'aux données d'exemple, jamais aux vraies données.
  */
 export function appliquerVentesBoutique(d: Donnees, ventes: Vente[], synchroniseLe: string): Donnees {
-  const estTest = (v: Vente) => v.plateforme.endsWith('-test');
-  const reelles = ventes.filter((v) => !estTest(v));
-  const tests = ventes.filter(estTest);
+  const reelles = ventes.filter((v) => !estVenteTest(v));
+  const tests = ventes.filter(estVenteTest);
   let resultat = d;
   // Sans vraie vente, on ne quitte pas l'exemple ; avec de vraies données, la date « à jour » avance quand même.
   if (reelles.length > 0 || !resultat.exemple) resultat = importerVentes(resultat, reelles, synchroniseLe).donnees;
@@ -116,9 +160,11 @@ const RAISONS_TIKTOK: Record<string, string> = {
   access_denied: 'Tu as refusé l’accès sur TikTok : rien n’a été relié.',
 };
 
+const messageDe = (e: unknown, defaut: string) => (e instanceof Error ? e.message : defaut);
+
 /** Les ventes de la boutique reliée arrivent toutes seules : à l'ouverture, puis en revenant sur l'appli. */
 export function useSynchroBoutique(
-  modifier: (f: (d: Donnees) => Donnees) => void,
+  modifier: Modifier,
   actif: boolean,
   retourTikTok: RetourTikTok | null = null,
   businessId: string | null = null,
@@ -126,8 +172,12 @@ export function useSynchroBoutique(
   const [comptes, setComptes] = useState<CompteRelie[] | null>(null);
   const [enCours, setEnCours] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
-  const [messageTikTok, setMessageTikTok] = useState<SynchroBoutique['messageTikTok']>(null);
+  const [erreursComptes, setErreursComptes] = useState<SynchroBoutique['erreursComptes']>({});
+  const [connexionExpiree, setConnexionExpiree] = useState(false);
+  const [messageTikTok, setMessageTikTok] = useState<MessageCompte | null>(null);
   const [ignorees, setIgnorees] = useState<VenteEcartee[]>([]);
+  const [ventesTest, setVentesTest] = useState<SynchroBoutique['ventesTest']>({});
+  const [liaisons, setLiaisons] = useState<SynchroBoutique['liaisons']>({});
   const derniere = useRef(0);
   const retourTraite = useRef(false);
 
@@ -161,11 +211,17 @@ export function useSynchroBoutique(
           const bilan = await lireComptesRelies(businessId, liste, { boutique: synchroniserBoutique, tiktok: synchroniserTikTok }, modifier);
           if (!monte.current) return;
           setIgnorees(bilan.ignorees);
-          setErreur(bilan.erreurs[0] ?? null);
+          setVentesTest(bilan.ventesTest);
+          setErreursComptes(bilan.parCompte);
+          setConnexionExpiree(bilan.expiree);
+          // Session expirée : un seul message, pas un par compte.
+          setErreur(bilan.expiree ? MESSAGE_CONNEXION_EXPIREE : bilan.erreurs.join(' ') || null);
           setComptes(await listerComptes(businessId));
         } catch (e) {
           if (!monte.current) return;
-          setErreur(e instanceof Error ? e.message : 'L’actualisation a échoué. Réessaie.');
+          setErreursComptes({});
+          setConnexionExpiree(e instanceof ConnexionExpiree);
+          setErreur(messageDe(e, 'L’actualisation a échoué. Réessaie.'));
         }
       } while (relancer.current && monte.current);
     })();
@@ -195,8 +251,10 @@ export function useSynchroBoutique(
         setMessageTikTok({ type: 'succes', texte: `TikTok relié : « ${libelle} ».` });
         void synchroniser();
       },
-      (e: unknown) =>
-        setMessageTikTok({ type: 'erreur', texte: e instanceof Error ? e.message : 'La liaison TikTok a échoué. Réessaie.' }),
+      (e: unknown) => {
+        if (e instanceof ConnexionExpiree) setConnexionExpiree(true);
+        setMessageTikTok({ type: 'erreur', texte: messageDe(e, 'La liaison TikTok a échoué. Réessaie.') });
+      },
     );
   }, [enLigne, retourTikTok, synchroniser]);
 
@@ -212,10 +270,25 @@ export function useSynchroBoutique(
 
   const relier = useCallback(
     async (source: SourceBoutique, cle: string) => {
-      if (!businessId) throw new Error('Choisis d’abord un business.');
-      const libelle = await relierBoutique(businessId, source, cle);
-      await synchroniser();
-      return libelle;
+      const finir = (message: MessageCompte) => {
+        if (monte.current) setLiaisons((l) => ({ ...l, [source]: { enCours: false, message } }));
+      };
+      if (!businessId) {
+        finir({ type: 'erreur', texte: 'Choisis d’abord un business.' });
+        return false;
+      }
+      setLiaisons((l) => ({ ...l, [source]: { enCours: true, message: null } }));
+      try {
+        const libelle = await relierBoutique(businessId, source, cle);
+        await synchroniser();
+        const apport = apportLibelle(libelle, NOMS_COMPTES[source]);
+        finir({ type: 'succes', texte: apport ? `Boutique reliée : ${apport}.` : 'Boutique reliée.' });
+        return true;
+      } catch (e) {
+        if (e instanceof ConnexionExpiree && monte.current) setConnexionExpiree(true);
+        finir({ type: 'erreur', texte: messageDe(e, 'La liaison a échoué. Réessaie.') });
+        return false;
+      }
     },
     [businessId, synchroniser],
   );
@@ -226,6 +299,9 @@ export function useSynchroBoutique(
       await deconnecterCompte(businessId, source, identifiant);
       setComptes(await listerComptes(businessId));
       setErreur(null);
+      setErreursComptes((e) => ({ ...e, [source]: undefined }));
+      // Le message de liaison (« Boutique reliée ») n'a plus lieu d'être.
+      if ((BOUTIQUES as SourceCompte[]).includes(source)) setLiaisons((l) => ({ ...l, [source]: undefined }));
     },
     [businessId],
   );
@@ -245,13 +321,18 @@ export function useSynchroBoutique(
     comptes,
     enCours,
     erreur,
+    erreursComptes,
+    connexionExpiree,
     synchroniser,
     relier,
+    liaisons,
     deconnecter,
     mouvements,
     relierTikTok: partirSurTikTok,
     messageTikTok,
+    effacerMessageTikTok: useCallback(() => setMessageTikTok(null), []),
     ignorees,
+    ventesTest,
     effacerErreur: useCallback(() => setErreur(null), []),
   };
 }

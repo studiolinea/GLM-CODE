@@ -345,7 +345,7 @@ async function relierTikTok(
   const code = String(corps.code ?? '');
   const businessId = code ? await verifierEtat(String(corps.etat ?? ''), sansBusiness.userId, secret) : null;
   if (!businessId) {
-    return json(400, { erreur: 'Ce lien TikTok n’est plus valable. Appuie à nouveau sur « Relier un compte TikTok ».' });
+    return json(400, { erreur: 'Ce lien TikTok n’est plus valable. Recommence depuis la carte TikTok des réglages.' });
   }
   const ctx: Contexte = { ...sansBusiness, businessId };
   let jetons: JetonsTikTok;
@@ -356,7 +356,7 @@ async function relierTikTok(
   } catch (e) {
     if (e instanceof DroitsInsuffisants) return json(400, { erreur: MESSAGE_DROITS_TIKTOK });
     if (e instanceof CleRefusee) {
-      return json(400, { erreur: 'TikTok a refusé la liaison. Réessaie avec le bouton « Relier un compte TikTok ».' });
+      return json(400, { erreur: 'TikTok a refusé la liaison. Recommence depuis la carte TikTok des réglages.' });
     }
     return json(502, { erreur: 'TikTok ne répond pas. Réessaie dans un moment.' });
   }

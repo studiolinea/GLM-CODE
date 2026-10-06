@@ -3,7 +3,7 @@ import type { Donnees } from '../modele';
 import { donneesValides, donneesVides } from './actions';
 import { exempleAAfficher, versDonnees, type Depot } from './depot';
 import { chargerDonnees, enregistrerDonnees } from './stockage';
-import { Synchro } from './synchro';
+import { messageEchecEnregistrement, Synchro, type OrigineModification } from './synchro';
 
 /** Où sont gardées les données : sur l'appareil seulement, ou dans le compte en ligne. */
 export type Source =
@@ -14,7 +14,8 @@ export type Source =
 export interface EtatDonnees {
   /** null tant que les données ne sont pas encore arrivées. */
   donnees: Donnees | null;
-  modifier: (f: (d: Donnees) => Donnees) => void;
+  /** `origine` : absente pour une action de la personne, « ventes » ou « vidéos » pour une actualisation automatique. */
+  modifier: (f: (d: Donnees) => Donnees, origine?: OrigineModification) => void;
   erreur: string | null;
   effacerErreur: () => void;
   recharger: () => void;
@@ -131,9 +132,9 @@ export function useDonnees(source: Source): EtatDonnees {
 
   useEffect(() => {
     if (!depot) return;
-    synchro.current = new Synchro(depot, actuelles.current ?? donneesVides(), (etatServeur) => {
+    synchro.current = new Synchro(depot, actuelles.current ?? donneesVides(), (etatServeur, origine) => {
       afficher(etatServeur);
-      setErreur('Pas de connexion, réessaie : ta dernière action n’a pas été enregistrée.');
+      setErreur(messageEchecEnregistrement(origine));
     });
     void recharger();
     // En revenant sur l'appli (par exemple après avoir noté une vidéo sur l'autre appareil), ou quand le réseau
@@ -151,14 +152,14 @@ export function useDonnees(source: Source): EtatDonnees {
   }, [depot, afficher, recharger]);
 
   const modifier = useCallback(
-    (f: (d: Donnees) => Donnees) => {
+    (f: (d: Donnees) => Donnees, origine?: OrigineModification) => {
       const avant = actuelles.current;
       if (!avant || !monte.current) return;
       const apres = f(avant);
       if (apres === avant) return;
       version.current++;
       afficher(apres);
-      if (synchro.current) synchro.current.enregistrer(avant, apres);
+      if (synchro.current) synchro.current.enregistrer(avant, apres, origine);
       else if (!enregistrerDonnees(apres)) setErreur(MESSAGE_APPAREIL);
     },
     [afficher],

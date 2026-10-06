@@ -1,9 +1,26 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { formatEuros } from '../argent';
-import type { CompteRelie, MouvementBoutique, SourceBoutique } from '../donnees/comptesRelies';
-import type { SynchroBoutique } from '../donnees/useSynchroBoutique';
+import { resumeVentesTest } from '../calculs/ventesTest';
+import {
+  apportLibelle,
+  MESSAGE_CONNEXION_EXPIREE,
+  type CompteRelie,
+  type MouvementBoutique,
+  type SourceBoutique,
+} from '../donnees/comptesRelies';
+import type { MessageCompte, SynchroBoutique } from '../donnees/useSynchroBoutique';
 import { quandParis } from '../temps';
 import { fr } from '../texte';
+import { avecSouris } from './Feuille';
+import { IconeChevron } from './Icones';
+
+/** Les cartes vers lesquelles les réglages peuvent s'ouvrir directement. */
+export type CarteCompte = 'boutique' | 'tiktok' | 'comptes';
+export const ID_CARTES: Record<CarteCompte, string> = {
+  boutique: 'carte-stripe',
+  tiktok: 'carte-tiktok',
+  comptes: 'titre-comptes-relies',
+};
 
 interface FicheBoutique {
   source: SourceBoutique;
@@ -14,6 +31,8 @@ interface FicheBoutique {
   aide: ReactNode;
   /** La boutique sait montrer ses derniers mouvements d'argent (frais, TVA). */
   verification?: boolean;
+  /** Pas reliée, la carte est repliée sur une ligne (Kévin ne s'en sert pas). */
+  repliable?: boolean;
 }
 
 const FICHES: FicheBoutique[] = [
@@ -43,30 +62,34 @@ const FICHES: FicheBoutique[] = [
         « Pilotage », puis copie la clé. Elle est chiffrée avant d’être enregistrée.
       </>
     ),
+    repliable: true,
   },
 ];
 
-/**
- * Ce que le libellé du compte apporte en plus du titre de la carte : « Stripe » → rien,
- * « Stripe (mode test) » → « mode test », le nom d'une boutique Lemon Squeezy → « « Ma boutique » ».
- */
-function apportLibelle(libelle: string, plateforme: string): string | null {
-  if (libelle.startsWith(plateforme)) return libelle.slice(plateforme.length).replace(/[()]/g, '').trim() || null;
-  return libelle.trim() ? `« ${libelle.trim()} »` : null;
-}
-
 /** « Mes comptes reliés » : chacun relie et déconnecte lui-même ses propres comptes. */
-export function ComptesRelies({ boutique }: { boutique: SynchroBoutique }) {
+export function ComptesRelies({ boutique, onReconnecter }: { boutique: SynchroBoutique; onReconnecter?: () => void }) {
   const comptes = boutique.comptes;
-  // Un message déjà affiché sur la carte d'un compte n'est pas répété en haut.
-  const erreur =
-    boutique.erreur && !comptes?.some((c) => c.derniereErreur === boutique.erreur) ? boutique.erreur : null;
+  // Le message d'un compte s'affiche sur sa carte ; en haut, seulement ce qui ne concerne aucun compte en particulier.
+  const surUneCarte = Object.values(boutique.erreursComptes).some(Boolean);
+  const erreur = boutique.connexionExpiree ? null : boutique.erreur && !surUneCarte ? boutique.erreur : null;
   return (
     <section aria-labelledby="titre-comptes-relies">
       <h3 id="titre-comptes-relies" className="titre-reglage">
         Mes comptes reliés
       </h3>
       {comptes === null && !boutique.erreur && <p className="texte-doux">Lecture de tes comptes reliés…</p>}
+      {boutique.connexionExpiree && (
+        <div role="alert">
+          <p className="erreur">{fr(MESSAGE_CONNEXION_EXPIREE)}</p>
+          {onReconnecter && (
+            <div className="pied pied-haut" style={{ justifyContent: 'flex-start' }}>
+              <button type="button" className="bouton principal" onClick={onReconnecter}>
+                Me reconnecter
+              </button>
+            </div>
+          )}
+        </div>
+      )}
       {erreur && <p className="erreur">{fr(erreur)}</p>}
       {comptes === null && boutique.erreur && (
         <button type="button" className="bouton" onClick={() => void boutique.synchroniser()}>
@@ -109,25 +132,30 @@ export function ComptesRelies({ boutique }: { boutique: SynchroBoutique }) {
 
 function Boutique({ fiche, boutique }: { fiche: FicheBoutique; boutique: SynchroBoutique }) {
   const relie = boutique.comptes?.find((c) => c.source === fiche.source);
+  // La liaison (et son résultat) est gardée par l'appli : elle continue, et reste affichée, si la fenêtre est fermée.
+  const liaison = boutique.liaisons[fiche.source];
   const [cle, setCle] = useState('');
   const [occupe, setOccupe] = useState(false);
-  const [message, setMessage] = useState<{ type: 'succes' | 'erreur'; texte: string } | null>(null);
+  // Les messages de la carte elle-même : clé manquante, déconnexion.
+  const [message, setMessage] = useState<MessageCompte | null>(null);
   const [confirmer, setConfirmer] = useState(false);
+  const [deplie, setDeplie] = useState(false);
+  const champ = useRef<HTMLInputElement>(null);
+  const enLiaison = liaison?.enCours ?? false;
+  const affiche = message ?? liaison?.message ?? null;
+  const erreurActualisation = boutique.connexionExpiree ? undefined : boutique.erreursComptes[fiche.source];
+  const ventesTest = boutique.ventesTest[fiche.source];
+  const resumeTest = ventesTest ? resumeVentesTest(ventesTest) : null;
+
+  // Carte dépliée au clavier ou à la souris : le curseur va dans le champ de la clé.
+  useEffect(() => {
+    if (deplie && avecSouris()) champ.current?.focus();
+  }, [deplie]);
 
   const relier = async () => {
     setMessage(null);
     if (!cle.trim()) return setMessage({ type: 'erreur', texte: 'Colle d’abord ta clé d’accès.' });
-    setOccupe(true);
-    try {
-      const libelle = await boutique.relier(fiche.source, cle.trim());
-      setCle('');
-      const apport = apportLibelle(libelle, fiche.plateforme);
-      setMessage({ type: 'succes', texte: apport ? `Boutique reliée : ${apport}.` : 'Boutique reliée.' });
-    } catch (e) {
-      setMessage({ type: 'erreur', texte: e instanceof Error ? e.message : 'La liaison a échoué. Réessaie.' });
-    } finally {
-      setOccupe(false);
-    }
+    if (await boutique.relier(fiche.source, cle.trim())) setCle('');
   };
 
   const deconnecter = async () => {
@@ -150,8 +178,28 @@ function Boutique({ fiche, boutique }: { fiche: FicheBoutique; boutique: Synchro
       ? `ventes à jour le ${quandParis(new Date(relie.derniereSynchro))}`
       : 'pas encore lue';
 
+  // Pas reliée et rarement utilisée : une seule ligne, qui se déplie au toucher.
+  if (fiche.repliable && !relie && !deplie && !affiche && !enLiaison) {
+    return (
+      <button
+        type="button"
+        id={`carte-${fiche.source}`}
+        className="compte-relie compte-replie"
+        aria-expanded="false"
+        onClick={() => setDeplie(true)}
+      >
+        <span className="compte-nom">{fiche.nom}</span>
+        <span className="puce">Pas reliée</span>
+        <span className="compte-deplier">
+          Relier
+          <IconeChevron taille={16} />
+        </span>
+      </button>
+    );
+  }
+
   return (
-    <div className="compte-relie">
+    <div className="compte-relie" id={`carte-${fiche.source}`}>
       <div className="compte-entete">
         <span className="compte-nom">{fiche.nom}</span>
         <span className={`puce ${relie ? 'puce-on' : ''}`}>{relie ? 'Reliée' : 'Pas reliée'}</span>
@@ -160,7 +208,13 @@ function Boutique({ fiche, boutique }: { fiche: FicheBoutique; boutique: Synchro
       {relie ? (
         <>
           <p className="texte-doux">{apport ? `${apport} · ${etat}` : etat}</p>
-          {relie.derniereErreur && <p className="erreur">{fr(relie.derniereErreur)}</p>}
+          {/* L'erreur de cette actualisation, sinon la dernière notée par le serveur. */}
+          {erreurActualisation ? (
+            <p className="erreur">{fr(erreurActualisation)}</p>
+          ) : (
+            relie.derniereErreur && <p className="erreur">{fr(relie.derniereErreur)}</p>
+          )}
+          {resumeTest && <p className="note alerte-note">{fr(resumeTest)}</p>}
           {!confirmer ? (
             <>
               {fiche.verification && <Verification source={fiche.source} plateforme={fiche.plateforme} boutique={boutique} />}
@@ -195,6 +249,7 @@ function Boutique({ fiche, boutique }: { fiche: FicheBoutique; boutique: Synchro
           <label className="champ">
             <span>Clé d’accès</span>
             <input
+              ref={champ}
               id={`cle-${fiche.source}`}
               type="password"
               autoComplete="off"
@@ -205,15 +260,15 @@ function Boutique({ fiche, boutique }: { fiche: FicheBoutique; boutique: Synchro
           </label>
           <p className="note">{fiche.aide}</p>
           <div className="pied" style={{ justifyContent: 'flex-start' }}>
-            <button type="submit" className="bouton principal" disabled={occupe}>
-              {occupe ? 'Vérification…' : 'Relier'}
+            <button type="submit" className="bouton principal" disabled={enLiaison}>
+              {enLiaison ? 'Vérification…' : 'Relier'}
             </button>
           </div>
         </form>
       )}
-      {message && (
-        <p className={message.type} role="status">
-          {fr(message.texte)}
+      {affiche && (
+        <p className={affiche.type} role="status">
+          {fr(affiche.texte)}
         </p>
       )}
     </div>
@@ -349,11 +404,13 @@ function Verification({ source, plateforme, boutique }: { source: SourceBoutique
 function CompteTikTok({ boutique }: { boutique: SynchroBoutique }) {
   const relies = boutique.comptes?.filter((c) => c.source === 'tiktok') ?? [];
   const [occupe, setOccupe] = useState(false);
-  const [message, setMessage] = useState<{ type: 'succes' | 'erreur'; texte: string } | null>(null);
+  const [message, setMessage] = useState<MessageCompte | null>(null);
   const affiche = message ?? boutique.messageTikTok;
+  const erreurActualisation = boutique.connexionExpiree ? undefined : boutique.erreursComptes.tiktok;
 
   const relier = async () => {
     setMessage(null);
+    boutique.effacerMessageTikTok();
     setOccupe(true);
     try {
       await boutique.relierTikTok(); // la page part sur TikTok
@@ -364,7 +421,7 @@ function CompteTikTok({ boutique }: { boutique: SynchroBoutique }) {
   };
 
   return (
-    <div className="compte-relie">
+    <div className="compte-relie" id="carte-tiktok">
       <div className="compte-entete">
         <span className="compte-nom">TikTok</span>
         <span className={`puce ${relies.length > 0 ? 'puce-on' : ''}`}>
@@ -376,6 +433,7 @@ function CompteTikTok({ boutique }: { boutique: SynchroBoutique }) {
       ) : (
         relies.map((c) => <CompteTikTokRelie key={c.identifiant} compte={c} boutique={boutique} onMessage={setMessage} />)
       )}
+      {erreurActualisation && <p className="erreur">{fr(erreurActualisation)}</p>}
       <p className="note">
         TikTok te demandera ton accord. Pilotage lit seulement tes vidéos publiques et leurs vues : il ne publie rien.
       </p>
@@ -411,7 +469,7 @@ function CompteTikTokRelie({
 }: {
   compte: CompteRelie;
   boutique: SynchroBoutique;
-  onMessage: (m: { type: 'succes' | 'erreur'; texte: string }) => void;
+  onMessage: (m: MessageCompte) => void;
 }) {
   const [confirmer, setConfirmer] = useState(false);
   const [occupe, setOccupe] = useState(false);

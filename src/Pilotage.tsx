@@ -11,11 +11,12 @@ import {
   supprimerVideo,
 } from './donnees/actions';
 import type { ChoixBusiness } from './App';
-import { BOUTIQUES, lireRetourTikTok } from './donnees/comptesRelies';
+import { BOUTIQUES, lireRetourTikTok, MESSAGE_PAS_DE_CONNEXION } from './donnees/comptesRelies';
 import { donneesExemple } from './donnees/exemple';
 import { useDonnees, type Source } from './donnees/useDonnees';
 import { useSynchroBoutique } from './donnees/useSynchroBoutique';
 import { AjoutFichier, type BilanImport } from './ecrans/AjoutFichier';
+import type { CarteCompte } from './ecrans/ComptesRelies';
 import { EcranMessage } from './ecrans/EcranMessage';
 import { IconeCroix, IconeReglages } from './ecrans/Icones';
 import { MesBusiness } from './ecrans/MesBusiness';
@@ -32,9 +33,13 @@ type Fenetre =
   | { type: 'saisie' }
   | { type: 'modifier'; videoId: string }
   | { type: 'import' }
-  | { type: 'reglages' }
+  /** `cible` : la carte à montrer à l'ouverture (boutique, TikTok, ou tous les comptes reliés). */
+  | { type: 'reglages'; cible?: CarteCompte }
   | { type: 'business' }
   | { type: 'ensemble' };
+
+/** L'annonce sur l'écran principal (par exemple : un business supprimé) disparaît toute seule au bout de ce délai. */
+const DUREE_ANNONCE_MS = 8000;
 
 /** L'heure actuelle, remise à jour toutes les 30 secondes (les alertes en dépendent). */
 function useMaintenant(): Date {
@@ -111,7 +116,7 @@ function Cockpit({
   // Les ventes de la boutique reliée arrivent toutes seules (seulement avec la base en ligne).
   const boutique = useSynchroBoutique(modifier, enLigne, retourTikTok, business?.actuel.id ?? null);
   const [periode, setPeriode] = useState<Periode>('7j');
-  const [fenetre, setFenetre] = useState<Fenetre>(() => (retourTikTok ? { type: 'reglages' } : { type: 'aucune' }));
+  const [fenetre, setFenetre] = useState<Fenetre>(() => (retourTikTok ? { type: 'reglages', cible: 'tiktok' } : { type: 'aucune' }));
 
   const aujourdhui = dateParis(maintenant);
   const resume = useMemo(() => calculerResume(donnees.ventes, periode, maintenant), [donnees.ventes, periode, maintenant]);
@@ -137,6 +142,35 @@ function Cockpit({
 
   const fermer = useCallback(() => setFenetre({ type: 'aucune' }), []);
 
+  // Un seul bandeau rouge à la fois : l'erreur des données, celle de l'actualisation et celle de TikTok y sont réunies.
+  // Les deux dernières restent dans les réglages quand ils sont ouverts (sur la carte du compte concerné).
+  const surEcranPrincipal = fenetre.type !== 'reglages';
+  const erreurActualisation =
+    enLigne && surEcranPrincipal && boutique.erreur && !(erreur && boutique.erreur === MESSAGE_PAS_DE_CONNEXION) // déjà dit
+      ? boutique.erreur
+      : null;
+  const erreurTikTok = surEcranPrincipal && boutique.messageTikTok?.type === 'erreur' ? boutique.messageTikTok.texte : null;
+  const succesTikTok = surEcranPrincipal && boutique.messageTikTok?.type === 'succes' ? boutique.messageTikTok.texte : null;
+  const rouges = [
+    erreur,
+    erreurActualisation && (boutique.connexionExpiree ? erreurActualisation : `Actualisation incomplète. ${erreurActualisation}`),
+    erreurTikTok,
+  ].filter((t): t is string => !!t);
+  const effacerRouges = () => {
+    effacerErreur();
+    boutique.effacerErreur();
+    if (erreurTikTok) boutique.effacerMessageTikTok();
+  };
+
+  // L'annonce (un business supprimé) s'efface toute seule.
+  const effacerAnnonce = business?.effacerAnnonce;
+  const annonce = business?.annonce;
+  useEffect(() => {
+    if (!annonce || !effacerAnnonce) return;
+    const minuteur = setTimeout(effacerAnnonce, DUREE_ANNONCE_MS);
+    return () => clearTimeout(minuteur);
+  }, [annonce, effacerAnnonce]);
+
   const surAction = (action: Action) => {
     switch (action.cible) {
       case 'saisie-video':
@@ -146,7 +180,7 @@ function Cockpit({
       case 'modifier-video':
         return setFenetre({ type: 'modifier', videoId: action.videoId });
       case 'comptes':
-        return setFenetre({ type: 'reglages' });
+        return setFenetre({ type: 'reglages', cible: action.compte ?? 'comptes' });
       case 'actualiser':
         return void boutique.synchroniser();
     }
@@ -182,7 +216,7 @@ function Cockpit({
   const actions = enLigne ? (
     <nav className="barre" aria-label="Actions">
       {relies && relies.length === 0 ? (
-        <button className="bouton principal" onClick={() => setFenetre({ type: 'reglages' })}>
+        <button className="bouton principal" onClick={() => setFenetre({ type: 'reglages', cible: 'comptes' })}>
           Relier mes comptes
         </button>
       ) : (
@@ -207,21 +241,50 @@ function Cockpit({
 
   return (
     <div className="page">
-      {erreur && (
+      {rouges.length > 0 && (
         <div className="bandeau-erreur" role="alert">
-          <span className="bandeau-texte">{fr(erreur)}</span>
-          <button className="bouton discret icone-seule bandeau-fermer" onClick={effacerErreur} aria-label="Fermer le message">
+          <span className="bandeau-texte">
+            {rouges.map((texte) => (
+              <span key={texte} className="bandeau-ligne">
+                {fr(texte)}
+              </span>
+            ))}
+          </span>
+          {boutique.connexionExpiree && compte ? (
+            <button className="bouton discret bandeau-action" onClick={() => void compte.deconnecter()}>
+              Me reconnecter
+            </button>
+          ) : (
+            (erreurActualisation || erreurTikTok) && (
+              <button
+                className="bouton discret bandeau-action"
+                onClick={() => setFenetre({ type: 'reglages', cible: erreurActualisation ? 'comptes' : 'tiktok' })}
+              >
+                Voir
+              </button>
+            )
+          )}
+          <button className="bouton discret icone-seule bandeau-fermer" onClick={effacerRouges} aria-label="Fermer le message">
             <IconeCroix />
           </button>
         </div>
       )}
-      {enLigne && boutique.erreur && fenetre.type !== 'reglages' && (
-        <div className="bandeau-erreur" role="alert">
-          <span className="bandeau-texte">{fr(`Actualisation incomplète : ${boutique.erreur}`)}</span>
-          <button className="bouton discret bandeau-action" onClick={() => setFenetre({ type: 'reglages' })}>
-            Voir mes comptes reliés
+      {succesTikTok && (
+        <div className="bandeau-info bandeau-succes" role="status">
+          <span className="bandeau-texte">{fr(succesTikTok)}</span>
+          <button
+            className="bouton discret icone-seule bandeau-fermer"
+            onClick={boutique.effacerMessageTikTok}
+            aria-label="Fermer le message"
+          >
+            <IconeCroix />
           </button>
-          <button className="bouton discret icone-seule bandeau-fermer" onClick={boutique.effacerErreur} aria-label="Fermer le message">
+        </div>
+      )}
+      {business?.annonce && (
+        <div className="bandeau-info" role="status">
+          <span className="bandeau-texte">{fr(business.annonce)}</span>
+          <button className="bouton discret icone-seule bandeau-fermer" onClick={business.effacerAnnonce} aria-label="Fermer le message">
             <IconeCroix />
           </button>
         </div>
@@ -274,7 +337,7 @@ function Cockpit({
       )}
 
       {fenetre.type === 'business' && business && (
-        <MesBusiness business={business} onEnsemble={() => setFenetre({ type: 'ensemble' })} onFermer={fermer} />
+        <MesBusiness business={business} exemple={donnees.exemple} onEnsemble={() => setFenetre({ type: 'ensemble' })} onFermer={fermer} />
       )}
 
       {fenetre.type === 'ensemble' && business && (
@@ -295,6 +358,8 @@ function Cockpit({
           enLigne={enLigne}
           compte={compte}
           boutique={enLigne ? boutique : undefined}
+          business={business?.actuel}
+          cible={fenetre.cible}
           onSaisieManuelle={() => setFenetre({ type: 'saisie' })}
           onImportManuel={() => setFenetre({ type: 'import' })}
           onObjectif={(objectifParJour) => modifier((d) => changerReglages(d, { ...d.reglages, objectifParJour }))}
