@@ -30,17 +30,20 @@ export class Synchro {
     return this.enCours > 0;
   }
 
-  enregistrer(avant: Donnees, apres: Donnees, origine?: OrigineModification): void {
+  /** Renvoie une promesse : vrai quand la base a enregistré le changement, faux s'il n'a pas pu l'être. */
+  enregistrer(avant: Donnees, apres: Donnees, origine?: OrigineModification): Promise<boolean> {
     const changements = calculerChangements(avant, apres);
-    if (!changements) return;
+    if (!changements) return Promise.resolve(true);
     const generation = this.generation;
     this.enCours++;
+    let enregistre = false;
     this.file = this.file
       .then(async () => {
         if (generation !== this.generation) return;
         try {
           await this.depot.appliquer(changements);
           this.etatServeur = apres;
+          enregistre = true;
         } catch {
           this.generation++;
           this.surEchec(this.etatServeur, origine);
@@ -49,6 +52,7 @@ export class Synchro {
       .finally(() => {
         this.enCours--;
       });
+    return this.file.then(() => enregistre);
   }
 
   /** Attend la fin de tous les envois prévus. */
@@ -61,5 +65,5 @@ export class Synchro {
 export function messageEchecEnregistrement(origine?: OrigineModification): string {
   if (origine === 'ventes') return 'Tes dernières ventes n’ont pas pu être enregistrées. Réessaie dans un moment.';
   if (origine === 'videos') return 'Tes dernières vidéos n’ont pas pu être enregistrées. Réessaie dans un moment.';
-  return 'Pas de connexion, réessaie : ta dernière action n’a pas été enregistrée.';
+  return 'Ta dernière action n’a pas été enregistrée. Vérifie ta connexion, puis réessaie.';
 }

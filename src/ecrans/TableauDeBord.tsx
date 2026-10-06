@@ -6,6 +6,7 @@ import type { Rythme } from '../calculs/rythme';
 import { quandParis } from '../temps';
 import { PHRASE_GAINS } from '../texte';
 import { CarteAlerte } from './CarteAlerte';
+import { ID_SELECTEUR_BUSINESS, prendreFocus } from './focus';
 import { IconeChevron, Logo } from './Icones';
 import { Jauge } from './Jauge';
 import { Odometre } from './Odometre';
@@ -90,7 +91,14 @@ export function TableauDeBord({
               {jourEnTete(maintenant)}
             </p>
             {onBusiness && (
-              <button className="selecteur-business" onClick={onBusiness} aria-label={`Business ouvert : ${nomBusiness}. Changer de business`}>
+              <button
+                id={ID_SELECTEUR_BUSINESS}
+                // Après avoir ouvert un autre business, le curseur du clavier revient ici (sur ordinateur).
+                ref={prendreFocus}
+                className="selecteur-business"
+                onClick={onBusiness}
+                aria-label={`Business ouvert : ${nomBusiness}. Changer de business`}
+              >
                 <span className="selecteur-business-texte">
                   <span className="etiquette">Business</span>
                   <span className="selecteur-business-nom">{nomBusiness}</span>

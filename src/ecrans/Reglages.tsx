@@ -42,11 +42,13 @@ export function Reglages({
   boutique?: SynchroBoutique;
   /** La carte à montrer à l'ouverture (depuis un voyant, au retour de TikTok…). */
   cible?: CarteCompte;
-  onObjectif: (objectifParJour: number) => void;
+  /** La promesse dit si l'objectif est bien enregistré. */
+  onObjectif: (objectifParJour: number) => Promise<boolean>;
   /** En secours seulement (en ligne, tout arrive des comptes reliés). */
   onSaisieManuelle?: () => void;
   onImportManuel?: () => void;
-  onRestaurer: (donnees: Donnees) => void;
+  /** La promesse dit si la sauvegarde est bien enregistrée. */
+  onRestaurer: (donnees: Donnees) => Promise<boolean>;
   onRemettreExemple: () => void;
   onFermer: () => void;
 }) {
@@ -56,6 +58,8 @@ export function Reglages({
   const [confirmer, setConfirmer] = useState(false);
   // La sauvegarde choisie, en attente de confirmation.
   const [aRestaurer, setARestaurer] = useState<Sauvegarde | null>(null);
+  const [restauration, setRestauration] = useState(false);
+  const [erreurObjectif, setErreurObjectif] = useState(false);
 
   // Ouverts depuis un voyant ou au retour de TikTok : on va jusqu'à la carte concernée, dès qu'elle est affichée.
   const defile = useRef(false);
@@ -69,7 +73,13 @@ export function Reglages({
     carte.scrollIntoView({ block: 'start', behavior: reduit ? 'auto' : 'smooth' });
   }, [cible, comptesArrives]);
 
-  const changerObjectif = (n: number) => onObjectif(Math.min(OBJECTIF_MAX, Math.max(0, n)));
+  const changerObjectif = async (n: number) => {
+    const voulu = Math.min(OBJECTIF_MAX, Math.max(0, n));
+    if (voulu === objectif) return;
+    setErreurObjectif(false);
+    // Si la base refuse, l'objectif revient tout seul à sa valeur d'avant : on le dit ici, dans la fenêtre.
+    setErreurObjectif(!(await onObjectif(voulu)));
+  };
 
   const choisirSauvegarde = async (fichier: File) => {
     setMessage(null);
@@ -79,14 +89,29 @@ export function Reglages({
       setARestaurer(null);
       return setMessage({ type: 'erreur', texte: resultat });
     }
+    // En ligne, les données d'exemple ne vont jamais dans la base : elles disparaîtraient au prochain chargement.
+    if (enLigne && resultat.donnees.exemple) {
+      setARestaurer(null);
+      return setMessage({ type: 'erreur', texte: 'Cette sauvegarde ne contient que les données d’exemple : rien à restaurer.' });
+    }
     setARestaurer(resultat);
   };
 
-  const restaurer = () => {
-    if (!aRestaurer) return;
-    onRestaurer(aRestaurer.donnees);
+  const restaurer = async () => {
+    if (!aRestaurer || restauration) return;
+    setRestauration(true);
+    setMessage(null);
+    const ok = await onRestaurer(aRestaurer.donnees);
+    setRestauration(false);
     setARestaurer(null);
-    setMessage({ type: 'succes', texte: 'Sauvegarde restaurée.' });
+    setMessage(
+      ok
+        ? { type: 'succes', texte: 'Sauvegarde restaurée.' }
+        : {
+            type: 'erreur',
+            texte: 'La sauvegarde n’a pas pu être enregistrée : tes données n’ont pas changé. Réessaie quand le réseau revient.',
+          },
+    );
   };
 
   return (
@@ -103,8 +128,9 @@ export function Reglages({
             type="button"
             className="bouton icone-seule"
             aria-label="Une vidéo de moins"
-            disabled={objectif <= 0}
-            onClick={() => changerObjectif(objectif - 1)}
+            // aria-disabled plutôt que disabled : au clavier, le curseur reste sur le bouton à 0.
+            aria-disabled={objectif <= 0}
+            onClick={() => void changerObjectif(objectif - 1)}
           >
             <IconeMoins />
           </button>
@@ -115,13 +141,18 @@ export function Reglages({
             type="button"
             className="bouton icone-seule"
             aria-label="Une vidéo de plus"
-            disabled={objectif >= OBJECTIF_MAX}
-            onClick={() => changerObjectif(objectif + 1)}
+            aria-disabled={objectif >= OBJECTIF_MAX}
+            onClick={() => void changerObjectif(objectif + 1)}
           >
             <IconePlus />
           </button>
           <span className="texte-doux">{objectif === 0 ? 'pas de rappel' : `${accord(objectif, 'vidéo')} par jour`}</span>
         </div>
+        {erreurObjectif && (
+          <p className="erreur" role="alert">
+            L’objectif n’a pas pu être enregistré. Réessaie dans un moment.
+          </p>
+        )}
       </section>
 
       {boutique && (
@@ -133,8 +164,8 @@ export function Reglages({
               <hr className="separateur" />
               <h3 className="titre-reglage">À la main, en secours</h3>
               <p className="texte-doux">
-                Tout arrive tout seul de tes comptes reliés. Ces boutons ne servent qu’en secours : une vidéo Instagram
-                (pas encore reliée) ou un fichier de ventes d’une autre plateforme.
+                Tout arrive tout seul de tes comptes reliés. Ces boutons ne servent qu’en secours : noter une vidéo
+                Instagram (pas encore reliée), ou ajouter un fichier de ventes au format de l’appli.
               </p>
               <div className="pied" style={{ justifyContent: 'flex-start' }}>
                 {onSaisieManuelle && (
@@ -205,10 +236,10 @@ export function Reglages({
         <div role="alert" className="confirmation">
           <p className="erreur">{fr(questionRestauration(aRestaurer.business, business))}</p>
           <div className="pied" style={{ justifyContent: 'flex-start' }}>
-            <button type="button" className="bouton danger" onClick={restaurer}>
-              Remplacer par la sauvegarde
+            <button type="button" className="bouton danger" disabled={restauration} onClick={() => void restaurer()}>
+              {restauration ? 'Restauration…' : 'Remplacer par la sauvegarde'}
             </button>
-            <button type="button" className="bouton discret" onClick={() => setARestaurer(null)}>
+            <button type="button" className="bouton discret" disabled={restauration} onClick={() => setARestaurer(null)}>
               Annuler
             </button>
           </div>

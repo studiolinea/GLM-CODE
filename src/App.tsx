@@ -60,11 +60,13 @@ function oublierSessionSupabase(): void {
   }
 }
 
-/** Le business à ouvrir sans réseau, s'il a une copie sur l'appareil ; sinon null. */
+/** Le business à ouvrir sans réseau : le dernier ouvert s'il a une copie sur l'appareil, sinon un autre qui en a une. */
 function businessHorsLigne(userId: string): Business | null {
   const memoire = memoireBusiness(userId);
   const garde = businessAOuvrir(memoire.liste, memoire.actuel);
-  return garde && copieExiste(`${userId}:${garde.id}`) ? garde : null;
+  const aUneCopie = (b: Business | null) => !!b && copieExiste(`${userId}:${b.id}`);
+  if (aUneCopie(garde)) return garde;
+  return memoire.liste.find(aUneCopie) ?? null;
 }
 
 export function App() {
@@ -185,6 +187,10 @@ export interface ChoixBusiness {
   /** Un message pour l'écran principal (par exemple : le business ouvert vient d'être supprimé). */
   annonce: string | null;
   effacerAnnonce: () => void;
+  /** Vrai quand la base ne répond pas et que la liste vient de la copie de l'appareil. */
+  horsLigne: boolean;
+  /** Vrai si ce business a une copie sur cet appareil : sans réseau, seul un business avec une copie s'ouvre. */
+  aUneCopie: (id: string) => boolean;
 }
 
 function AvecBusiness({
@@ -226,8 +232,11 @@ function AvecBusiness({
 
   /** Sans réseau : on ouvre le dernier business avec la copie gardée sur l'appareil. Renvoie faux s'il n'y en a pas. */
   const ouvrirCopie = useCallback(() => {
-    if (!businessHorsLigne(userId)) return false;
+    const garde = businessHorsLigne(userId);
+    if (!garde) return false;
     setListe((deja) => deja ?? memoireBusiness(userId).liste);
+    // Le business choisi n'a pas de copie sur cet appareil : on ouvre celui qui en a une.
+    setActuelId((id) => (id && copieExiste(`${userId}:${id}`) ? id : garde.id));
     setDepuisCopie(true);
     return true;
   }, [userId]);
@@ -254,7 +263,8 @@ function AvecBusiness({
       );
       if (ouvrirCopie()) return;
       // Le bouton « Réessayer » est juste en dessous : pas besoin de « Réessaie. » dans le message.
-      setErreur(e instanceof Error ? e.message.replace(/\s*Réessaie\.$/, '') : 'Impossible de lire tes business.');
+      if (navigator.onLine === false) setErreur('Pas de connexion : impossible de lire tes business.');
+      else setErreur(e instanceof Error ? e.message.replace(/\s*Réessaie\.$/, '') : 'Impossible de lire tes business.');
     } finally {
       clearTimeout(minuteur);
     }
@@ -271,6 +281,8 @@ function AvecBusiness({
     window.addEventListener('online', surReseau);
     return () => window.removeEventListener('online', surReseau);
   }, [depuisCopie, charger]);
+
+  const aUneCopie = useCallback((id: string) => copieExiste(`${userId}:${id}`), [userId]);
 
   const actuel = liste ? businessAOuvrir(liste, actuelId) : null;
   const idOuvert = actuel?.id ?? null;
@@ -371,6 +383,8 @@ function AvecBusiness({
         chargerEnsemble: lireEnsemble,
         annonce,
         effacerAnnonce,
+        horsLigne: depuisCopie,
+        aUneCopie,
       }}
     />
   );

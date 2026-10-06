@@ -53,6 +53,8 @@ function useMaintenant(): Date {
 
 export function Pilotage({ source, compte, business }: { source: Source; compte?: Compte; business?: ChoixBusiness }) {
   const { donnees, modifier, erreur, effacerErreur, recharger } = useDonnees(source);
+  // Sans réseau, un business jamais ouvert sur cet appareil ne s'affiche pas : on peut revenir à un autre.
+  const [choix, setChoix] = useState(false);
 
   if (!donnees) {
     return (
@@ -66,6 +68,11 @@ export function Pilotage({ source, compte, business }: { source: Source; compte?
               <button className="bouton principal" onClick={recharger}>
                 Réessayer
               </button>
+              {business && business.liste.length > 1 && (
+                <button className="bouton" onClick={() => setChoix(true)}>
+                  Changer de business
+                </button>
+              )}
               {compte && (
                 <button className="bouton" onClick={() => void compte.deconnecter()}>
                   Se déconnecter
@@ -76,6 +83,7 @@ export function Pilotage({ source, compte, business }: { source: Source; compte?
         ) : (
           <p className="sous-titre">Chargement de tes données…</p>
         )}
+        {choix && business && <MesBusiness business={business} onFermer={() => setChoix(false)} />}
       </EcranMessage>
     );
   }

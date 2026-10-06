@@ -14,8 +14,11 @@ export type Source =
 export interface EtatDonnees {
   /** null tant que les données ne sont pas encore arrivées. */
   donnees: Donnees | null;
-  /** `origine` : absente pour une action de la personne, « ventes » ou « vidéos » pour une actualisation automatique. */
-  modifier: (f: (d: Donnees) => Donnees, origine?: OrigineModification) => void;
+  /**
+   * `origine` : absente pour une action de la personne, « ventes » ou « vidéos » pour une actualisation automatique.
+   * La promesse dit si le changement est bien enregistré (dans la base, ou sur l'appareil).
+   */
+  modifier: (f: (d: Donnees) => Donnees, origine?: OrigineModification) => Promise<boolean>;
   erreur: string | null;
   effacerErreur: () => void;
   recharger: () => void;
@@ -70,6 +73,10 @@ export function oublierCache(userId: string): void {
 
 /** La base ne répond pas, mais l'appli montre la copie de l'appareil. */
 export const MESSAGE_HORS_LIGNE = 'Pas de connexion : les chiffres affichés sont peut-être anciens.';
+
+/** La base ne répond pas, et cet appareil n'a pas de copie de ce business. */
+export const MESSAGE_SANS_COPIE =
+  'Impossible de charger les chiffres de ce business. Vérifie ta connexion internet : sans réseau, seuls les business déjà ouverts sur cet appareil s’affichent.';
 
 const MESSAGE_APPAREIL =
   'Attention : cet appareil n’enregistre pas tes données (navigation privée ?). Elles seront perdues en fermant la page.';
@@ -126,7 +133,7 @@ export function useDonnees(source: Source): EtatDonnees {
       afficher(d);
       setErreur(null);
     } catch {
-      setErreur(actuelles.current ? MESSAGE_HORS_LIGNE : 'Impossible de charger tes données. Vérifie ta connexion internet.');
+      setErreur(actuelles.current ? MESSAGE_HORS_LIGNE : MESSAGE_SANS_COPIE);
     }
   }, [depot, afficher]);
 
@@ -154,13 +161,15 @@ export function useDonnees(source: Source): EtatDonnees {
   const modifier = useCallback(
     (f: (d: Donnees) => Donnees, origine?: OrigineModification) => {
       const avant = actuelles.current;
-      if (!avant || !monte.current) return;
+      if (!avant || !monte.current) return Promise.resolve(false);
       const apres = f(avant);
-      if (apres === avant) return;
+      if (apres === avant) return Promise.resolve(true);
       version.current++;
       afficher(apres);
-      if (synchro.current) synchro.current.enregistrer(avant, apres, origine);
-      else if (!enregistrerDonnees(apres)) setErreur(MESSAGE_APPAREIL);
+      if (synchro.current) return synchro.current.enregistrer(avant, apres, origine);
+      if (enregistrerDonnees(apres)) return Promise.resolve(true);
+      setErreur(MESSAGE_APPAREIL);
+      return Promise.resolve(false);
     },
     [afficher],
   );

@@ -4,6 +4,7 @@ import type { Business } from '../donnees/business';
 import { NOM_MAX, premierBusinessARenommer } from '../donnees/business';
 import { fr } from '../texte';
 import { avecSouris, Feuille } from './Feuille';
+import { demanderFocus, ID_SELECTEUR_BUSINESS } from './focus';
 
 type Message = { type: 'succes' | 'erreur'; texte: string };
 /** Où s'affiche le message d'une action : dans la ligne du business, en haut de la fenêtre, ou sous le champ de création. */
@@ -22,12 +23,14 @@ export function MesBusiness({
   business: ChoixBusiness;
   /** Vrai si le business ouvert montre les données d'exemple. */
   exemple?: boolean;
-  onEnsemble: () => void;
+  /** Absent quand les chiffres du business ouvert ne sont pas là (sans réseau) : pas de vue d'ensemble. */
+  onEnsemble?: () => void;
   onFermer: () => void;
 }) {
   const [nouveau, setNouveau] = useState('');
   const [occupe, setOccupe] = useState(false);
   const [message, setMessage] = useState<MessagePlace | null>(null);
+  const tableau = useRef<HTMLUListElement>(null);
 
   /** Lance une action ; son message (succès ou erreur) s'affiche à l'endroit donné, et s'efface à l'action suivante. */
   const agir = async (action: () => Promise<void>, ou: Endroit, succes?: { texte: string; ou?: Endroit }): Promise<boolean> => {
@@ -64,7 +67,7 @@ export function MesBusiness({
           {fr(enHaut.texte)}
         </p>
       )}
-      {business.liste.length > 1 && (
+      {business.liste.length > 1 && onEnsemble && (
         <div className="pied" style={{ justifyContent: 'flex-start' }}>
           <button type="button" className="bouton contour" onClick={onEnsemble}>
             Voir la vue d’ensemble
@@ -72,23 +75,30 @@ export function MesBusiness({
         </div>
       )}
 
-      <ul className="tableau-business" aria-label="Tes business">
+      <ul ref={tableau} className="tableau-business" aria-label="Tes business">
         {business.liste.map((b) => (
           <LigneBusiness
             key={b.id}
             b={b}
             ouvert={b.id === business.actuel.id}
+            // Sans réseau, seul un business déjà ouvert sur cet appareil a ses chiffres ici.
+            sansCopie={business.horsLigne && !business.aUneCopie(b.id)}
             seul={business.liste.length <= 1}
             occupe={occupe}
             message={dansLigne(message, b.id)}
             onAction={() => setMessage(null)}
             onOuvrir={() => {
+              demanderFocus(ID_SELECTEUR_BUSINESS);
               business.choisir(b.id);
               onFermer();
             }}
             onRenommer={(nom) => agir(() => business.renommer(b.id, nom), { ligne: b.id }, { texte: 'Nom enregistré.' })}
-            // La ligne disparaît : le message s'affiche en haut de la fenêtre.
-            onSupprimer={() => agir(() => business.supprimer(b.id), { ligne: b.id }, { texte: `« ${b.nom} » est supprimé.`, ou: 'haut' })}
+            // La ligne disparaît : le message s'affiche en haut de la fenêtre, et le curseur du clavier va au tableau.
+            onSupprimer={async () => {
+              const ok = await agir(() => business.supprimer(b.id), { ligne: b.id }, { texte: `« ${b.nom} » est supprimé.`, ou: 'haut' });
+              if (ok && avecSouris()) tableau.current?.querySelector<HTMLButtonElement>('button')?.focus({ preventScroll: true });
+              return ok;
+            }}
           />
         ))}
       </ul>
@@ -99,7 +109,13 @@ export function MesBusiness({
           e.preventDefault();
           if (occupe || !nouveau.trim()) return;
           void agir(async () => {
-            await business.creer(nouveau);
+            demanderFocus(ID_SELECTEUR_BUSINESS);
+            try {
+              await business.creer(nouveau);
+            } catch (e) {
+              demanderFocus(null);
+              throw e;
+            }
             setNouveau('');
             onFermer();
           }, 'creation');
@@ -135,6 +151,7 @@ export function MesBusiness({
 function LigneBusiness({
   b,
   ouvert,
+  sansCopie,
   seul,
   occupe,
   message,
@@ -145,6 +162,7 @@ function LigneBusiness({
 }: {
   b: Business;
   ouvert: boolean;
+  sansCopie: boolean;
   seul: boolean;
   occupe: boolean;
   /** Le message de la dernière action sur cette ligne. */
@@ -182,7 +200,10 @@ function LigneBusiness({
             <button
               type="button"
               className="bouton contour"
+              aria-disabled={sansCopie}
+              aria-describedby={sansCopie ? `sans-copie-${b.id}` : undefined}
               onClick={() => {
+                if (sansCopie) return;
                 onAction();
                 onOuvrir();
               }}
@@ -207,6 +228,12 @@ function LigneBusiness({
             </button>
           )}
         </div>
+      )}
+
+      {mode === 'voir' && !ouvert && sansCopie && (
+        <p id={`sans-copie-${b.id}`} className="note">
+          Pas encore ouvert sur cet appareil&nbsp;: il s’ouvrira quand le réseau reviendra.
+        </p>
       )}
 
       {mode === 'renommer' && (

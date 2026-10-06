@@ -1170,6 +1170,11 @@ a.bouton {
   opacity: 0.6;
   cursor: wait;
 }
+/* Au bout (objectif à 0 ou à 20) : l'air désactivé, mais le curseur du clavier reste dessus. */
+.bouton[aria-disabled='true'] {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
 
 @media (prefers-reduced-motion: reduce) {
   .jauge-aiguille,

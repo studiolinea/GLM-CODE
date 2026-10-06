@@ -189,6 +189,21 @@ describe('Synchro', () => {
     expect(depot.envois).toHaveLength(1);
     expect(depot.compte.videos.map((v) => v.id)).toEqual(['v1']);
   });
+
+  it('dit à l’écran si le changement est enregistré : vrai, puis faux pendant une coupure', async () => {
+    const depot = new DepotMemoire();
+    const synchro = new Synchro(depot, donneesVides(), () => undefined);
+    const avecVideo = enregistrerVideo(donneesVides(), video);
+    await expect(synchro.enregistrer(donneesVides(), avecVideo)).resolves.toBe(true);
+    depot.enPanne = true;
+    const premier = synchro.enregistrer(avecVideo, enregistrerVideo(avecVideo, { ...video, id: 'v2' }));
+    // Abandonné, car le précédent a échoué : pas enregistré non plus.
+    const suivant = synchro.enregistrer(avecVideo, enregistrerVideo(avecVideo, { ...video, id: 'v3' }));
+    await expect(premier).resolves.toBe(false);
+    await expect(suivant).resolves.toBe(false);
+    // Rien à changer : rien à attendre.
+    await expect(synchro.enregistrer(avecVideo, avecVideo)).resolves.toBe(true);
+  });
 });
 
 describe('ventes reçues de la boutique reliée', () => {
@@ -357,7 +372,7 @@ describe('erreurs d’actualisation : chaque message dit le compte concerné', (
 
 describe('enregistrement qui échoue : le message dit ce qui n’a pas été enregistré', () => {
   it('une action de la personne, ou une actualisation automatique', () => {
-    expect(messageEchecEnregistrement()).toBe('Pas de connexion, réessaie : ta dernière action n’a pas été enregistrée.');
+    expect(messageEchecEnregistrement()).toBe('Ta dernière action n’a pas été enregistrée. Vérifie ta connexion, puis réessaie.');
     expect(messageEchecEnregistrement('ventes')).toBe('Tes dernières ventes n’ont pas pu être enregistrées. Réessaie dans un moment.');
     expect(messageEchecEnregistrement('videos')).toBe('Tes dernières vidéos n’ont pas pu être enregistrées. Réessaie dans un moment.');
   });
