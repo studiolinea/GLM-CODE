@@ -132,9 +132,10 @@ button {
   border: 1px solid var(--bord);
   border-radius: 9px;
 }
+/* 44 px au moins : la taille conseillée pour un doigt */
 .rapport {
   min-width: 52px;
-  min-height: 38px;
+  min-height: 44px;
   background: none;
   border: 0;
   border-radius: 6px;
