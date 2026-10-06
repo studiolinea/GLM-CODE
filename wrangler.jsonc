@@ -11,6 +11,8 @@
   "previews": {
     "vars": { "IA_ACTIVEE": "non", "VEILLE_ACTIVEE": "non" }
   },
+  // Un passage par minute ; seuls les business ayant autorisé la veille sont traités.
+  "triggers": { "crons": ["* * * * *"] },
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS",
@@ -21,12 +23,12 @@
   // Valeurs publiques. Les secrets CLE_CHIFFREMENT et TIKTOK_CLIENT_SECRET se posent dans les réglages
   // Cloudflare, jamais ici.
   "vars": {
-    // Plan Free et confidentialité ZDR vérifiés ; activation après essais et secrets sécurisés.
+    // Plan Free, ZDR, migration et secrets serveur vérifiés ; opt-in propre à chaque business.
     "IA_MODE": "groq-gratuit",
     "IA_PLAN_VERIFIE": "free",
     "IA_TRANSFERT_AUTORISE": "oui",
-    "IA_ACTIVEE": "non",
-    "VEILLE_ACTIVEE": "non",
+    "IA_ACTIVEE": "oui",
+    "VEILLE_ACTIVEE": "oui",
     "SUPABASE_URL": "https://onzisrzwlzbhtvmzuwrf.supabase.co",
     "SUPABASE_CLE_PUBLIQUE": "sb_publishable_F-Q33yhg8WU3uNDjKtnfvw_51OfqJnz",
     // Appli développeur TikTok « Pilotage », mode test (sandbox).
