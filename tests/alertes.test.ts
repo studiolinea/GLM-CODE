@@ -194,3 +194,38 @@ describe('ordre et rangement des alertes', () => {
     expect(alertesVisibles(alertes, etats, '2026-10-06').map((a) => a.id)).toEqual(['fichier-premier']);
   });
 });
+
+describe('avec la base en ligne : tout arrive des comptes reliés, rien à noter à la main', () => {
+  const relie = { boutique: true, videos: true };
+
+  it('boutique pas reliée : on propose de la relier, pas d’ajouter un fichier', () => {
+    const [a] = parType(contexte({ couverture: null, comptes: { boutique: false, videos: true } }), 'fichier');
+    expect(a).toMatchObject({ id: 'boutique-a-relier', titre: 'Relie ta boutique', action: { cible: 'comptes', libelle: 'Relier ma boutique' } });
+  });
+
+  it('boutique reliée, ventes lues hier : rien à signaler ; il y a 3 jours : la synchro ne marche plus', () => {
+    expect(parType(contexte({ couverture: ilYA(24), comptes: relie }), 'fichier')).toEqual([]);
+    expect(parType(contexte({ couverture: null, comptes: relie }), 'fichier')).toEqual([]);
+    const [a] = parType(contexte({ couverture: ilYA(72), comptes: relie }), 'fichier');
+    expect(a).toMatchObject({
+      titre: 'Tes ventes ne se mettent plus à jour',
+      dapres: 'D’après : dernières ventes lues le 02/10. Regarde la boutique reliée dans les réglages.',
+      action: { cible: 'comptes' },
+    });
+  });
+
+  it('pas publié aujourd’hui : « Actualiser » si TikTok est relié, sinon « Relier TikTok »', () => {
+    const [avec] = parType(contexte({ comptes: relie }), 'publication');
+    expect(avec).toMatchObject({
+      dapres: 'D’après : Aucune vidéo pour l’instant. Ton objectif : 1 par jour.',
+      action: { cible: 'actualiser', libelle: 'Actualiser' },
+    });
+    const [sans] = parType(contexte({ comptes: { boutique: true, videos: false } }), 'publication');
+    expect(sans?.action).toEqual({ cible: 'comptes', libelle: 'Relier TikTok' });
+  });
+
+  it('une vidéo sans lien ne se complète plus à la main quand TikTok est relié', () => {
+    const [a] = parType(contexte({ comptes: relie, videos: [video('v1', ilYA(2))] }), 'video');
+    expect(a?.action).toEqual({ cible: 'actualiser', libelle: 'Actualiser' });
+  });
+});

@@ -11,7 +11,7 @@ import {
   supprimerVideo,
 } from './donnees/actions';
 import type { ChoixBusiness } from './App';
-import { lireRetourTikTok } from './donnees/comptesRelies';
+import { BOUTIQUES, lireRetourTikTok } from './donnees/comptesRelies';
 import { donneesExemple } from './donnees/exemple';
 import { useDonnees, type Source } from './donnees/useDonnees';
 import { useSynchroBoutique } from './donnees/useSynchroBoutique';
@@ -108,9 +108,21 @@ function Cockpit({
     () => rythmeSemaine(donnees.videos, donnees.reglages.objectifParJour, maintenant),
     [donnees.videos, donnees.reglages.objectifParJour, maintenant],
   );
+  // Avec la base en ligne, les données viennent des comptes reliés : rien à noter à la main.
+  const relies = boutique.comptes;
+  const comptes = useMemo(
+    () =>
+      enLigne && relies
+        ? {
+            boutique: relies.some((c) => (BOUTIQUES as string[]).includes(c.source)),
+            videos: relies.some((c) => c.source === 'tiktok' || c.source === 'instagram'),
+          }
+        : undefined,
+    [enLigne, relies],
+  );
   const alertes = useMemo(
-    () => alertesVisibles(calculerAlertes({ ...donnees, maintenant }), donnees.etatsAlertes, aujourdhui),
-    [donnees, maintenant, aujourdhui],
+    () => alertesVisibles(calculerAlertes({ ...donnees, maintenant, comptes }), donnees.etatsAlertes, aujourdhui),
+    [donnees, maintenant, aujourdhui, comptes],
   );
 
   const fermer = useCallback(() => setFenetre({ type: 'aucune' }), []);
@@ -123,6 +135,10 @@ function Cockpit({
         return setFenetre({ type: 'import' });
       case 'modifier-video':
         return setFenetre({ type: 'modifier', videoId: action.videoId });
+      case 'comptes':
+        return setFenetre({ type: 'reglages' });
+      case 'actualiser':
+        return void boutique.synchroniser();
     }
   };
 
@@ -140,7 +156,26 @@ function Cockpit({
   const videoAModifier =
     fenetre.type === 'modifier' ? donnees.videos.find((v) => v.id === fenetre.videoId) : undefined;
 
-  const actions = (
+  const reglages = (
+    <button className="bouton icone-seule" aria-label="Réglages" onClick={() => setFenetre({ type: 'reglages' })}>
+      ⚙
+    </button>
+  );
+  // En ligne, tout arrive des comptes reliés : on actualise, ou on relie. Sur l'appareil seul, on note à la main.
+  const actions = enLigne ? (
+    <nav className="barre" aria-label="Actions">
+      {relies && relies.length === 0 ? (
+        <button className="bouton principal" onClick={() => setFenetre({ type: 'reglages' })}>
+          Relier mes comptes
+        </button>
+      ) : (
+        <button className="bouton principal" disabled={boutique.enCours} onClick={() => void boutique.synchroniser()}>
+          {boutique.enCours ? 'Actualisation…' : 'Actualiser'}
+        </button>
+      )}
+      {reglages}
+    </nav>
+  ) : (
     <nav className="barre" aria-label="Actions">
       <button className="bouton principal" onClick={() => setFenetre({ type: 'saisie' })}>
         J’ai publié
@@ -148,9 +183,7 @@ function Cockpit({
       <button className="bouton" onClick={() => setFenetre({ type: 'import' })}>
         Fichier de ventes
       </button>
-      <button className="bouton icone-seule" aria-label="Réglages" onClick={() => setFenetre({ type: 'reglages' })}>
-        ⚙
-      </button>
+      {reglages}
     </nav>
   );
 
@@ -169,6 +202,7 @@ function Cockpit({
         maintenant={maintenant}
         nomBusiness={business?.actuel.nom}
         onBusiness={business ? () => setFenetre({ type: 'business' }) : undefined}
+        automatique={enLigne}
         exemple={donnees.exemple}
         couverture={donnees.couverture}
         periode={periode}
@@ -211,6 +245,8 @@ function Cockpit({
           enLigne={enLigne}
           compte={compte}
           boutique={enLigne ? boutique : undefined}
+          onSaisieManuelle={() => setFenetre({ type: 'saisie' })}
+          onImportManuel={() => setFenetre({ type: 'import' })}
           onObjectif={(objectifParJour) => modifier((d) => changerReglages(d, { ...d.reglages, objectifParJour }))}
           onRestaurer={(restaurees) => modifier(() => restaurees)}
           // La confirmation se fait dans les réglages, avant d'arriver ici.
