@@ -5,6 +5,9 @@ import {
   enregistrerVideo,
   importerVentes,
   lireSauvegarde,
+  nomFichierSauvegarde,
+  ouvrirSauvegarde,
+  questionRestauration,
   rangerAlerte,
   supprimerVideo,
   versSauvegarde,
@@ -109,5 +112,56 @@ describe('rangement des alertes et sauvegarde', () => {
     expect(typeof lireSauvegarde('{"bonjour": 1}')).toBe('string');
     expect(typeof lireSauvegarde('pas du json')).toBe('string');
     expect(typeof lireSauvegarde('{"format":"pilotage-sauvegarde","donnees":{"ventes":3}}')).toBe('string');
+  });
+});
+
+describe('sauvegarde : elle reconnaît son business', () => {
+  const d = donneesVides();
+  const guide = { id: 'b-guide', nom: 'Guide detailing' };
+  const kit = { id: 'b-kit', nom: 'Kit Alibaba' };
+
+  it('le fichier garde le nom et l’identifiant du business, et se relit avec', () => {
+    const texte = versSauvegarde(d, guide);
+    expect(JSON.parse(texte).business).toEqual(guide);
+    expect(ouvrirSauvegarde(texte)).toEqual({ donnees: d, business: guide });
+  });
+
+  it('une ancienne sauvegarde (sans business) reste acceptée', () => {
+    const ancienne = JSON.stringify({ format: 'pilotage-sauvegarde', version: 1, donnees: d });
+    expect(ouvrirSauvegarde(ancienne)).toEqual({ donnees: d, business: null });
+    expect(ouvrirSauvegarde(versSauvegarde(d))).toEqual({ donnees: d, business: null });
+  });
+
+  it('un business abîmé dans le fichier est ignoré, pas les données', () => {
+    const texte = JSON.stringify({ format: 'pilotage-sauvegarde', version: 1, business: { id: 3 }, donnees: d });
+    expect(ouvrirSauvegarde(texte)).toEqual({ donnees: d, business: null });
+  });
+
+  it('le nom du fichier : pilotage-<nom simplifié>-<date>.json', () => {
+    expect(nomFichierSauvegarde('Guide detailing', '2026-10-06')).toBe('pilotage-guide-detailing-2026-10-06.json');
+    expect(nomFichierSauvegarde('  Kévin & Cie : Été 2026 !', '2026-10-06')).toBe('pilotage-kevin-cie-ete-2026-2026-10-06.json');
+    expect(nomFichierSauvegarde('« »', '2026-10-06')).toBe('pilotage-sauvegarde-2026-10-06.json');
+    expect(nomFichierSauvegarde(undefined, '2026-10-06')).toBe('pilotage-sauvegarde-2026-10-06.json');
+  });
+
+  it('la question avant de restaurer : simple pour le même business, ou une ancienne sauvegarde', () => {
+    const question = 'Remplacer les données de « Guide detailing » par cette sauvegarde ? Ça ne peut pas être annulé.';
+    expect(questionRestauration(guide, guide)).toBe(question);
+    expect(questionRestauration(null, guide)).toBe(question);
+    // Renommé depuis (même identifiant), ou recréé avec le même nom : c'est le même business.
+    expect(questionRestauration({ id: 'b-guide', nom: 'Ancien nom' }, guide)).toBe(question);
+    expect(questionRestauration({ id: null, nom: 'guide  DETAILING' }, guide)).toBe(question);
+  });
+
+  it('la question dit quand la sauvegarde vient d’un autre business', () => {
+    expect(questionRestauration(guide, kit)).toBe(
+      'Cette sauvegarde vient de « Guide detailing », pas de « Kit Alibaba ». Remplacer quand même les données de « Kit Alibaba » ? Ça ne peut pas être annulé.',
+    );
+  });
+
+  it('sur l’appareil seul : la même confirmation, sans business', () => {
+    expect(questionRestauration(guide, undefined)).toBe(
+      'Remplacer les données de cet appareil par cette sauvegarde ? Ça ne peut pas être annulé.',
+    );
   });
 });

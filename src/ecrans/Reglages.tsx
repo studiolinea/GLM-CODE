@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { lireSauvegarde, versSauvegarde } from '../donnees/actions';
+import { nomFichierSauvegarde, ouvrirSauvegarde, questionRestauration, versSauvegarde, type Sauvegarde } from '../donnees/actions';
 import type { SynchroBoutique } from '../donnees/useSynchroBoutique';
 import type { Donnees } from '../modele';
 import { dateParis } from '../temps';
@@ -22,6 +22,7 @@ export function Reglages({
   maintenant,
   enLigne,
   compte,
+  business,
   boutique,
   onObjectif,
   onSaisieManuelle,
@@ -34,6 +35,8 @@ export function Reglages({
   maintenant: Date;
   enLigne: boolean;
   compte?: Compte;
+  /** Le business ouvert (avec la base en ligne) : la sauvegarde porte son nom. */
+  business?: { id: string; nom: string };
   /** Les comptes reliés (boutique, réseaux), seulement avec la base en ligne. */
   boutique?: SynchroBoutique;
   onObjectif: (objectifParJour: number) => void;
@@ -47,6 +50,8 @@ export function Reglages({
   const [objectif, setObjectif] = useState(donnees.reglages.objectifParJour);
   const [message, setMessage] = useState<{ type: 'succes' | 'erreur'; texte: string } | null>(null);
   const [confirmer, setConfirmer] = useState(false);
+  // La sauvegarde choisie, en attente de confirmation.
+  const [aRestaurer, setARestaurer] = useState<Sauvegarde | null>(null);
 
   const changerObjectif = (n: number) => {
     const borne = Math.min(OBJECTIF_MAX, Math.max(0, n));
@@ -54,11 +59,22 @@ export function Reglages({
     onObjectif(borne);
   };
 
-  const restaurer = async (fichier: File) => {
-    const resultat = lireSauvegarde(await fichier.text());
-    if (typeof resultat === 'string') return setMessage({ type: 'erreur', texte: resultat });
-    onRestaurer(resultat);
-    setObjectif(resultat.reglages.objectifParJour);
+  const choisirSauvegarde = async (fichier: File) => {
+    setMessage(null);
+    setConfirmer(false);
+    const resultat = ouvrirSauvegarde(await fichier.text());
+    if (typeof resultat === 'string') {
+      setARestaurer(null);
+      return setMessage({ type: 'erreur', texte: resultat });
+    }
+    setARestaurer(resultat);
+  };
+
+  const restaurer = () => {
+    if (!aRestaurer) return;
+    onRestaurer(aRestaurer.donnees);
+    setObjectif(aRestaurer.donnees.reglages.objectifParJour);
+    setARestaurer(null);
     setMessage({ type: 'succes', texte: 'Sauvegarde restaurée.' });
   };
 
@@ -143,7 +159,11 @@ export function Reglages({
           type="button"
           className="bouton"
           onClick={() =>
-            telecharger(`pilotage-sauvegarde-${dateParis(maintenant)}.json`, versSauvegarde(donnees), 'application/json')
+            telecharger(
+              nomFichierSauvegarde(business?.nom, dateParis(maintenant)),
+              versSauvegarde(donnees, business),
+              'application/json',
+            )
           }
         >
           Sauvegarder
@@ -158,17 +178,31 @@ export function Reglages({
             accept=".json,application/json"
             onChange={(e) => {
               const fichier = e.target.files?.[0];
-              if (fichier) void restaurer(fichier);
+              if (fichier) void choisirSauvegarde(fichier);
               e.target.value = '';
             }}
           />
         </label>
-        {!enLigne && !donnees.exemple && !confirmer && (
+        {!enLigne && !donnees.exemple && !confirmer && !aRestaurer && (
           <button type="button" className="bouton discret" onClick={() => setConfirmer(true)}>
             Revoir l’exemple
           </button>
         )}
       </div>
+
+      {aRestaurer && (
+        <div role="alert" style={{ marginTop: 14 }}>
+          <p className="erreur">{fr(questionRestauration(aRestaurer.business, business))}</p>
+          <div className="pied" style={{ justifyContent: 'flex-start' }}>
+            <button type="button" className="bouton danger" onClick={restaurer}>
+              Remplacer par la sauvegarde
+            </button>
+            <button type="button" className="bouton discret" onClick={() => setARestaurer(null)}>
+              Annuler
+            </button>
+          </div>
+        </div>
+      )}
 
       {confirmer && (
         <div role="alert" style={{ marginTop: 14 }}>

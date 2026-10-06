@@ -17,6 +17,12 @@ export function fr(texte: string): string {
     .replace(/[ \u00a0\u202f]+([:;!?])/g, `${INSECABLE}$1`);
 }
 
+/** Vrai si les deux noms sont les mêmes, sans compter les majuscules ni les espaces (« Guide  detailing » = « guide DETAILING »). */
+export function memeNom(a: string, b: string): boolean {
+  const simple = (nom: string) => nom.normalize('NFC').replace(/\s+/g, '').toLocaleLowerCase('fr-FR');
+  return simple(a) === simple(b);
+}
+
 /** Le mot au singulier pour 0 et 1, au pluriel à partir de 2 (règle française). */
 export function accord(n: number, singulier: string, pluriel = `${singulier}s`): string {
   return Math.abs(n) >= 2 ? pluriel : singulier;

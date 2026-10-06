@@ -4,6 +4,7 @@
 import { REGLAGES_PAR_DEFAUT, type Donnees, type Reglages, type Video } from '../modele';
 import { fusionnerVentes, type ResultatFusion } from '../ventes/lire';
 import type { Vente } from '../ventes/modele';
+import { memeNom } from '../texte';
 
 export function donneesVides(reglages: Reglages = REGLAGES_PAR_DEFAUT): Donnees {
   return { ventes: [], videos: [], reglages, couverture: null, etatsAlertes: {}, exemple: false };
@@ -73,21 +74,73 @@ function trierVideos(videos: Video[]): Video[] {
 
 const FORMAT_SAUVEGARDE = 'pilotage-sauvegarde';
 
-export function versSauvegarde(d: Donnees): string {
-  return JSON.stringify({ format: FORMAT_SAUVEGARDE, version: 1, donnees: d }, null, 2);
+/** Le business d'où vient une sauvegarde. Les anciennes sauvegardes (et celles de l'appareil seul) n'en ont pas. */
+export interface BusinessSauvegarde {
+  id: string | null;
+  nom: string;
 }
 
-/** Relit un fichier de sauvegarde. Renvoie les données, ou un message d'erreur. */
-export function lireSauvegarde(texte: string): Donnees | string {
+export interface Sauvegarde {
+  donnees: Donnees;
+  business: BusinessSauvegarde | null;
+}
+
+/** Le contenu du fichier de sauvegarde : les données, et le business d'où elles viennent (avec la base en ligne). */
+export function versSauvegarde(d: Donnees, business?: { id: string; nom: string }): string {
+  const origine = business ? { business: { id: business.id, nom: business.nom } } : {};
+  return JSON.stringify({ format: FORMAT_SAUVEGARDE, version: 1, ...origine, donnees: d }, null, 2);
+}
+
+/** Relit un fichier de sauvegarde. Renvoie les données et leur business, ou un message d'erreur. */
+export function ouvrirSauvegarde(texte: string): Sauvegarde | string {
   let brut: unknown;
   try {
     brut = JSON.parse(texte);
   } catch {
     return 'Ce fichier n’est pas une sauvegarde de Pilotage.';
   }
-  const enveloppe = brut as { format?: unknown; donnees?: unknown };
+  const enveloppe = brut as { format?: unknown; donnees?: unknown; business?: { id?: unknown; nom?: unknown } } | null;
   if (enveloppe?.format !== FORMAT_SAUVEGARDE) return 'Ce fichier n’est pas une sauvegarde de Pilotage.';
-  return donneesValides(enveloppe.donnees) ?? 'Cette sauvegarde est abîmée : rien n’a été modifié.';
+  const donnees = donneesValides(enveloppe.donnees);
+  if (!donnees) return 'Cette sauvegarde est abîmée : rien n’a été modifié.';
+  const b = enveloppe.business;
+  const business =
+    b && typeof b === 'object' && typeof b.nom === 'string' && b.nom.trim()
+      ? { id: typeof b.id === 'string' ? b.id : null, nom: b.nom }
+      : null;
+  return { donnees, business };
+}
+
+/** Relit un fichier de sauvegarde. Renvoie les données, ou un message d'erreur. */
+export function lireSauvegarde(texte: string): Donnees | string {
+  const resultat = ouvrirSauvegarde(texte);
+  return typeof resultat === 'string' ? resultat : resultat.donnees;
+}
+
+/** « pilotage-guide-detailing-2026-10-06.json » : le nom du business, simplifié, puis la date. */
+export function nomFichierSauvegarde(nomBusiness: string | null | undefined, date: string): string {
+  const simple = (nomBusiness ?? '')
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .slice(0, 40)
+    .replace(/^-+|-+$/g, '');
+  return `pilotage-${simple || 'sauvegarde'}-${date}.json`;
+}
+
+/**
+ * La question posée avant de restaurer, dans la fenêtre. Si la sauvegarde vient d'un autre business, on le dit.
+ * `actuel` est absent sur l'appareil seul (pas de business).
+ */
+export function questionRestauration(fichier: BusinessSauvegarde | null, actuel?: { id: string; nom: string } | null): string {
+  const definitif = 'Ça ne peut pas être annulé.';
+  if (!actuel) return `Remplacer les données de cet appareil par cette sauvegarde ? ${definitif}`;
+  const autre = fichier && !(fichier.id === actuel.id || memeNom(fichier.nom, actuel.nom));
+  if (autre) {
+    return `Cette sauvegarde vient de « ${fichier.nom} », pas de « ${actuel.nom} ». Remplacer quand même les données de « ${actuel.nom} » ? ${definitif}`;
+  }
+  return `Remplacer les données de « ${actuel.nom} » par cette sauvegarde ? ${definitif}`;
 }
 
 /** Vérifie la forme des données (sauvegarde ou stockage). Renvoie null si elles sont abîmées. */
