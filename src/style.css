@@ -808,6 +808,12 @@ a.bouton {
   color: var(--vert);
   font-size: 0.92rem;
 }
+/* Ce qui demande de l'attention sans être une erreur (lignes refusées d'un fichier) : orange, comme les voyants à traiter */
+.avertissement {
+  margin: 0 0 12px;
+  color: var(--ambre);
+  font-size: 0.92rem;
+}
 .texte-doux {
   color: var(--doux);
   font-size: 0.9rem;
