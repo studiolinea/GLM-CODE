@@ -7,3 +7,6 @@ dist/
 .dev.vars
 .dev.vars.*
 .wrangler/
+
+# Copies de travail temporaires des agents
+.claude/worktrees/
