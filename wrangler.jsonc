@@ -6,6 +6,11 @@
   "compatibility_date": "2026-10-01",
   // L'adresse publique pilotage.<sous-domaine>.workers.dev reste activée à chaque mise en ligne.
   "workers_dev": true,
+  // Les branches de PR ont leur aperçu séparé ; aucune IA ni veille activée.
+  // Les variables et secrets de production ne sont pas recopiés ici.
+  "previews": {
+    "vars": { "IA_ACTIVEE": "non", "VEILLE_ACTIVEE": "non" }
+  },
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS",
