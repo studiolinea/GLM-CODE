@@ -18,6 +18,7 @@ import { useSynchroBoutique } from './donnees/useSynchroBoutique';
 import { AjoutFichier, type BilanImport } from './ecrans/AjoutFichier';
 import type { CarteCompte } from './ecrans/ComptesRelies';
 import { EcranMessage } from './ecrans/EcranMessage';
+import { curseurSurEcran } from './ecrans/Feuille';
 import { IconeCroix, IconeReglages } from './ecrans/Icones';
 import { MesBusiness } from './ecrans/MesBusiness';
 import { VueEnsemble } from './ecrans/VueEnsemble';
@@ -264,7 +265,7 @@ function Cockpit({
               </button>
             )
           )}
-          <button className="bouton discret icone-seule bandeau-fermer" onClick={effacerRouges} aria-label="Fermer le message">
+          <button className="bouton discret icone-seule bandeau-fermer" onClick={() => { curseurSurEcran(); effacerRouges(); }} aria-label="Fermer le message">
             <IconeCroix />
           </button>
         </div>

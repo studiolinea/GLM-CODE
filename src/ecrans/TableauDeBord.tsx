@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import { compteurVoyants, type Action, type Alerte } from '../alertes/alertes';
 import { formatEuros } from '../argent';
 import { PERIODES, type Periode, type Resume } from '../calculs/resume';
@@ -6,6 +6,7 @@ import type { Rythme } from '../calculs/rythme';
 import { quandParis } from '../temps';
 import { accord, nombre, PHRASE_GAINS } from '../texte';
 import { CarteAlerte } from './CarteAlerte';
+import { avecSouris, ID_TITRE_ECRAN } from './Feuille';
 import { IconeChevron, Logo } from './Icones';
 import { Jauge } from './Jauge';
 import { Odometre } from './Odometre';
@@ -75,16 +76,37 @@ export function TableauDeBord({
   // Un « — » (pas de valeur) reste gris : jamais en vert comme un vrai gain.
   const valeur = (texte: string | number) => <b className={texte === '—' ? 'vide' : undefined}>{texte}</b>;
 
+  // « Fait » ou « Plus tard » : le voyant disparaît, et son bouton avec. Le curseur va au voyant suivant, ou au titre
+  // « Voyants » s'il n'y en a pas (au clavier ou à la souris seulement, sans faire défiler la page).
+  const zoneVoyants = useRef<HTMLElement>(null);
+  const titreVoyants = useRef<HTMLHeadingElement>(null);
+  const apresRangement = useRef<{ range: string; suivant: string | null } | null>(null);
+  const ranger = (id: string, statut: 'fait' | 'plus-tard') => {
+    const i = alertes.findIndex((a) => a.id === id);
+    apresRangement.current = avecSouris() ? { range: id, suivant: alertes[i + 1]?.id ?? null } : null;
+    onRanger(id, statut);
+  };
+  useEffect(() => {
+    const attente = apresRangement.current;
+    if (!attente) return;
+    apresRangement.current = null;
+    if (alertes.some((a) => a.id === attente.range)) return; // le voyant est resté : le curseur aussi
+    const suivant = attente.suivant
+      ? [...(zoneVoyants.current?.querySelectorAll<HTMLElement>('[data-voyant]') ?? [])].find((el) => el.dataset.voyant === attente.suivant)
+      : undefined;
+    (suivant ?? titreVoyants.current)?.focus({ preventScroll: true });
+  }, [alertes]);
+
   return (
     <>
       <header className="entete">
         <div className="entete-haut">
           <div className="entete-titre">
-            <div className="marque">
+            <h1 className="marque" id={ID_TITRE_ECRAN} tabIndex={-1}>
               <Logo />
               PILOTAGE
               {exemple && <span className="tag">EXEMPLE</span>}
-            </div>
+            </h1>
             <p className="sous-titre">
               {onBusiness ? '' : 'Ma boutique · '}
               {jourEnTete(maintenant)}
@@ -185,9 +207,11 @@ export function TableauDeBord({
           </p>
         </section>
 
-        <section className="zone-voyants" aria-labelledby="titre-voyants">
+        <section className="zone-voyants" aria-labelledby="titre-voyants" ref={zoneVoyants}>
           <div className="titre-section">
-            <h2 id="titre-voyants">Voyants</h2>
+            <h2 id="titre-voyants" ref={titreVoyants} tabIndex={-1}>
+              Voyants
+            </h2>
             <span className="compteur">{compteurVoyants(alertes)}</span>
           </div>
           {alertes.length === 0 ? (
@@ -199,7 +223,7 @@ export function TableauDeBord({
           ) : (
             <ul className="alertes">
               {alertes.map((a) => (
-                <CarteAlerte key={a.id} alerte={a} onAction={onAction} onRanger={(statut) => onRanger(a.id, statut)} />
+                <CarteAlerte key={a.id} alerte={a} onAction={onAction} onRanger={(statut) => ranger(a.id, statut)} />
               ))}
             </ul>
           )}

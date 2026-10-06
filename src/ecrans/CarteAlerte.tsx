@@ -18,7 +18,8 @@ export function CarteAlerte({
 }) {
   const action = alerte.action;
   return (
-    <li className={`alerte ${alerte.ton}`}>
+    // tabIndex={-1} : le curseur peut y être posé quand le voyant d'avant vient d'être rangé (TableauDeBord).
+    <li className={`alerte ${alerte.ton}`} data-voyant={alerte.id} tabIndex={-1}>
       <span className="voyant" aria-hidden="true">
         {VOYANTS[alerte.ton]}
       </span>

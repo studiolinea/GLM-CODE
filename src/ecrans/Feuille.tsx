@@ -9,6 +9,20 @@ export function avecSouris(): boolean {
   return typeof window.matchMedia === 'function' && window.matchMedia('(pointer: fine)').matches;
 }
 
+/** Le titre de l'écran principal (« PILOTAGE ») : il peut recevoir le curseur. */
+export const ID_TITRE_ECRAN = 'titre-ecran';
+
+/**
+ * Rend le curseur à un élément stable de l'écran principal, quand celui qui l'avait vient de disparaître : le
+ * sélecteur de business, sinon le titre de l'écran. Seulement avec une souris ou un pavé tactile (comme pour les
+ * champs) ; la page ne défile pas.
+ */
+export function curseurSurEcran(): void {
+  if (!avecSouris()) return;
+  const cible = document.querySelector<HTMLElement>('.selecteur-business') ?? document.getElementById(ID_TITRE_ECRAN);
+  cible?.focus({ preventScroll: true });
+}
+
 const FOCUSABLES = 'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 /** Ce qu'on peut atteindre avec Tab dans la fenêtre, dans l'ordre (les éléments cachés ne comptent pas). */
@@ -25,8 +39,10 @@ export function Feuille({ titre, onFermer, children }: { titre: string; onFermer
 
   // Une seule fois à l'ouverture : sinon le curseur sauterait à chaque frappe.
   useEffect(() => {
-    // Le bouton qui a ouvert la fenêtre : il retrouve le curseur à la fermeture.
-    const ouvreur = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    // Le bouton qui a ouvert la fenêtre : il retrouve le curseur à la fermeture. Aucun (le curseur est déjà sur la
+    // page entière) : ce bouton a disparu à l'ouverture, comme « Voir » du bandeau rouge.
+    const aOuvert = document.activeElement;
+    const ouvreur = aOuvert instanceof HTMLElement && aOuvert !== document.body ? aOuvert : null;
     const surTouche = (e: KeyboardEvent) => {
       if (e.key === 'Escape') return fermer.current();
       // Tab et Maj+Tab restent dans la fenêtre.
@@ -53,7 +69,9 @@ export function Feuille({ titre, onFermer, children }: { titre: string; onFermer
     (premier ?? ref.current)?.focus();
     return () => {
       document.removeEventListener('keydown', surTouche);
+      // Le bouton d'origine a disparu (voyant rangé, tableau refait…) : un élément stable de l'écran à la place.
       if (ouvreur?.isConnected) ouvreur.focus({ preventScroll: true });
+      else curseurSurEcran();
     };
   }, []);
 

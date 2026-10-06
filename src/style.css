@@ -79,6 +79,7 @@ button {
   display: flex;
   align-items: center;
   gap: 10px;
+  margin: 0;
   font-family: var(--police-titre);
   font-weight: 700;
   font-size: 1.2rem;
@@ -980,6 +981,17 @@ a.bouton {
 .selecteur-business:focus-visible {
   outline: 2px solid var(--ambre);
   outline-offset: 2px;
+}
+/* Le curseur posé par l'appli après une action au clavier : titre de l'écran, titre « Voyants », voyant suivant */
+.marque:focus-visible,
+.titre-section h2:focus-visible,
+.alerte:focus-visible {
+  outline: 2px solid var(--ambre);
+  outline-offset: 3px;
+}
+.marque:focus-visible,
+.titre-section h2:focus-visible {
+  border-radius: 4px;
 }
 .selecteur-business-texte {
   display: grid;
