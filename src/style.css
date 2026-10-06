@@ -34,6 +34,7 @@ html {
 body {
   margin: 0;
   min-height: 100vh;
+  min-height: 100dvh;
   background: radial-gradient(130% 480px at 50% 0%, var(--fond-haut) 0%, var(--fond) 100%) no-repeat, var(--fond);
   color: var(--texte);
   font-family: var(--police);
@@ -108,7 +109,7 @@ button {
 .tag {
   font-family: var(--police-titre);
   font-weight: 600;
-  font-size: 0.62rem;
+  font-size: 0.68rem;
   letter-spacing: 0.14em;
   color: var(--ambre);
   border: 1px solid rgba(255, 176, 58, 0.5);
@@ -132,6 +133,8 @@ button {
   border-radius: 9px;
 }
 .rapport {
+  min-width: 52px;
+  min-height: 38px;
   background: none;
   border: 0;
   border-radius: 6px;
@@ -205,7 +208,7 @@ button {
 .etiquette {
   font-family: var(--police-titre);
   font-weight: 600;
-  font-size: 0.64rem;
+  font-size: 0.7rem;
   letter-spacing: 0.16em;
   color: var(--doux);
   text-transform: uppercase;
@@ -475,7 +478,12 @@ button {
 }
 
 /* ───── Boutons ───── */
+/* Toujours au moins 44 px de haut : assez grand pour un pouce. */
 .bouton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
   border: 1px solid var(--bord);
   background: var(--panneau);
   color: var(--texte);
@@ -538,14 +546,29 @@ a.bouton {
   border-top: 1px solid var(--bord);
 }
 .barre .bouton {
-  flex: 1;
+  display: block;
+  flex: 1 1 auto;
+  min-width: 0;
   padding: 13px 6px;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .barre .bouton.icone-seule {
+  display: inline-flex;
   flex: none;
   padding-inline: 14px;
   font-size: 1rem;
+}
+/* Petit écran (320 px) : un peu plus serré, pour que tout tienne sur une ligne */
+@media (max-width: 379px) {
+  .barre {
+    gap: 6px;
+  }
+  .barre .bouton {
+    font-size: 0.74rem;
+    letter-spacing: 0.03em;
+  }
 }
 /* « Actualiser », avec l'heure de la dernière actualisation réussie en dessous */
 .bouton.actualiser {
@@ -602,6 +625,8 @@ a.bouton {
   align-items: flex-end;
   justify-content: center;
   background: rgba(0, 0, 0, 0.65);
+  overscroll-behavior: contain;
+  animation: voile 180ms ease-out;
 }
 .feuille:focus {
   outline: none;
@@ -610,7 +635,10 @@ a.bouton {
   width: 100%;
   max-width: 520px;
   max-height: 92vh;
+  max-height: 92dvh;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  animation: monter 180ms ease-out;
   background: var(--panneau);
   border: 1px solid var(--bord);
   border-radius: 20px 20px 0 0;
@@ -622,6 +650,37 @@ a.bouton {
   }
   .feuille {
     border-radius: 20px;
+    animation-name: apparaitre;
+  }
+}
+/* Sur téléphone, une petite poignée grise en haut de la feuille */
+@media (max-width: 759px) {
+  .feuille-tete::before {
+    content: '';
+    position: absolute;
+    top: 6px;
+    left: 50%;
+    width: 36px;
+    height: 4px;
+    margin-left: -18px;
+    border-radius: 2px;
+    background: var(--cran);
+  }
+}
+@keyframes monter {
+  from {
+    transform: translateY(100%);
+  }
+}
+@keyframes apparaitre {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+}
+@keyframes voile {
+  from {
+    opacity: 0;
   }
 }
 .feuille-tete {
@@ -675,6 +734,7 @@ a.bouton {
 }
 .champ input {
   width: 100%;
+  min-width: 0;
   min-height: 44px;
   padding: 10px 12px;
   background: var(--case);
@@ -683,7 +743,7 @@ a.bouton {
 }
 .ligne {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 12px;
 }
 .choix {
@@ -825,6 +885,17 @@ a.bouton {
 .compte-relie .note {
   margin: 0 0 8px;
 }
+.compte-relie .texte-doux + .note {
+  margin-top: 8px;
+}
+.compte-relie .pied + .erreur,
+.compte-relie .pied + .succes {
+  margin-top: 10px;
+}
+.compte-relie > :last-child,
+.ligne-business > :last-child {
+  margin-bottom: 0;
+}
 .compte-entete {
   display: flex;
   align-items: center;
@@ -841,7 +912,7 @@ a.bouton {
   border-radius: 999px;
   font-family: var(--police-titre);
   font-weight: 600;
-  font-size: 0.62rem;
+  font-size: 0.68rem;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--doux);
@@ -1020,18 +1091,32 @@ a.bouton {
   margin: 0 0 12px;
 }
 
-/* ───── Bandeau d'erreur (connexion) ───── */
+/* ───── Bandeau d'erreur : le message, la croix en haut à droite, l'action en dessous ───── */
 .bandeau-erreur {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  column-gap: 6px;
   margin: 0 0 14px;
-  padding: 10px 6px 10px 14px;
+  padding: 4px 4px 4px 14px;
   border: 1px solid var(--danger);
   border-radius: 12px;
   color: var(--danger);
   font-size: 0.9rem;
+}
+.bandeau-texte {
+  grid-column: 1;
+  grid-row: 1;
+  padding: 8px 0;
+}
+.bandeau-fermer {
+  grid-column: 2;
+  grid-row: 1;
+}
+.bandeau-action {
+  grid-column: 1 / -1;
+  justify-self: start;
+  margin: -4px 0 4px -13px;
 }
 
 /* ───── Écrans de chargement et de connexion ───── */
@@ -1041,6 +1126,7 @@ a.bouton {
   justify-items: center;
   gap: 14px;
   min-height: 100vh;
+  min-height: 100dvh;
   max-width: 440px;
   margin: 0 auto;
   padding: 24px 16px;
@@ -1065,7 +1151,9 @@ a.bouton {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .jauge-aiguille {
+  .jauge-aiguille,
+  .voile,
+  .feuille {
     animation: none;
   }
 }

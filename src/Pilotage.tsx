@@ -209,19 +209,19 @@ function Cockpit({
     <div className="page">
       {erreur && (
         <div className="bandeau-erreur" role="alert">
-          <span>{erreur}</span>
-          <button className="bouton discret icone-seule" onClick={effacerErreur} aria-label="Fermer le message">
+          <span className="bandeau-texte">{fr(erreur)}</span>
+          <button className="bouton discret icone-seule bandeau-fermer" onClick={effacerErreur} aria-label="Fermer le message">
             <IconeCroix />
           </button>
         </div>
       )}
       {enLigne && boutique.erreur && fenetre.type !== 'reglages' && (
         <div className="bandeau-erreur" role="alert">
-          <span>Actualisation incomplète : {boutique.erreur}</span>
-          <button className="bouton discret" onClick={() => setFenetre({ type: 'reglages' })}>
+          <span className="bandeau-texte">{fr(`Actualisation incomplète : ${boutique.erreur}`)}</span>
+          <button className="bouton discret bandeau-action" onClick={() => setFenetre({ type: 'reglages' })}>
             Voir mes comptes reliés
           </button>
-          <button className="bouton discret icone-seule" onClick={boutique.effacerErreur} aria-label="Fermer le message">
+          <button className="bouton discret icone-seule bandeau-fermer" onClick={boutique.effacerErreur} aria-label="Fermer le message">
             <IconeCroix />
           </button>
         </div>
