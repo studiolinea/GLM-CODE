@@ -713,6 +713,9 @@ a.bouton {
   gap: 8px;
   margin-top: 6px;
 }
+.pied.pied-centre {
+  justify-content: center;
+}
 .erreur {
   margin: 0 0 12px;
   color: var(--danger);

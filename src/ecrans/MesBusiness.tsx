@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { ChoixBusiness } from '../App';
 import type { Business } from '../donnees/business';
 import { NOM_MAX } from '../donnees/business';
+import { fr } from '../texte';
 import { Feuille } from './Feuille';
 
 type Message = { type: 'succes' | 'erreur'; texte: string };
@@ -38,8 +39,8 @@ export function MesBusiness({
   return (
     <Feuille titre="Mes business" onFermer={onFermer}>
       <p className="texte-doux">
-        Chaque business a ses ventes, ses vidéos, ses voyants et ses comptes reliés. Appuie sur « Ouvrir » pour passer
-        de l’un à l’autre.
+        Chaque business a ses ventes, ses vidéos, ses voyants et ses comptes reliés.
+        {business.liste.length > 1 && ' Appuie sur « Ouvrir » pour passer de l’un à l’autre.'}
       </p>
       {business.liste.length > 1 && (
         <div className="pied" style={{ justifyContent: 'flex-start' }}>
@@ -68,36 +69,38 @@ export function MesBusiness({
       </ul>
 
       <h3 className="titre-reglage">Nouveau business</h3>
-      <label className="champ">
-        <span>Son nom</span>
-        <input
-          id="nouveau-business"
-          maxLength={NOM_MAX}
-          placeholder="Par exemple : Guide detailing"
-          value={nouveau}
-          onChange={(e) => setNouveau(e.target.value)}
-        />
-      </label>
-      <p className="note">Il commence vide : relie sa boutique et ses comptes dans les réglages.</p>
-      <div className="pied" style={{ justifyContent: 'flex-start' }}>
-        <button
-          type="button"
-          className="bouton principal"
-          disabled={occupe || !nouveau.trim()}
-          onClick={() =>
-            void agir(async () => {
-              await business.creer(nouveau);
-              setNouveau('');
-              onFermer();
-            })
-          }
-        >
-          Créer et ouvrir ce business
-        </button>
-      </div>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (occupe || !nouveau.trim()) return;
+          void agir(async () => {
+            await business.creer(nouveau);
+            setNouveau('');
+            onFermer();
+          });
+        }}
+      >
+        <label className="champ">
+          <span>Son nom</span>
+          <input
+            id="nouveau-business"
+            maxLength={NOM_MAX}
+            placeholder="Par exemple : Guide detailing"
+            enterKeyHint="done"
+            value={nouveau}
+            onChange={(e) => setNouveau(e.target.value)}
+          />
+        </label>
+        <p className="note">Il commence vide : relie sa boutique et ses comptes dans les réglages.</p>
+        <div className="pied" style={{ justifyContent: 'flex-start' }}>
+          <button type="submit" className="bouton principal" disabled={occupe || !nouveau.trim()}>
+            Créer et ouvrir ce business
+          </button>
+        </div>
+      </form>
       {message && (
         <p className={message.type} role="status">
-          {message.texte}
+          {fr(message.texte)}
         </p>
       )}
     </Feuille>
@@ -123,6 +126,7 @@ function LigneBusiness({
 }) {
   const [mode, setMode] = useState<'voir' | 'renommer' | 'supprimer'>('voir');
   const [nom, setNom] = useState(b.nom);
+  const inchange = occupe || !nom.trim() || nom.trim() === b.nom;
 
   return (
     <li className={`ligne-business ${ouvert ? 'ouvert' : ''}`}>
@@ -134,13 +138,13 @@ function LigneBusiness({
       {mode === 'voir' && (
         <div className="pied" style={{ justifyContent: 'flex-start' }}>
           {!ouvert && (
-            <button type="button" className="bouton principal" onClick={onOuvrir}>
+            <button type="button" className="bouton contour" onClick={onOuvrir}>
               Ouvrir
             </button>
           )}
           <button
             type="button"
-            className="bouton discret"
+            className="bouton"
             onClick={() => {
               setNom(b.nom);
               setMode('renommer');
@@ -148,58 +152,53 @@ function LigneBusiness({
           >
             Renommer
           </button>
-          <button type="button" className="bouton discret" onClick={() => setMode('supprimer')}>
-            Supprimer
-          </button>
+          {/* Le dernier business ne se supprime pas : pas de bouton. */}
+          {!seul && (
+            <button type="button" className="bouton" onClick={() => setMode('supprimer')}>
+              Supprimer
+            </button>
+          )}
         </div>
       )}
 
       {mode === 'renommer' && (
-        <>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (!inchange) void onRenommer(nom).then((ok) => ok && setMode('voir'));
+          }}
+        >
           <label className="champ">
             <span>Nouveau nom</span>
-            <input maxLength={NOM_MAX} value={nom} onChange={(e) => setNom(e.target.value)} />
+            <input maxLength={NOM_MAX} enterKeyHint="done" value={nom} onChange={(e) => setNom(e.target.value)} />
           </label>
           <div className="pied" style={{ justifyContent: 'flex-start' }}>
-            <button
-              type="button"
-              className="bouton principal"
-              disabled={occupe || !nom.trim() || nom.trim() === b.nom}
-              onClick={() => void onRenommer(nom).then((ok) => ok && setMode('voir'))}
-            >
+            <button type="submit" className="bouton principal" disabled={inchange}>
               Enregistrer
             </button>
             <button type="button" className="bouton discret" onClick={() => setMode('voir')}>
               Annuler
             </button>
           </div>
-        </>
+        </form>
       )}
 
-      {mode === 'supprimer' &&
-        (seul ? (
-          <div role="alert">
-            <p className="erreur">Il te faut au moins un business : crée-en un autre avant de supprimer celui-ci.</p>
+      {mode === 'supprimer' && !seul && (
+        <div role="alert">
+          <p className="erreur">
+            Supprimer « {b.nom} » ? Ses ventes, ses vidéos, ses voyants et ses comptes reliés seront effacés pour de bon.
+            Ça ne peut pas être annulé.
+          </p>
+          <div className="pied" style={{ justifyContent: 'flex-start' }}>
+            <button type="button" className="bouton danger" disabled={occupe} onClick={() => void onSupprimer()}>
+              Oui, supprimer définitivement
+            </button>
             <button type="button" className="bouton discret" onClick={() => setMode('voir')}>
-              D’accord
+              Annuler
             </button>
           </div>
-        ) : (
-          <div role="alert">
-            <p className="erreur">
-              Supprimer « {b.nom} » ? Ses ventes, ses vidéos, ses voyants et ses comptes reliés seront effacés pour de
-              bon. Ça ne peut pas être annulé.
-            </p>
-            <div className="pied" style={{ justifyContent: 'flex-start' }}>
-              <button type="button" className="bouton danger" disabled={occupe} onClick={() => void onSupprimer()}>
-                Oui, supprimer définitivement
-              </button>
-              <button type="button" className="bouton discret" onClick={() => setMode('voir')}>
-                Annuler
-              </button>
-            </div>
-          </div>
-        ))}
+        </div>
+      )}
     </li>
   );
 }

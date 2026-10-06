@@ -24,6 +24,7 @@ import { Reglages, type Compte } from './ecrans/Reglages';
 import { SaisieVideo } from './ecrans/SaisieVideo';
 import { TableauDeBord } from './ecrans/TableauDeBord';
 import { dateParis, heureParis, quandParis } from './temps';
+import { fr } from './texte';
 import type { Vente } from './ventes/modele';
 
 type Fenetre =
@@ -54,11 +55,18 @@ export function Pilotage({ source, compte, business }: { source: Source; compte?
         {erreur ? (
           <>
             <p className="erreur" role="alert">
-              {erreur}
+              {fr(erreur)}
             </p>
-            <button className="bouton principal" onClick={recharger}>
-              Réessayer
-            </button>
+            <div className="pied pied-centre">
+              <button className="bouton principal" onClick={recharger}>
+                Réessayer
+              </button>
+              {compte && (
+                <button className="bouton" onClick={() => void compte.deconnecter()}>
+                  Se déconnecter
+                </button>
+              )}
+            </div>
           </>
         ) : (
           <p className="sous-titre">Chargement de tes données…</p>
@@ -268,6 +276,7 @@ function Cockpit({
           charger={business.chargerEnsemble}
           actuelId={business.actuel.id}
           maintenant={maintenant}
+          periodeInitiale={periode}
           onOuvrir={(id) => business.choisir(id)}
           onFermer={fermer}
         />

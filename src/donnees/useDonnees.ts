@@ -118,7 +118,7 @@ export function useDonnees(source: Source): EtatDonnees {
       setErreur(
         actuelles.current
           ? 'Pas de connexion : les chiffres affichés sont peut-être anciens.'
-          : 'Impossible de charger tes données. Vérifie ta connexion, puis réessaie.',
+          : 'Impossible de charger tes données. Vérifie ta connexion internet.',
       );
     }
   }, [depot, afficher]);

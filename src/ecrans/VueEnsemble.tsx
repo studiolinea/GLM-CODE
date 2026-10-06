@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { formatEuros } from '../argent';
 import { calculerEnsemble, type DonneesBusiness } from '../calculs/ensemble';
 import { PERIODES, type Periode } from '../calculs/resume';
-import { PHRASE_GAINS } from '../texte';
+import { fr, PHRASE_GAINS } from '../texte';
 import { Feuille } from './Feuille';
 
 const COURTS: Record<Periode, string> = { '7j': '7 J', '1m': '1 M', '3m': '3 M' };
@@ -12,18 +12,21 @@ export function VueEnsemble({
   charger,
   actuelId,
   maintenant,
+  periodeInitiale = '7j',
   onOuvrir,
   onFermer,
 }: {
   charger: () => Promise<DonneesBusiness[]>;
   actuelId: string;
   maintenant: Date;
+  /** La période du tableau de bord : la vue d'ensemble s'ouvre sur la même. */
+  periodeInitiale?: Periode;
   onOuvrir: (id: string) => void;
   onFermer: () => void;
 }) {
   const [donnees, setDonnees] = useState<DonneesBusiness[] | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
-  const [periode, setPeriode] = useState<Periode>('7j');
+  const [periode, setPeriode] = useState<Periode>(periodeInitiale);
 
   const lire = useCallback(async () => {
     setErreur(null);
@@ -61,7 +64,7 @@ export function VueEnsemble({
 
       {erreur && (
         <>
-          <p className="erreur">{erreur}</p>
+          <p className="erreur">{fr(erreur)}</p>
           <button type="button" className="bouton" onClick={() => void lire()}>
             Réessayer
           </button>
@@ -124,7 +127,7 @@ export function VueEnsemble({
                 )}
                 {l.id !== actuelId && (
                   <div className="pied" style={{ justifyContent: 'flex-start' }}>
-                    <button type="button" className="bouton" onClick={() => onOuvrir(l.id)}>
+                    <button type="button" className="bouton contour" onClick={() => onOuvrir(l.id)}>
                       Ouvrir
                     </button>
                   </div>

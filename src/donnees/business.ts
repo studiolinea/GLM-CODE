@@ -17,7 +17,8 @@ export function nomValide(nom: string): string | null {
 
 export async function listerBusiness(client: SupabaseClient): Promise<Business[]> {
   const { data, error } = await client.from('business').select('id, nom').order('cree_le').order('id');
-  if (error) throw new Error('Impossible de lire tes business. Réessaie.');
+  // Le détail technique (cause) sert à l'écran d'erreur, qui l'écrit dans la console.
+  if (error) throw new Error('Impossible de lire tes business. Réessaie.', { cause: error });
   return (data ?? []) as Business[];
 }
 

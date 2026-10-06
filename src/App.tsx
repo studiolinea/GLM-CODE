@@ -18,6 +18,7 @@ import { oublierCache, oublierCopie, type Source } from './donnees/useDonnees';
 import { Connexion } from './ecrans/Connexion';
 import { EcranMessage } from './ecrans/EcranMessage';
 import { Pilotage } from './Pilotage';
+import { fr } from './texte';
 import './style.css';
 
 const SUR_APPAREIL: Source = { type: 'appareil' };
@@ -124,8 +125,12 @@ function AvecBusiness({
       });
       setListe(await lecture.current);
     } catch (e) {
-      setErreur(
-        `${e instanceof Error ? e.message : 'Impossible de lire tes business.'} Si le problème continue, la base n’est peut-être pas à jour (texte SQL « 05-plusieurs-business.sql »).`,
+      // Le bouton « Réessayer » est juste en dessous : pas besoin de « Réessaie. » dans le message.
+      setErreur(e instanceof Error ? e.message.replace(/\s*Réessaie\.$/, '') : 'Impossible de lire tes business.');
+      // Le détail technique, pour qui ouvre la console du navigateur.
+      console.error(
+        'Lecture des business impossible. Si le problème continue, la base n’est peut-être pas à jour (texte SQL « 05-plusieurs-business.sql »).',
+        e instanceof Error ? (e.cause ?? e) : e,
       );
     }
   }, [client, userId]);
@@ -189,11 +194,16 @@ function AvecBusiness({
         {erreur ? (
           <>
             <p className="erreur" role="alert">
-              {erreur}
+              {fr(erreur)}
             </p>
-            <button className="bouton principal" onClick={() => void charger()}>
-              Réessayer
-            </button>
+            <div className="pied pied-centre">
+              <button className="bouton principal" onClick={() => void charger()}>
+                Réessayer
+              </button>
+              <button className="bouton" onClick={() => void compte.deconnecter()}>
+                Se déconnecter
+              </button>
+            </div>
           </>
         ) : (
           <p className="sous-titre">Chargement de tes business…</p>
