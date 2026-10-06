@@ -206,7 +206,10 @@ confidentialité.
 Kévin veut lancer beaucoup de business (15, 20…) sous sa maison mère **Studiolinea**, chacun avec ses propres
 comptes TikTok, Instagram et sa boutique. Pilotage devient donc multi-business, avant les premières vraies données.
 
-- En haut de l'écran, le nom du business ouvert : un appui ouvre « Mes business » (changer, renommer, créer).
+- En haut de l'écran, un bouton bien visible « Business : … — Changer » ouvre « Mes business » : le tableau de tous
+  les business, avec « Ouvrir », « Renommer » et « Supprimer » sur chaque ligne, puis « Nouveau business ».
+- Supprimer un business efface ses ventes, vidéos, voyants et comptes reliés (avec confirmation, sans retour
+  possible). Le dernier business ne peut pas être supprimé ; si c'était celui ouvert, l'appli ouvre le premier qui reste.
 - Chaque business a ses ventes, ses vidéos, ses voyants, son objectif de vidéos et ses comptes reliés.
 - Un business peut relier plusieurs comptes TikTok : leurs vidéos s'additionnent.
 - Le premier business montre les données d'exemple ; les suivants commencent vides.

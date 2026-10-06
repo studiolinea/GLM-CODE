@@ -664,26 +664,79 @@ a.bouton {
   margin: 0 0 4px;
 }
 
-/* Le business affiché, en haut : un appui ouvre « Mes business » */
-.choix-business {
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--ambre);
+/* Le business ouvert, en haut : un bouton bien visible ouvre « Mes business » */
+.selecteur-business {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  max-width: 420px;
+  margin: 10px 0 4px;
+  padding: 8px 12px;
+  background: var(--case);
+  border: 1px solid var(--ambre);
+  border-radius: 12px;
+  color: var(--texte);
   font: inherit;
-  font-weight: 600;
+  text-align: left;
   cursor: pointer;
 }
-.choix-business:focus-visible {
+.selecteur-business:focus-visible {
   outline: 2px solid var(--ambre);
   outline-offset: 2px;
 }
-.liste-business {
+.selecteur-business-texte {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.selecteur-business-nom {
+  overflow: hidden;
+  font-weight: 600;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.selecteur-business-action {
+  flex: none;
+  color: var(--ambre);
+  font-family: var(--police-titre);
+  font-weight: 600;
+  font-size: 0.75rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.tableau-business {
   display: grid;
   gap: 8px;
-  margin: 12px 0 0;
+  margin: 12px 0 18px;
   padding: 0;
   list-style: none;
+}
+.ligne-business {
+  padding: 10px 12px;
+  background: var(--case);
+  border: 1px solid var(--bord);
+  border-radius: 12px;
+}
+.ligne-business.ouvert {
+  border-color: rgba(70, 223, 136, 0.6);
+}
+.ligne-business-tete {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.ligne-business-nom {
+  overflow-wrap: anywhere;
+  font-weight: 600;
+}
+.ligne-business .champ {
+  margin: 8px 0 4px;
+}
+.ligne-business .erreur {
+  margin: 8px 0;
 }
 
 /* Vérification des frais et de la TVA : les mouvements d'argent de la boutique */

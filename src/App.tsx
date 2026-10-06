@@ -7,11 +7,12 @@ import {
   listerBusiness,
   renommerBusiness,
   retenirBusiness,
+  supprimerBusiness,
   type Business,
 } from './donnees/business';
 import { client } from './donnees/config';
 import { DepotSupabase } from './donnees/depotSupabase';
-import { oublierCache, type Source } from './donnees/useDonnees';
+import { oublierCache, oublierCopie, type Source } from './donnees/useDonnees';
 import { Connexion } from './ecrans/Connexion';
 import { EcranMessage } from './ecrans/EcranMessage';
 import { Pilotage } from './Pilotage';
@@ -73,6 +74,8 @@ export interface ChoixBusiness {
   choisir: (id: string) => void;
   creer: (nom: string) => Promise<void>;
   renommer: (id: string, nom: string) => Promise<void>;
+  /** Supprime un business et toutes ses données. Le dernier business ne peut pas être supprimé. */
+  supprimer: (id: string) => Promise<void>;
 }
 
 function AvecBusiness({
@@ -133,6 +136,19 @@ function AvecBusiness({
     [client],
   );
 
+  const supprimer = useCallback(
+    async (id: string) => {
+      if ((liste?.length ?? 0) <= 1) throw new Error('Il te faut au moins un business : crée-en un autre avant de supprimer celui-ci.');
+      await supprimerBusiness(client, id);
+      oublierCopie(`${userId}:${id}`);
+      const reste = await listerBusiness(client);
+      setListe(reste);
+      // Le business ouvert vient d'être supprimé : on ouvre le premier qui reste.
+      if (id === actuelId && reste[0]) choisir(reste[0].id);
+    },
+    [client, userId, liste, actuelId, choisir],
+  );
+
   const idOuvert = actuel?.id ?? null;
   const source = useMemo<Source | null>(
     () =>
@@ -164,7 +180,7 @@ function AvecBusiness({
       key={actuel.id}
       source={source}
       compte={compte}
-      business={{ liste, actuel, choisir, creer, renommer }}
+      business={{ liste, actuel, choisir, creer, renommer, supprimer }}
     />
   );
 }

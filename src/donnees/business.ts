@@ -48,6 +48,12 @@ export async function renommerBusiness(client: SupabaseClient, id: string, nom: 
   if (error) throw new Error('Impossible de renommer ce business. Réessaie.');
 }
 
+/** Supprime un business et tout ce qu'il contient (ventes, vidéos, voyants, comptes reliés et leurs clés). */
+export async function supprimerBusiness(client: SupabaseClient, id: string): Promise<void> {
+  const { error } = await client.from('business').delete().eq('id', id);
+  if (error) throw new Error('Impossible de supprimer ce business. Réessaie.');
+}
+
 // Le business ouvert en dernier, retenu sur l'appareil.
 const cleChoix = (userId: string) => `pilotage:business:${userId}`;
 

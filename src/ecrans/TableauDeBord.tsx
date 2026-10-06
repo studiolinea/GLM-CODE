@@ -68,15 +68,20 @@ export function TableauDeBord({
               PILOTAGE
               {exemple && <span className="tag">EXEMPLE</span>}
             </div>
+            {onBusiness && (
+              <button className="selecteur-business" onClick={onBusiness} aria-label={`Business ouvert : ${nomBusiness}. Changer de business`}>
+                <span className="selecteur-business-texte">
+                  <span className="etiquette">Business</span>
+                  <span className="selecteur-business-nom">{nomBusiness}</span>
+                </span>
+                <span className="selecteur-business-action" aria-hidden="true">
+                  Changer ▾
+                </span>
+              </button>
+            )}
             <p className="sous-titre">
-              {onBusiness ? (
-                <button className="choix-business" onClick={onBusiness} aria-label={`Business : ${nomBusiness}. Changer de business`}>
-                  {nomBusiness} <span aria-hidden="true">▾</span>
-                </button>
-              ) : (
-                'Ma boutique'
-              )}{' '}
-              · {FORMAT_JOUR.format(maintenant)}
+              {onBusiness ? '' : 'Ma boutique · '}
+              {FORMAT_JOUR.format(maintenant)}
             </p>
           </div>
           {actions}

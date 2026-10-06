@@ -41,6 +41,15 @@ function ecrireCache(cle: string, d: Donnees): void {
   }
 }
 
+/** Efface la copie d'un seul business sur l'appareil (par exemple quand il est supprimé). */
+export function oublierCopie(cle: string): void {
+  try {
+    localStorage.removeItem(cleCache(cle));
+  } catch {
+    // Rien à faire.
+  }
+}
+
 /** Efface les copies d'un compte sur l'appareil (tous ses business), par exemple à la déconnexion. */
 export function oublierCache(userId: string): void {
   try {
