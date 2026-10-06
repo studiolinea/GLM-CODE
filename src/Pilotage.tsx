@@ -18,6 +18,7 @@ import { useSynchroBoutique } from './donnees/useSynchroBoutique';
 import { AjoutFichier, type BilanImport } from './ecrans/AjoutFichier';
 import { EcranMessage } from './ecrans/EcranMessage';
 import { MesBusiness } from './ecrans/MesBusiness';
+import { VueEnsemble } from './ecrans/VueEnsemble';
 import { Reglages, type Compte } from './ecrans/Reglages';
 import { SaisieVideo } from './ecrans/SaisieVideo';
 import { TableauDeBord } from './ecrans/TableauDeBord';
@@ -30,7 +31,8 @@ type Fenetre =
   | { type: 'modifier'; videoId: string }
   | { type: 'import' }
   | { type: 'reglages' }
-  | { type: 'business' };
+  | { type: 'business' }
+  | { type: 'ensemble' };
 
 /** L'heure actuelle, remise à jour toutes les 30 secondes (les alertes en dépendent). */
 function useMaintenant(): Date {
@@ -202,6 +204,7 @@ function Cockpit({
         maintenant={maintenant}
         nomBusiness={business?.actuel.nom}
         onBusiness={business ? () => setFenetre({ type: 'business' }) : undefined}
+        onEnsemble={business && business.liste.length > 1 ? () => setFenetre({ type: 'ensemble' }) : undefined}
         automatique={enLigne}
         exemple={donnees.exemple}
         couverture={donnees.couverture}
@@ -236,7 +239,19 @@ function Cockpit({
         <AjoutFichier maintenant={maintenant} exemple={donnees.exemple} onImporter={importer} onFermer={fermer} />
       )}
 
-      {fenetre.type === 'business' && business && <MesBusiness business={business} onFermer={fermer} />}
+      {fenetre.type === 'business' && business && (
+        <MesBusiness business={business} onEnsemble={() => setFenetre({ type: 'ensemble' })} onFermer={fermer} />
+      )}
+
+      {fenetre.type === 'ensemble' && business && (
+        <VueEnsemble
+          charger={business.chargerEnsemble}
+          actuelId={business.actuel.id}
+          maintenant={maintenant}
+          onOuvrir={(id) => business.choisir(id)}
+          onFermer={fermer}
+        />
+      )}
 
       {fenetre.type === 'reglages' && (
         <Reglages

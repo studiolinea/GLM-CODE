@@ -10,7 +10,9 @@ import {
   supprimerBusiness,
   type Business,
 } from './donnees/business';
+import type { DonneesBusiness } from './calculs/ensemble';
 import { client } from './donnees/config';
+import { chargerEnsemble } from './donnees/ensemble';
 import { DepotSupabase } from './donnees/depotSupabase';
 import { oublierCache, oublierCopie, type Source } from './donnees/useDonnees';
 import { Connexion } from './ecrans/Connexion';
@@ -76,6 +78,8 @@ export interface ChoixBusiness {
   renommer: (id: string, nom: string) => Promise<void>;
   /** Supprime un business et toutes ses données. Le dernier business ne peut pas être supprimé. */
   supprimer: (id: string) => Promise<void>;
+  /** Les ventes et vidéos de tous les business, pour la vue d'ensemble. */
+  chargerEnsemble: () => Promise<DonneesBusiness[]>;
 }
 
 function AvecBusiness({
@@ -149,6 +153,8 @@ function AvecBusiness({
     [client, userId, liste, actuelId, choisir],
   );
 
+  const lireEnsemble = useCallback(() => chargerEnsemble(client, userId, liste ?? []), [client, userId, liste]);
+
   const idOuvert = actuel?.id ?? null;
   const source = useMemo<Source | null>(
     () =>
@@ -180,7 +186,7 @@ function AvecBusiness({
       key={actuel.id}
       source={source}
       compte={compte}
-      business={{ liste, actuel, choisir, creer, renommer, supprimer }}
+      business={{ liste, actuel, choisir, creer, renommer, supprimer, chargerEnsemble: lireEnsemble }}
     />
   );
 }

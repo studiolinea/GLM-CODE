@@ -21,7 +21,7 @@ avec les chiffres qui le prouvent.
 | 7. Lire les ventes de la boutique | en cours : boutique Stripe reliée en mode test le 6 octobre ; reste à vérifier la TVA et les frais avec un paiement test |
 | 8. Vérifier avec de vraies ventes | à faire |
 | 9. Tout automatique | boutique Stripe reliée (mode test) ; TikTok prêt à relier (appli TikTok en mode test, à relier avec le compte du business quand il existera) ; Instagram à faire |
-| 10. Plusieurs business | ✅ le 6 octobre : « Mes business » en haut de l'écran, chaque business a ses chiffres et ses comptes reliés (plusieurs TikTok possibles) ; vue d'ensemble à faire |
+| 10. Plusieurs business | ✅ le 6 octobre : « Mes business » en haut de l'écran, chaque business a ses chiffres et ses comptes reliés (plusieurs TikTok possibles) ; vue d'ensemble de tous les business ✅ |
 
 ## La base en ligne (Supabase)
 
