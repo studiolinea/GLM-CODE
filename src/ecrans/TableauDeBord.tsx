@@ -1,10 +1,10 @@
 import type { ReactNode } from 'react';
-import type { Action, Alerte } from '../alertes/alertes';
+import { compteurVoyants, type Action, type Alerte } from '../alertes/alertes';
 import { formatEuros } from '../argent';
 import { PERIODES, type Periode, type Resume } from '../calculs/resume';
 import type { Rythme } from '../calculs/rythme';
 import { quandParis } from '../temps';
-import { nombre, PHRASE_GAINS } from '../texte';
+import { PHRASE_GAINS } from '../texte';
 import { CarteAlerte } from './CarteAlerte';
 import { IconeChevron, Logo } from './Icones';
 import { Jauge } from './Jauge';
@@ -188,7 +188,7 @@ export function TableauDeBord({
         <section className="zone-voyants" aria-labelledby="titre-voyants">
           <div className="titre-section">
             <h2 id="titre-voyants">Voyants</h2>
-            <span className="compteur">{alertes.length === 0 ? 'tout est éteint' : nombre(alertes.length, 'allumé')}</span>
+            <span className="compteur">{compteurVoyants(alertes)}</span>
           </div>
           {alertes.length === 0 ? (
             <p className="rien">
