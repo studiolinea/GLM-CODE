@@ -733,7 +733,7 @@ a.bouton {
   border-top: 1px solid var(--bord);
 }
 
-/* ───── Comptes reliés (réglages) ───── */
+/* ───── Réglages ───── */
 .titre-reglage {
   margin: 0 0 10px;
   font-family: var(--police-titre);
@@ -742,6 +742,61 @@ a.bouton {
   letter-spacing: 0.14em;
   text-transform: uppercase;
 }
+.titre-reglage + .texte-doux {
+  margin-top: 0;
+}
+/* Objectif : « – N + » */
+.objectif {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.objectif .bouton.icone-seule {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+}
+.objectif-valeur {
+  min-width: 2ch;
+  font-family: var(--police-titre);
+  font-weight: 700;
+  font-size: 1.6rem;
+  line-height: 1;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+/* Bouton qui ouvre le choix d'un fichier : le vrai champ est caché à l'œil, mais atteignable au clavier */
+.choix-fichier {
+  cursor: pointer;
+}
+.choix-fichier:has(input:focus-visible) {
+  outline: 2px solid var(--ambre);
+  outline-offset: 2px;
+}
+/* Pied de page : conditions et confidentialité */
+.liens-legaux {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 2px;
+  margin: 14px 0 0;
+  color: var(--doux);
+  font-size: 0.85rem;
+}
+.liens-legaux a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 8px;
+  color: var(--doux);
+  text-underline-offset: 3px;
+}
+.liens-legaux a:focus-visible {
+  outline: 2px solid var(--ambre);
+  outline-offset: 2px;
+}
+
+/* ───── Comptes reliés (réglages) ───── */
 .compte-relie {
   margin-bottom: 10px;
   padding: 12px;

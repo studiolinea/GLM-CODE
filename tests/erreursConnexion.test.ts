@@ -12,7 +12,9 @@ describe('traduireErreurConnexion', () => {
     expect(traduireErreurConnexion('Failed to fetch')).toBe('Pas de connexion, réessaie.');
   });
 
-  it('garde le message d’origine quand il est inconnu', () => {
-    expect(traduireErreurConnexion('Something odd')).toBe('La connexion a échoué (Something odd).');
+  it('message inconnu : une phrase en français, jamais l’anglais brut', () => {
+    const inconnu = traduireErreurConnexion('Something odd');
+    expect(inconnu).toBe('La connexion n’a pas marché. Réessaie dans un moment.');
+    expect(inconnu).not.toContain('Something odd');
   });
 });

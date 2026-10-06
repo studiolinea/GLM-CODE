@@ -3,8 +3,13 @@ import { lireSauvegarde, versSauvegarde } from '../donnees/actions';
 import type { SynchroBoutique } from '../donnees/useSynchroBoutique';
 import type { Donnees } from '../modele';
 import { dateParis } from '../temps';
+import { accord, fr } from '../texte';
 import { ComptesRelies } from './ComptesRelies';
 import { Feuille, telecharger } from './Feuille';
+import { IconeMoins, IconePlus } from './Icones';
+import { LiensLegaux } from './LiensLegaux';
+
+const OBJECTIF_MAX = 20;
 
 /** Le compte connecté, quand l'appli est reliée à la base en ligne. */
 export interface Compte {
@@ -39,39 +44,58 @@ export function Reglages({
   onRemettreExemple: () => void;
   onFermer: () => void;
 }) {
-  const [objectif, setObjectif] = useState(String(donnees.reglages.objectifParJour));
+  const [objectif, setObjectif] = useState(donnees.reglages.objectifParJour);
   const [message, setMessage] = useState<{ type: 'succes' | 'erreur'; texte: string } | null>(null);
   const [confirmer, setConfirmer] = useState(false);
 
-  const changerObjectif = (texte: string) => {
-    setObjectif(texte);
-    const n = Number(texte);
-    if (texte.trim() !== '' && Number.isInteger(n) && n >= 0 && n <= 20) onObjectif(n);
+  const changerObjectif = (n: number) => {
+    const borne = Math.min(OBJECTIF_MAX, Math.max(0, n));
+    setObjectif(borne);
+    onObjectif(borne);
   };
 
   const restaurer = async (fichier: File) => {
     const resultat = lireSauvegarde(await fichier.text());
     if (typeof resultat === 'string') return setMessage({ type: 'erreur', texte: resultat });
     onRestaurer(resultat);
-    setObjectif(String(resultat.reglages.objectifParJour));
+    setObjectif(resultat.reglages.objectifParJour);
     setMessage({ type: 'succes', texte: 'Sauvegarde restaurée.' });
   };
 
   return (
     <Feuille titre="Réglages" onFermer={onFermer}>
-      <label className="champ">
-        <span>Objectif : combien de vidéos par jour ? (0 = pas de rappel)</span>
-        <input
-          id="objectif-par-jour"
-          type="number"
-          inputMode="numeric"
-          autoComplete="off"
-          min={0}
-          max={20}
-          value={objectif}
-          onChange={(e) => changerObjectif(e.target.value)}
-        />
-      </label>
+      <section aria-labelledby="titre-objectif">
+        <h3 id="titre-objectif" className="titre-reglage">
+          Objectif
+        </h3>
+        <p id="question-objectif" className="texte-doux">
+          Combien de vidéos par jour ? Mets 0 pour ne plus avoir de rappel.
+        </p>
+        <div className="objectif" role="group" aria-labelledby="question-objectif">
+          <button
+            type="button"
+            className="bouton icone-seule"
+            aria-label="Une vidéo de moins"
+            disabled={objectif <= 0}
+            onClick={() => changerObjectif(objectif - 1)}
+          >
+            <IconeMoins />
+          </button>
+          <output id="objectif-par-jour" className="objectif-valeur" aria-live="polite">
+            {objectif}
+          </output>
+          <button
+            type="button"
+            className="bouton icone-seule"
+            aria-label="Une vidéo de plus"
+            disabled={objectif >= OBJECTIF_MAX}
+            onClick={() => changerObjectif(objectif + 1)}
+          >
+            <IconePlus />
+          </button>
+          <span className="texte-doux">{objectif === 0 ? 'pas de rappel' : `${accord(objectif, 'vidéo')} par jour`}</span>
+        </div>
+      </section>
 
       {boutique && (
         <>
@@ -79,6 +103,7 @@ export function Reglages({
           <ComptesRelies boutique={boutique} />
           {(onSaisieManuelle || onImportManuel) && (
             <>
+              <hr className="separateur" />
               <h3 className="titre-reglage">À la main, en secours</h3>
               <p className="texte-doux">
                 Tout arrive tout seul de tes comptes reliés. Ces boutons ne servent qu’en secours : une vidéo Instagram
@@ -86,12 +111,12 @@ export function Reglages({
               </p>
               <div className="pied" style={{ justifyContent: 'flex-start' }}>
                 {onSaisieManuelle && (
-                  <button type="button" className="bouton discret" onClick={onSaisieManuelle}>
+                  <button type="button" className="bouton" onClick={onSaisieManuelle}>
                     Noter une vidéo
                   </button>
                 )}
                 {onImportManuel && (
-                  <button type="button" className="bouton discret" onClick={onImportManuel}>
+                  <button type="button" className="bouton" onClick={onImportManuel}>
                     Ajouter un fichier de ventes
                   </button>
                 )}
@@ -102,12 +127,17 @@ export function Reglages({
       )}
 
       <hr className="separateur" />
+      <h3 className="titre-reglage">Sauvegarde</h3>
       <p className="texte-doux">
         {enLigne
           ? 'Tes données sont dans ta base en ligne : les mêmes sur le Mac et le téléphone. La sauvegarde en fait une copie dans un fichier, au cas où.'
           : 'Tes données sont gardées sur cet appareil. La sauvegarde en fait une copie dans un fichier, au cas où.'}
       </p>
-      {message && <p className={message.type}>{message.texte}</p>}
+      {message && (
+        <p className={message.type} role="status">
+          {fr(message.texte)}
+        </p>
+      )}
       <div className="pied" style={{ justifyContent: 'flex-start' }}>
         <button
           type="button"
@@ -118,13 +148,14 @@ export function Reglages({
         >
           Sauvegarder
         </button>
-        <label className="bouton" style={{ display: 'inline-block' }}>
+        {/* Le champ reste dans la page (caché à l'œil) : on l'atteint aussi au clavier, avec Tab. */}
+        <label className="bouton choix-fichier">
           Restaurer
           <input
             id="restaurer-sauvegarde"
+            className="cache"
             type="file"
             accept=".json,application/json"
-            hidden
             onChange={(e) => {
               const fichier = e.target.files?.[0];
               if (fichier) void restaurer(fichier);
@@ -166,6 +197,7 @@ export function Reglages({
       {compte && (
         <>
           <hr className="separateur" />
+          <h3 className="titre-reglage">Mon compte</h3>
           <p className="texte-doux">Connecté avec {compte.email}.</p>
           <div className="pied" style={{ justifyContent: 'flex-start' }}>
             <button type="button" className="bouton" onClick={() => void compte.deconnecter()}>
@@ -180,6 +212,7 @@ export function Reglages({
           Fermer
         </button>
       </div>
+      <LiensLegaux />
     </Feuille>
   );
 }

@@ -18,5 +18,6 @@ export function traduireErreurConnexion(message: string): string {
     return 'Trop d’essais d’un coup. Attends quelques minutes, puis réessaie.';
   }
   if (m.includes('fetch') || m.includes('network')) return 'Pas de connexion, réessaie.';
-  return `La connexion a échoué (${message}).`;
+  // Un message inconnu reste en anglais chez Supabase : on ne le montre pas tel quel (il part dans la console).
+  return 'La connexion n’a pas marché. Réessaie dans un moment.';
 }

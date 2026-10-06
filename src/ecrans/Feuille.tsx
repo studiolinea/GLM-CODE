@@ -16,7 +16,7 @@ export function Feuille({ titre, onFermer, children }: { titre: string; onFermer
     document.addEventListener('keydown', surTouche);
     // Avec une souris, on se place sur le premier champ. Sur téléphone, non : le clavier monterait tout seul.
     const souris = typeof window.matchMedia === 'function' && window.matchMedia('(pointer: fine)').matches;
-    const premier = souris ? ref.current?.querySelector<HTMLElement>('input, button:not(.fermer-feuille)') : null;
+    const premier = souris ? ref.current?.querySelector<HTMLElement>('input:not([disabled]), button:not(.fermer-feuille):not([disabled])') : null;
     (premier ?? ref.current)?.focus();
     return () => document.removeEventListener('keydown', surTouche);
   }, []);
