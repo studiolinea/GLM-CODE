@@ -2,6 +2,7 @@
 // La liste se lit directement dans la base (chacun ne voit que les siens) ;
 // relier et synchroniser passent par le serveur de l'appli, qui garde les clés chiffrées.
 
+import type { Video } from '../modele';
 import type { MouvementBoutique } from '../serveur/commun';
 import type { Vente } from '../ventes/modele';
 import { client } from './config';
@@ -85,6 +86,35 @@ export function synchroniserBoutique(source: SourceBoutique): Promise<ResultatSy
 export async function mouvementsBoutique(source: SourceBoutique): Promise<MouvementBoutique[]> {
   const { mouvements } = await appelerServeur<{ mouvements: MouvementBoutique[] }>(`/api/comptes/${source}/mouvements`);
   return mouvements;
+}
+
+// ── TikTok ──
+
+/** Demande au serveur l'adresse de la page d'accord de TikTok. */
+export async function adresseConnexionTikTok(): Promise<string> {
+  const { url } = await appelerServeur<{ url: string }>('/api/comptes/tiktok/connexion');
+  return url;
+}
+
+/** Finit la liaison au retour de TikTok. Renvoie le nom du compte TikTok. */
+export async function relierTikTok(code: string, etat: string): Promise<string> {
+  const { libelle } = await appelerServeur<{ libelle: string }>('/api/comptes/tiktok/relier', { code, etat });
+  return libelle;
+}
+
+export function synchroniserTikTok(): Promise<{ videos: Video[]; synchroniseLe: string }> {
+  return appelerServeur('/api/comptes/tiktok/synchroniser');
+}
+
+/** Ce que TikTok a renvoyé dans l'adresse de l'appli, après l'accord ou le refus. */
+export type RetourTikTok = { code: string; etat: string } | { erreur: string };
+
+export function lireRetourTikTok(recherche: string): RetourTikTok | null {
+  const p = new URLSearchParams(recherche);
+  if (p.get('tiktok') !== 'retour') return null;
+  const code = p.get('code');
+  const etat = p.get('etat');
+  return code && etat ? { code, etat } : { erreur: p.get('erreur') ?? 'inconnue' };
 }
 
 /** Efface le compte relié et sa clé. Les ventes déjà chargées restent. */

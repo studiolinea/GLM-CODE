@@ -20,6 +20,7 @@ avec les chiffres qui le prouvent.
 | 6. Mettre l'appli en ligne | ✅ https://pilotage.studiolinea-pro.workers.dev |
 | 7. Lire les ventes de la boutique | en cours : boutique Stripe reliée en mode test le 6 octobre ; reste à vérifier la TVA et les frais avec un paiement test |
 | 8. Vérifier avec de vraies ventes | à faire |
+| 9. Tout automatique | boutique Stripe reliée (mode test) ; TikTok prêt à relier (appli TikTok en mode test, à relier avec le compte du business quand il existera) ; Instagram à faire |
 
 ## La base en ligne (Supabase)
 
@@ -46,6 +47,10 @@ limitée en lecture (`rk_…`), jamais la clé secrète complète (`sk_…`).
   puis [supabase/03-boutique-stripe.sql](supabase/03-boutique-stripe.sql) pour une base créée avant Stripe.
 - TVA retenue par Stripe (Managed Payments) : [supabase/04-tva.sql](supabase/04-tva.sql) pour une base créée
   avant le 6 octobre. À lancer avant la première vraie vente.
+- TikTok : appli développeur « Pilotage » (mode test). Sa clé publique est dans `wrangler.jsonc`
+  (`TIKTOK_CLIENT_KEY`), son secret **`TIKTOK_CLIENT_SECRET`** se pose dans Cloudflare comme `CLE_CHIFFREMENT`.
+  Adresse de retour déclarée chez TikTok : `https://pilotage.studiolinea-pro.workers.dev/api/tiktok/retour`.
+  Pages demandées par TikTok : `/confidentialite` et `/conditions`.
 
 ## Commandes
 

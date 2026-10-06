@@ -1,14 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { Donnees } from '../modele';
+import type { Donnees, Video } from '../modele';
 import type { Vente } from '../ventes/modele';
-import { importerVentes } from './actions';
+import { importerVentes, quitterExemple } from './actions';
 import {
+  adresseConnexionTikTok,
   BOUTIQUES,
   deconnecterCompte,
   listerComptes,
   relierBoutique,
+  relierTikTok,
   synchroniserBoutique,
+  synchroniserTikTok,
   type CompteRelie,
+  type RetourTikTok,
   type SourceBoutique,
   type SourceCompte,
 } from './comptesRelies';
@@ -22,6 +26,10 @@ export interface SynchroBoutique {
   /** Renvoie le libellé de la boutique ; lève une erreur avec un message clair sinon. */
   relier: (source: SourceBoutique, cle: string) => Promise<string>;
   deconnecter: (source: SourceCompte) => Promise<void>;
+  /** Part sur la page d'accord de TikTok ; lève une erreur avec un message clair si c'est impossible. */
+  relierTikTok: () => Promise<void>;
+  /** Le résultat de la liaison TikTok, au retour de la page d'accord. */
+  messageTikTok: { type: 'succes' | 'erreur'; texte: string } | null;
 }
 
 const ECART_MIN_MS = 5 * 60_000; // en revenant sur l'appli, pas plus d'une synchro toutes les 5 minutes
@@ -44,12 +52,34 @@ export function appliquerVentesBoutique(d: Donnees, ventes: Vente[], synchronise
   return resultat;
 }
 
+/**
+ * Ajoute ou met à jour les vidéos lues sur un réseau (mêmes identifiants : les vues sont mises à jour).
+ * Ce sont de vraies données : elles font disparaître l'exemple. Sans vidéo, rien ne change.
+ */
+export function appliquerVideos(d: Donnees, videos: Video[]): Donnees {
+  if (videos.length === 0) return d;
+  const base = quitterExemple(d);
+  const parId = new Map(base.videos.map((v) => [v.id, v]));
+  for (const v of videos) parId.set(v.id, v);
+  return { ...base, videos: [...parId.values()].sort((a, b) => a.instant.localeCompare(b.instant)) };
+}
+
+const RAISONS_TIKTOK: Record<string, string> = {
+  access_denied: 'Tu as refusé l’accès sur TikTok : rien n’a été relié.',
+};
+
 /** Les ventes de la boutique reliée arrivent toutes seules : à l'ouverture, puis en revenant sur l'appli. */
-export function useSynchroBoutique(modifier: (f: (d: Donnees) => Donnees) => void, actif: boolean): SynchroBoutique {
+export function useSynchroBoutique(
+  modifier: (f: (d: Donnees) => Donnees) => void,
+  actif: boolean,
+  retourTikTok: RetourTikTok | null = null,
+): SynchroBoutique {
   const [comptes, setComptes] = useState<CompteRelie[] | null>(null);
   const [enCours, setEnCours] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
+  const [messageTikTok, setMessageTikTok] = useState<SynchroBoutique['messageTikTok']>(null);
   const derniere = useRef(0);
+  const retourTraite = useRef(false);
 
   const synchroniser = useCallback(async () => {
     if (!actif) return;
@@ -58,11 +88,16 @@ export function useSynchroBoutique(modifier: (f: (d: Donnees) => Donnees) => voi
       const liste = await listerComptes();
       setComptes(liste);
       const reliees = BOUTIQUES.filter((b) => liste.some((c) => c.source === b));
-      if (reliees.length === 0) return;
+      const tiktok = liste.some((c) => c.source === 'tiktok');
+      if (reliees.length === 0 && !tiktok) return;
       setEnCours(true);
       for (const source of reliees) {
         const r = await synchroniserBoutique(source);
         modifier((d) => appliquerVentesBoutique(d, r.ventes, r.synchroniseLe));
+      }
+      if (tiktok) {
+        const r = await synchroniserTikTok();
+        modifier((d) => appliquerVideos(d, r.videos));
       }
       setComptes(await listerComptes());
       setErreur(null);
@@ -73,6 +108,28 @@ export function useSynchroBoutique(modifier: (f: (d: Donnees) => Donnees) => voi
       setEnCours(false);
     }
   }, [actif, modifier]);
+
+  useEffect(() => {
+    if (!actif || !retourTikTok || retourTraite.current) return;
+    retourTraite.current = true;
+    // Le code de TikTok ne sert qu'une fois : on l'enlève de l'adresse tout de suite.
+    window.history.replaceState(null, '', window.location.pathname);
+    if ('erreur' in retourTikTok) {
+      setMessageTikTok({
+        type: 'erreur',
+        texte: RAISONS_TIKTOK[retourTikTok.erreur] ?? 'TikTok n’a pas pu relier ton compte. Réessaie.',
+      });
+      return;
+    }
+    relierTikTok(retourTikTok.code, retourTikTok.etat).then(
+      (libelle) => {
+        setMessageTikTok({ type: 'succes', texte: `TikTok relié : « ${libelle} ».` });
+        void synchroniser();
+      },
+      (e: unknown) =>
+        setMessageTikTok({ type: 'erreur', texte: e instanceof Error ? e.message : 'La liaison TikTok a échoué. Réessaie.' }),
+    );
+  }, [actif, retourTikTok, synchroniser]);
 
   useEffect(() => {
     if (!actif) return;
@@ -99,5 +156,18 @@ export function useSynchroBoutique(modifier: (f: (d: Donnees) => Donnees) => voi
     setErreur(null);
   }, []);
 
-  return { comptes, enCours, erreur, synchroniser, relier, deconnecter };
+  const partirSurTikTok = useCallback(async () => {
+    window.location.assign(await adresseConnexionTikTok());
+  }, []);
+
+  return {
+    comptes,
+    enCours,
+    erreur,
+    synchroniser,
+    relier,
+    deconnecter,
+    relierTikTok: partirSurTikTok,
+    messageTikTok,
+  };
 }

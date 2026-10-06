@@ -13,9 +13,12 @@
     // Seules les adresses /api/… passent par le serveur ; les pages sont servies directement.
     "run_worker_first": ["/api/*"]
   },
-  // Valeurs publiques. Le secret CLE_CHIFFREMENT se pose dans les réglages Cloudflare, jamais ici.
+  // Valeurs publiques. Les secrets CLE_CHIFFREMENT et TIKTOK_CLIENT_SECRET se posent dans les réglages
+  // Cloudflare, jamais ici.
   "vars": {
     "SUPABASE_URL": "https://onzisrzwlzbhtvmzuwrf.supabase.co",
-    "SUPABASE_CLE_PUBLIQUE": "sb_publishable_F-Q33yhg8WU3uNDjKtnfvw_51OfqJnz"
+    "SUPABASE_CLE_PUBLIQUE": "sb_publishable_F-Q33yhg8WU3uNDjKtnfvw_51OfqJnz",
+    // Appli développeur TikTok « Pilotage », mode test (sandbox).
+    "TIKTOK_CLIENT_KEY": "sbawtxmiys2a52048n"
   }
 }

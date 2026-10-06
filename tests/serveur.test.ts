@@ -386,7 +386,7 @@ describe('serveur : boutique Stripe', () => {
     const f = fauxStripe();
     const sansBoutique = await traiterApi(appel('/api/comptes/stripe/mouvements'), env, f.recuperer);
     expect(sansBoutique.status).toBe(404);
-    expect(((await sansBoutique.json()) as { erreur: string }).erreur).toContain('Aucune boutique Stripe');
+    expect(((await sansBoutique.json()) as { erreur: string }).erreur).toContain('Aucun compte Stripe');
 
     await traiterApi(appel('/api/comptes/stripe/relier', { cle: 'rk_test_bonne_cle_0123456789' }), env, f.recuperer);
     const sansDroits = (async (entree: RequestInfo | URL, init?: RequestInit) =>

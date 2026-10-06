@@ -10,6 +10,7 @@ import {
   rangerAlerte,
   supprimerVideo,
 } from './donnees/actions';
+import { lireRetourTikTok } from './donnees/comptesRelies';
 import { donneesExemple } from './donnees/exemple';
 import { useDonnees, type Source } from './donnees/useDonnees';
 import { useSynchroBoutique } from './donnees/useSynchroBoutique';
@@ -88,10 +89,12 @@ function Cockpit({
   compte?: Compte;
 }) {
   const maintenant = useMaintenant();
+  // Au retour de la page d'accord de TikTok, l'adresse porte le code : on finit la liaison dans les réglages.
+  const [retourTikTok] = useState(() => (enLigne ? lireRetourTikTok(window.location.search) : null));
   // Les ventes de la boutique reliée arrivent toutes seules (seulement avec la base en ligne).
-  const boutique = useSynchroBoutique(modifier, enLigne);
+  const boutique = useSynchroBoutique(modifier, enLigne, retourTikTok);
   const [periode, setPeriode] = useState<Periode>('7j');
-  const [fenetre, setFenetre] = useState<Fenetre>({ type: 'aucune' });
+  const [fenetre, setFenetre] = useState<Fenetre>(() => (retourTikTok ? { type: 'reglages' } : { type: 'aucune' }));
 
   const aujourdhui = dateParis(maintenant);
   const resume = useMemo(() => calculerResume(donnees.ventes, periode, maintenant), [donnees.ventes, periode, maintenant]);
