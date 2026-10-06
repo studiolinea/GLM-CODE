@@ -442,9 +442,30 @@ button {
    en ligne sur grand écran. */
 .alerte-actions {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 8px;
   margin-top: 10px;
+}
+.alerte-actions .bouton {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* Petit écran (320 px) : voyant un peu plus petit, pour que « Plus tard » tienne sur une ligne */
+@media (max-width: 379px) {
+  .alerte {
+    grid-template-columns: 32px minmax(0, 1fr);
+    gap: 10px;
+  }
+  .voyant {
+    width: 32px;
+    height: 32px;
+    font-size: 0.95rem;
+  }
+  .alerte-actions .bouton {
+    padding-inline: 8px;
+    font-size: 0.74rem;
+  }
 }
 .alerte-actions.avec-action > :first-child {
   grid-column: 1 / -1;
