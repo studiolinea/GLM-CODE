@@ -226,7 +226,7 @@ describe('serveur : comptes reliés Lemon Squeezy', () => {
 
 // ── Stripe ──
 
-import { chargesVersVentes, transactionsVersMouvements, type ChargeStripe } from '../src/serveur/stripe';
+import { chargesVersVentes, fraisGeresParJour, transactionsVersMouvements, type ChargeStripe } from '../src/serveur/stripe';
 
 const charge = (id: string, autres: Partial<ChargeStripe> = {}): ChargeStripe => ({
   id,
@@ -331,6 +331,72 @@ describe('paiements Stripe → ventes', () => {
       ['ch_mp_rembourse', 1990, null, 109],
       ['ch_mp_moitie', 995, null, 54],
     ]);
+  });
+
+  it('Managed Payments : le vrai paiement test du 6 octobre, avec ses frais Managed Payments facturés la nuit suivante', () => {
+    // Payé 20,99 € le 6 octobre à 01h25 à Paris (le 5 octobre en UTC). Stripe : 1,09 € de TVA retenue, 0,56 € de frais
+    // de paiement, puis à 04h20 un mouvement à part « Managed Payments Transaction Fee (2026-10-05) » de 0,73 € (3,5 %).
+    const paiement = charge('ch_3UNLGYETl1mcPk2F1mFo2E3j', {
+      amount: 2099,
+      created: Date.parse('2026-10-05T23:25:00Z') / 1000,
+      balance_transaction: {
+        amount: 2099,
+        fee: 165,
+        net: 1934,
+        currency: 'eur',
+        fee_details: [
+          { type: 'withheld_tax', amount: 109 },
+          { type: 'stripe_fee', amount: 56 },
+        ],
+      },
+    });
+    const fraisDuJour = fraisGeresParJour([
+      { type: 'stripe_fee', amount: -73, fee: 0, net: -73, currency: 'eur', description: 'Managed Payments Transaction Fee (2026-10-05)' },
+      // Autres frais Stripe, sans rapport avec une vente : pas comptés ici.
+      { type: 'stripe_fee', amount: -200, currency: 'eur', description: 'Radar (2026-10-05)' },
+    ]);
+    expect([...fraisDuJour]).toEqual([['2026-10-05', 73]]);
+    const [vente] = chargesVersVentes([paiement], fraisDuJour).ventes;
+    expect(vente).toMatchObject({ montantCentimes: 1990, fraisCentimes: 129, tvaCentimes: 109 });
+    // Gains : 19,90 − 0,56 − 0,73 = 18,61 €.
+    expect(vente!.montantCentimes - vente!.fraisCentimes!).toBe(1861);
+  });
+
+  it('Managed Payments : tant que Stripe n’a pas facturé les frais du jour, ils restent inconnus', () => {
+    const solde = { amount: 2099, fee: 165, net: 1934, currency: 'eur', fee_details: [{ type: 'withheld_tax', amount: 109 }, { type: 'stripe_fee', amount: 56 }] };
+    const hier = charge('ch_hier', { amount: 2099, created: Date.parse('2026-10-05T10:00:00Z') / 1000, balance_transaction: solde });
+    const aujourdhui = charge('ch_auj', { amount: 2099, created: Date.parse('2026-10-06T10:00:00Z') / 1000, balance_transaction: solde });
+    const { ventes } = chargesVersVentes([hier, aujourdhui], new Map([['2026-10-05', 73]]));
+    expect(ventes.map((v) => [v.numeroCommande, v.fraisCentimes])).toEqual([
+      ['ch_hier', 129],
+      ['ch_auj', null],
+    ]);
+    // Clé sans le droit de lire le solde : frais inconnus, ventes quand même là.
+    expect(chargesVersVentes([hier], null).ventes[0]!.fraisCentimes).toBeNull();
+  });
+
+  it('Managed Payments : les frais d’un jour sont partagés entre ses paiements, sans perdre un centime', () => {
+    const jour = Date.parse('2026-10-05T12:00:00Z') / 1000;
+    const avecTva = { amount: 2099, fee: 165, net: 1934, currency: 'eur', fee_details: [{ type: 'withheld_tax', amount: 109 }, { type: 'stripe_fee', amount: 56 }] };
+    // Client sans TVA : seuls les frais de paiement sont dans le paiement, les frais Managed Payments s'ajoutent quand même.
+    const sansTva = { amount: 1990, fee: 55, net: 1935, currency: 'eur', fee_details: [{ type: 'stripe_fee', amount: 55 }] };
+    const { ventes } = chargesVersVentes(
+      [
+        charge('ch_1', { amount: 2099, created: jour, balance_transaction: avecTva }),
+        charge('ch_2', { amount: 1990, created: jour + 60, balance_transaction: sansTva }),
+        charge('ch_echoue', { amount: 5000, created: jour, status: 'failed', paid: false }),
+      ],
+      new Map([['2026-10-05', 143]]),
+    );
+    // 143 partagés selon 2099 et 1990 : 73,4… et 69,5… → 73 et 70 (le centime restant va à la plus grande fraction).
+    expect(ventes.map((v) => [v.numeroCommande, v.fraisCentimes])).toEqual([
+      ['ch_1', 56 + 73],
+      ['ch_2', 55 + 70],
+    ]);
+  });
+
+  it('sans Managed Payments, rien ne change : les frais sont ceux du paiement', () => {
+    expect(chargesVersVentes([charge('ch_simple')], new Map()).ventes[0]!.fraisCentimes).toBe(125);
   });
 
   it('écarte les paiements échoués et les autres devises', () => {
@@ -492,5 +558,37 @@ describe('serveur : boutique Stripe', () => {
     } finally {
       journal.mockRestore();
     }
+  });
+});
+
+describe('frais Managed Payments : leur lecture ne bloque jamais les ventes', () => {
+  const reponse = (statut: number, corps: unknown = {}) => new Response(JSON.stringify(corps), { status: statut });
+  it.each([403, 400, 500])('Stripe refuse la lecture des frais (%i) : frais inconnus, sans erreur', async (statut) => {
+    const { toutesLesTransactionsFrais } = await import('../src/serveur/stripe');
+    const erreur = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    await expect(toutesLesTransactionsFrais('rk_test_x', (async () => reponse(statut)) as typeof fetch)).resolves.toBeNull();
+    erreur.mockRestore();
+  });
+
+  it('une clé refusée reste une erreur', async () => {
+    const { toutesLesTransactionsFrais } = await import('../src/serveur/stripe');
+    await expect(toutesLesTransactionsFrais('rk_test_x', (async () => reponse(401)) as typeof fetch)).rejects.toThrow();
+  });
+
+  it('lit toutes les pages des frais', async () => {
+    const { toutesLesTransactionsFrais } = await import('../src/serveur/stripe');
+    const adresses: string[] = [];
+    const recuperer = (async (entree: RequestInfo | URL) => {
+      const url = new URL(String(entree));
+      adresses.push(`${url.pathname}?${url.searchParams.toString()}`);
+      return url.searchParams.get('starting_after')
+        ? reponse(200, { data: [{ id: 'txn_2', type: 'stripe_fee' }], has_more: false })
+        : reponse(200, { data: [{ id: 'txn_1', type: 'stripe_fee' }], has_more: true });
+    }) as typeof fetch;
+    expect((await toutesLesTransactionsFrais('rk_test_x', recuperer))?.length).toBe(2);
+    expect(adresses).toEqual([
+      '/v1/balance_transactions?type=stripe_fee&limit=100',
+      '/v1/balance_transactions?type=stripe_fee&limit=100&starting_after=txn_1',
+    ]);
   });
 });

@@ -32,6 +32,7 @@ describe('calculerResume', () => {
       nbRemboursements: 1,
       fraisCentimes: 500, // 1,50 + 1,50 + 2,00
       ventesSansFrais: 0,
+      ventesSansFraisStripe: 0,
       gainsCentimes: 6470, // 69,70 − 5,00
       tvaCentimes: null, // le fichier ne donne pas de TVA retenue
     });

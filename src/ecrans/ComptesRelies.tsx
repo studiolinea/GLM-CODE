@@ -323,6 +323,7 @@ const DESCRIPTIONS: [RegExp, string][] = [
   [/^stripe processing fees$/i, 'frais de paiement Stripe'],
   [/^stripe payout$/i, 'virement Stripe'],
   [/^withheld sales tax$/i, 'TVA retenue'],
+  [/^managed payments transaction fee/i, 'frais Managed Payments'],
 ];
 
 function traduire(description: string | null): string | null {

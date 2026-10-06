@@ -100,7 +100,7 @@ export function VueEnsemble({
             {ensemble.total.businessSansGains.length > 0 && (
               <p className="note alerte-note">
                 {fr(
-                  `Gains inconnus pour ${liste(ensemble.total.businessSansGains)} : des frais ne sont pas fournis par la boutique, donc pas de total deviné.`,
+                  `Gains inconnus pour ${liste(ensemble.total.businessSansGains)} : des frais ne sont pas encore connus, donc pas de total deviné.`,
                 )}
               </p>
             )}

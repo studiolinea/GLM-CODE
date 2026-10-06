@@ -18,7 +18,7 @@ avec les chiffres qui le prouvent.
 | 4. Ce que Kévin peut faire dans l'appli | ✅ |
 | 5. Les mêmes données sur le Mac et le téléphone | ✅ (projet Supabase « Pilotage », compte de Kévin créé le 5 octobre) |
 | 6. Mettre l'appli en ligne | ✅ https://pilotage.studiolinea-pro.workers.dev |
-| 7. Lire les ventes de la boutique | en cours : boutique Stripe reliée en mode test le 6 octobre ; paiement test vérifié (la TVA retenue est enlevée des ventes) ; reste à lire les frais de 3,5 % de Managed Payments dès qu'une ligne « frais Stripe » apparaît dans « Vérifier les frais et la TVA » |
+| 7. Lire les ventes de la boutique | ✅ en mode test : boutique Stripe reliée le 6 octobre ; la TVA retenue est enlevée des ventes ; les frais comptent les frais de paiement et les frais Managed Payments (3,5 %, facturés par Stripe la nuit suivante) |
 | 8. Vérifier avec de vraies ventes | à faire |
 | 9. Tout automatique | boutique Stripe reliée (mode test) ; TikTok relié (appli TikTok en mode test, compte « studiolinea0 ») ; le compte TikTok du business à relier quand il existera ; Instagram à faire |
 | 10. Plusieurs business | ✅ le 6 octobre : « Mes business » en haut de l'écran, chaque business a ses chiffres et ses comptes reliés (plusieurs TikTok possibles) ; vue d'ensemble de tous les business ✅ |
