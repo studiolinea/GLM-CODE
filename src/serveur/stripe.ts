@@ -66,20 +66,92 @@ export async function toutesLesCharges(cle: string, recuperer: Recuperateur = fe
 }
 
 /**
+ * Les frais Managed Payments, par jour : Stripe les facture une fois par jour, la nuit suivante, dans un mouvement
+ * à part (« Managed Payments Transaction Fee (2026-10-05) »), pour tous les paiements de ce jour (date UTC).
+ * Renvoie, pour chaque jour facturé, le total des frais en centimes. Les remboursements de frais ne sont pas comptés.
+ */
+export function fraisGeresParJour(transactions: TransactionStripe[]): Map<string, number> {
+  const parJour = new Map<string, number>();
+  for (const t of transactions) {
+    if (t.type !== 'stripe_fee' || (t.currency ?? '').toLowerCase() !== 'eur' || typeof t.amount !== 'number' || t.amount >= 0) continue;
+    const jour = /managed payments/i.test(t.description ?? '') ? /\((\d{4}-\d{2}-\d{2})\)/.exec(t.description ?? '')?.[1] : undefined;
+    if (jour) parJour.set(jour, (parJour.get(jour) ?? 0) - t.amount);
+  }
+  return parJour;
+}
+
+/** Les mouvements « frais Stripe » du compte, page par page. null s'ils ne peuvent pas être lus (droit « Balance » absent…). */
+export async function toutesLesTransactionsFrais(cle: string, recuperer: Recuperateur = fetch): Promise<TransactionStripe[] | null> {
+  const transactions: TransactionStripe[] = [];
+  let apres: string | undefined;
+  try {
+    for (let page = 0; page < PAGES_MAX; page++) {
+      const suite = apres ? `&starting_after=${encodeURIComponent(apres)}` : '';
+      const reponse = await appeler<{ data?: (TransactionStripe & { id?: string })[]; has_more?: boolean }>(
+        cle,
+        `/balance_transactions?type=stripe_fee&limit=${PAR_PAGE}${suite}`,
+        recuperer,
+      );
+      const lot = reponse.data ?? [];
+      transactions.push(...lot);
+      const dernier = lot[lot.length - 1]?.id;
+      if (!reponse.has_more || !dernier) break;
+      apres = dernier;
+    }
+  } catch (e) {
+    // Sans le droit « Balance » (ou si Stripe refuse cette lecture), les frais Managed Payments restent inconnus,
+    // mais les ventes arrivent quand même. Le détail va dans les journaux Cloudflare.
+    if (e instanceof CleRefusee) throw e;
+    if (!(e instanceof DroitsInsuffisants)) console.error('Lecture des frais Stripe impossible', e);
+    return null;
+  }
+  return transactions;
+}
+
+/** Partage un total entre des parts, en proportion de leur poids, sans perdre ni ajouter un centime. */
+function partager(total: number, poids: number[]): number[] {
+  const somme = poids.reduce((a, b) => a + b, 0);
+  if (somme <= 0) return poids.map(() => 0);
+  const exactes = poids.map((p) => (total * p) / somme);
+  const parts = exactes.map(Math.floor);
+  let reste = total - parts.reduce((a, b) => a + b, 0);
+  const ordre = exactes.map((x, i) => [x - Math.floor(x), i] as const).sort((a, b) => b[0] - a[0] || a[1] - b[1]);
+  for (const [, i] of ordre) {
+    if (reste <= 0) break;
+    parts[i]!++;
+    reste--;
+  }
+  return parts;
+}
+
+const jourUtc = (c: ChargeStripe) => new Date(c.created * 1000).toISOString().slice(0, 10);
+const aboutie = (c: ChargeStripe) => c.status === 'succeeded' && c.paid && (c.currency ?? '').toLowerCase() === 'eur';
+
+/**
  * Transforme les paiements Stripe en ventes de l'appli.
  * - Le montant est la part du vendeur : sans la TVA que Stripe retient avec Managed Payments.
- * - Les frais viennent de Stripe, paiement par paiement. Avec Managed Payments, ses 3,5 % sont comptés à part :
- *   les frais restent inconnus (null) tant que l'appli ne les lit pas.
+ * - Les frais viennent de Stripe. Avec Managed Payments, il y en a deux : les frais de paiement, dans chaque paiement,
+ *   et les frais Managed Payments, facturés à part la nuit suivante (`fraisParJour`). Tant que ceux d'un jour ne sont
+ *   pas facturés (ou pas lisibles : `fraisParJour` à null), les frais des ventes de ce jour restent inconnus (null).
  * - Les paiements du mode test gardent la plateforme « stripe-test » : jamais dans les vraies données.
  */
-export function chargesVersVentes(charges: ChargeStripe[]): { ventes: Vente[]; ignorees: VenteIgnoree[] } {
+export function chargesVersVentes(
+  charges: ChargeStripe[],
+  fraisParJour: Map<string, number> | null = null,
+): { ventes: Vente[]; ignorees: VenteIgnoree[] } {
   const ventes: Vente[] = [];
   const ignorees: VenteIgnoree[] = [];
-  // Dès qu'un paiement porte de la TVA retenue, le compte est en Managed Payments : ses 3,5 % sont comptés à part
-  // pour tous ses paiements, même ceux sans TVA. Les frais restent alors inconnus partout.
-  const geresParStripe = charges.some(
-    (c) => typeof c.balance_transaction === 'object' && c.balance_transaction?.fee_details?.some((f) => f.type === 'withheld_tax'),
-  );
+  // Le compte est en Managed Payments dès qu'un paiement porte de la TVA retenue, ou que Stripe a facturé des frais
+  // Managed Payments : ces frais concernent alors tous ses paiements, même ceux sans TVA.
+  const geresParStripe =
+    (fraisParJour?.size ?? 0) > 0 ||
+    charges.some((c) => typeof c.balance_transaction === 'object' && c.balance_transaction?.fee_details?.some((f) => f.type === 'withheld_tax'));
+  // Les frais Managed Payments d'un jour, partagés entre les paiements de ce jour selon leur montant payé.
+  const fraisGeres = new Map<string, number>();
+  for (const [jour, total] of fraisParJour ?? []) {
+    const duJour = charges.filter((c) => aboutie(c) && jourUtc(c) === jour);
+    partager(total, duJour.map((c) => c.amount)).forEach((part, i) => fraisGeres.set(duJour[i]!.id, part));
+  }
   for (const c of charges) {
     if (c.status !== 'succeeded' || !c.paid) {
       ignorees.push({ numero: c.id, raison: 'paiement non abouti' });
@@ -103,15 +175,18 @@ export function chargesVersVentes(charges: ChargeStripe[]): { ventes: Vente[]; i
       numeroCommande: c.id,
       instant: new Date(c.created * 1000).toISOString(),
       montantCentimes: Math.max(0, paye - tvaGardee),
-      // Avec Managed Payments, ses frais de 3,5 % ne sont pas dans ce paiement : Stripe les compte à part.
-      // Tant que l'appli ne les lit pas, les frais restent inconnus plutôt que faux.
-      fraisCentimes: solde && !geresParStripe ? solde.fee : null,
+      fraisCentimes: !solde ? null : !geresParStripe ? solde.fee : fraisAvecGeres(solde.fee - tva, fraisGeres.get(c.id)),
       ...(tvaGardee > 0 ? { tvaCentimes: tvaGardee } : {}),
       rembourse: c.refunded,
       produit: c.description ?? '',
     });
   }
   return { ventes, ignorees };
+}
+
+/** Frais de paiement + frais Managed Payments ; inconnus tant que Stripe n'a pas facturé les seconds. */
+function fraisAvecGeres(paiement: number, geres: number | undefined): number | null {
+  return geres === undefined ? null : paiement + geres;
 }
 
 function somme(nombres: number[]): number {
@@ -167,7 +242,8 @@ export const connecteurStripe: Connecteur = {
     return cle.startsWith('rk_test_') ? 'Stripe (mode test)' : 'Stripe';
   },
   async lireVentes(cle, recuperer) {
-    return chargesVersVentes(await toutesLesCharges(cle, recuperer));
+    const [charges, frais] = await Promise.all([toutesLesCharges(cle, recuperer), toutesLesTransactionsFrais(cle, recuperer)]);
+    return chargesVersVentes(charges, frais && fraisGeresParJour(frais));
   },
   async mouvements(cle, recuperer) {
     const reponse = await appeler<{ data?: TransactionStripe[] }>(cle, '/balance_transactions?limit=25', recuperer);

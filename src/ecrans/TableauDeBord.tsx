@@ -4,7 +4,7 @@ import { formatEuros } from '../argent';
 import { PERIODES, type Periode, type Resume } from '../calculs/resume';
 import type { Rythme } from '../calculs/rythme';
 import { quandParis } from '../temps';
-import { accord, nombre, PHRASE_GAINS } from '../texte';
+import { accord, fr, nombre, PHRASE_GAINS } from '../texte';
 import { CarteAlerte } from './CarteAlerte';
 import { avecSouris, ID_TITRE_ECRAN } from './Feuille';
 import { ID_SELECTEUR_BUSINESS, prendreFocus } from './focus';
@@ -193,8 +193,11 @@ export function TableauDeBord({
 
           {!sansDonnees && resume.gainsCentimes === null && (
             <p className="note alerte-note">
-              Frais non fournis par la boutique pour {resume.ventesSansFrais} vente
-              {resume.ventesSansFrais > 1 ? 's' : ''} : pas de gains devinés.
+              {fr(
+                resume.ventesSansFraisStripe === resume.ventesSansFrais
+                  ? `Frais pas encore connus pour ${nombre(resume.ventesSansFrais, 'vente')} : Stripe compte ses frais Managed Payments la nuit suivante. Pas de gains devinés en attendant.`
+                  : `Frais non fournis par la boutique pour ${nombre(resume.ventesSansFrais, 'vente')} : pas de gains devinés.`,
+              )}
             </p>
           )}
           {resume.tvaCentimes !== null && (

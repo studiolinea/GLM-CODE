@@ -29,6 +29,8 @@ export interface Resume {
   fraisCentimes: number;
   /** Ventes non remboursées dont le fichier ne donne pas les frais. */
   ventesSansFrais: number;
+  /** Parmi elles, les ventes Stripe : leurs frais Managed Payments ne sont pas encore facturés (la nuit suivante). */
+  ventesSansFraisStripe: number;
   /** Ventes − frais. null si des frais manquent : on ne devine pas. */
   gainsCentimes: number | null;
   /** TVA retenue par la boutique sur les ventes non remboursées ; null si aucune vente n'en donne. */
@@ -49,6 +51,7 @@ export function calculerResume(ventes: Vente[], periode: Periode, maintenant: Da
   const commandes = gardees.length;
   const fraisCentimes = somme(gardees.map((v) => v.fraisCentimes ?? 0));
   const ventesSansFrais = gardees.filter((v) => v.fraisCentimes === null).length;
+  const ventesSansFraisStripe = gardees.filter((v) => v.fraisCentimes === null && v.plateforme === 'stripe').length;
   const avecTva = gardees.filter((v) => v.tvaCentimes !== undefined);
 
   return {
@@ -62,6 +65,7 @@ export function calculerResume(ventes: Vente[], periode: Periode, maintenant: Da
     nbRemboursements: remboursees.length,
     fraisCentimes,
     ventesSansFrais,
+    ventesSansFraisStripe,
     gainsCentimes: ventesSansFrais > 0 ? null : ventesCentimes - fraisCentimes,
     tvaCentimes: avecTva.length > 0 ? somme(avecTva.map((v) => v.tvaCentimes ?? 0)) : null,
   };
