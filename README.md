@@ -24,6 +24,8 @@ avec les chiffres qui le prouvent.
 | 10. Plusieurs business | ✅ le 6 octobre : « Mes business » en haut de l'écran, chaque business a ses chiffres et ses comptes reliés (plusieurs TikTok possibles) ; vue d'ensemble de tous les business ✅ |
 | Relecture complète | ✅ le 6 octobre : sécurité, fiabilité, interface et textes revus ; l'appli s'ouvre aussi sans réseau |
 
+| Audit indépendant local | Modifications préparées le 6 octobre : fiabilité, récupération, interface, assistant gratuit et veille cloud ; pas déployées. Voir [rapport et activation](docs/AUDIT-2026-10-06.md). |
+
 ## La base en ligne (Supabase)
 
 - Tables et règles de sécurité : [supabase/schema.sql](supabase/schema.sql), à coller dans Supabase > SQL Editor,

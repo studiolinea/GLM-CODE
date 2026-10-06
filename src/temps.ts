@@ -57,7 +57,7 @@ const RE_HEURE = /^(\d{2}):(\d{2})(?::(\d{2}))?$/;
 export function instantParis(date: string, heure = '00:00'): Date {
   const d = RE_DATE.exec(date);
   const h = RE_HEURE.exec(heure);
-  if (!d || !h) throw new Error(`Date ou heure invalide : ${date} ${heure}`);
+  if (!d || !h || !dateExiste(date) || !heureExiste(heure)) throw new Error(`Date ou heure invalide : ${date} ${heure}`);
   const commeUtc = Date.UTC(+d[1]!, +d[2]! - 1, +d[3]!, +h[1]!, +h[2]!, +(h[3] ?? 0));
   // Fin octobre, l'heure de 2 h à 3 h passe deux fois : on prend la première (sinon « J'ai publié »
   // croit l'heure actuelle dans le futur). On essaie le décalage de la veille et celui du lendemain.
@@ -103,6 +103,7 @@ export function quandParis(instant: Date): string {
 export function lireDateHeure(texte: string): Date | null {
   const t = texte.trim();
   if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:?\d{2})$/.test(t)) {
+    if (!dateExiste(t.slice(0, 10)) || !heureExiste(t.slice(11).split(/Z|[+-]/)[0]!.split('.')[0]!)) return null;
     const d = new Date(t);
     return Number.isNaN(d.getTime()) ? null : d;
   }
@@ -117,7 +118,7 @@ export function lireDateHeure(texte: string): Date | null {
     date = `${fr[3]}-${fr[2]}-${fr[1]}`;
     if (fr[4]) heure = fr[4];
   }
-  if (!date || !dateExiste(date)) return null;
+  if (!date || !dateExiste(date) || !heureExiste(heure)) return null;
   return instantParis(date, heure);
 }
 
@@ -126,4 +127,9 @@ function dateExiste(date: string): boolean {
   if (!d) return false;
   const essai = new Date(Date.UTC(+d[1]!, +d[2]! - 1, +d[3]!));
   return essai.toISOString().slice(0, 10) === date;
+}
+
+function heureExiste(heure: string): boolean {
+  const h = RE_HEURE.exec(heure);
+  return !!h && +h[1]! < 24 && +h[2]! < 60 && +(h[3] ?? 0) < 60;
 }

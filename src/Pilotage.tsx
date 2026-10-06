@@ -12,6 +12,7 @@ import {
 } from './donnees/actions';
 import type { ChoixBusiness } from './App';
 import { BOUTIQUES, lireRetourTikTok, MESSAGE_PAS_DE_CONNEXION } from './donnees/comptesRelies';
+import { changerPreparation } from './donnees/preparation';
 import { donneesExemple } from './donnees/exemple';
 import { useDonnees, type Source } from './donnees/useDonnees';
 import { useSynchroBoutique } from './donnees/useSynchroBoutique';
@@ -319,9 +320,11 @@ function Cockpit({
       <TableauDeBord
         maintenant={maintenant}
         nomBusiness={business?.actuel.nom}
+        businessId={business?.actuel.id}
         onBusiness={business ? () => setFenetre({ type: 'business' }) : undefined}
         onEnsemble={business && business.liste.length > 1 ? () => setFenetre({ type: 'ensemble' }) : undefined}
         automatique={enLigne}
+        sources={enLigne && relies ? comptes ?? null : null}
         exemple={donnees.exemple}
         couverture={donnees.couverture}
         periode={periode}
@@ -334,6 +337,8 @@ function Cockpit({
         onRanger={(id, statut) => modifier((d) => rangerAlerte(d, id, statut, aujourdhui))}
         onQuitterExemple={() => modifier((d) => quitterExemple(d))}
         ventesEcartees={boutique.ignorees.length}
+        etatsPreparation={donnees.etatsAlertes}
+        onPreparation={(etape, fait) => modifier((d) => changerPreparation(d, etape, fait, aujourdhui))}
       />
 
       {(fenetre.type === 'saisie' || videoAModifier) && (

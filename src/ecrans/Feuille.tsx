@@ -39,6 +39,21 @@ export function Feuille({ titre, onFermer, children }: { titre: string; onFermer
 
   // Une seule fois à l'ouverture : sinon le curseur sauterait à chaque frappe.
   useEffect(() => {
+    // aria-modal décrit la fenêtre ; inert empêche aussi la lecture et les clics derrière elle.
+    const inertAvant: { element: HTMLElement; valeur: boolean }[] = [];
+    let branche = ref.current?.parentElement;
+    while (branche?.parentElement) {
+      for (const voisin of branche.parentElement.children) {
+        if (voisin !== branche && voisin instanceof HTMLElement) {
+          inertAvant.push({ element: voisin, valeur: voisin.inert });
+          voisin.inert = true;
+        }
+      }
+      if (branche.parentElement === document.body) break;
+      branche = branche.parentElement;
+    }
+    const defilementAvant = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
     // Le bouton qui a ouvert la fenêtre : il retrouve le curseur à la fermeture. Aucun (le curseur est déjà sur la
     // page entière) : ce bouton a disparu à l'ouverture, comme « Voir » du bandeau rouge.
     const aOuvert = document.activeElement;
@@ -69,6 +84,8 @@ export function Feuille({ titre, onFermer, children }: { titre: string; onFermer
     (premier ?? ref.current)?.focus();
     return () => {
       document.removeEventListener('keydown', surTouche);
+      for (const { element, valeur } of inertAvant) element.inert = valeur;
+      document.body.style.overflow = defilementAvant;
       // Le bouton d'origine a disparu (voyant rangé, tableau refait…) : un élément stable de l'écran à la place.
       if (ouvreur?.isConnected) ouvreur.focus({ preventScroll: true });
       else curseurSurEcran();

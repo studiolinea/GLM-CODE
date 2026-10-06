@@ -82,7 +82,7 @@ describe('Alerte B : ce qu’a donné chaque vidéo', () => {
     expect(a).toMatchObject({
       id: 'video-v1-ventes',
       ton: 'bonne-nouvelle',
-      titre: 'Ta vidéo TikTok du 03/10 a ramené des ventes',
+      titre: 'Des ventes après ta vidéo TikTok du 03/10',
       dapres: 'D’après : 850 vues, 1 vente dans les 48 h suivantes.',
       note: NOTE_DATES,
       action: { cible: 'lien', url: 'https://www.tiktok.com/@kevin/video/1' },

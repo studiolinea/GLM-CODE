@@ -15,6 +15,8 @@ import {
   type LigneVideo,
 } from './lignes';
 
+const ORDRES: Record<string, string[]> = { ventes: ['plateforme', 'numero_commande'], videos: ['id'], etats_alertes: ['alerte_id'], reglages: ['business_id'] };
+
 const PAGE = 1000; // la base renvoie au plus 1 000 lignes par demande
 const PAQUET = 500;
 
@@ -42,12 +44,13 @@ export class DepotSupabase implements Depot {
   private async toutLire<T>(table: string): Promise<T[]> {
     const lignes: T[] = [];
     for (let debut = 0; ; debut += PAGE) {
-      const { data, error } = await this.client
+      let requete = this.client
         .from(table)
         .select('*')
         .eq('user_id', this.userId)
-        .eq('business_id', this.businessId)
-        .range(debut, debut + PAGE - 1);
+        .eq('business_id', this.businessId);
+      for (const colonne of ORDRES[table] ?? []) requete = requete.order(colonne, { ascending: true });
+      const { data, error } = await requete.range(debut, debut + PAGE - 1);
       verifier(error);
       lignes.push(...((data ?? []) as T[]));
       if (!data || data.length < PAGE) return lignes;

@@ -250,7 +250,7 @@ function alerteVideo(video: Video, ctx: ContexteAlertes): Alerte {
       ...base,
       id: `video-${video.id}-ventes`,
       ton: 'bonne-nouvelle',
-      titre: `${nom} a ramené des ventes`,
+      titre: `Des ventes après ta vidéo ${NOMS_RESEAUX[video.reseau]} du ${jourMois(dateParis(debut))}`,
       dapres: `D’après : ${vues}${ventesTexte}.`,
       note: NOTE_DATES,
     };

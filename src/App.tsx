@@ -26,6 +26,7 @@ import { chargerEnsemble } from './donnees/ensemble';
 import { DepotSupabase } from './donnees/depotSupabase';
 import { copieExiste, oublierCache, oublierCopie, type Source } from './donnees/useDonnees';
 import { Connexion } from './ecrans/Connexion';
+import { NouveauMotDePasse } from './ecrans/NouveauMotDePasse';
 import { EcranMessage } from './ecrans/EcranMessage';
 import { Pilotage } from './Pilotage';
 import { fr } from './texte';
@@ -80,6 +81,7 @@ function AvecCompte({ client }: { client: SupabaseClient }) {
   // Sans réseau, la session ne peut pas être renouvelée : on ouvre quand même la copie du dernier compte connecté.
   const [horsLigne, setHorsLigne] = useState<CompteRetenu | null>(null);
   const [sortie, setSortie] = useState(false);
+  const [recuperation, setRecuperation] = useState(() => new URLSearchParams(window.location.search).get('recuperation') === '1');
 
   useEffect(() => {
     let actif = true;
@@ -104,6 +106,7 @@ function AvecCompte({ client }: { client: SupabaseClient }) {
     const { data } = client.auth.onAuthStateChange((evenement, nouvelle) => {
       // La session de départ est lue juste au-dessus, avec getSession.
       if (evenement === 'INITIAL_SESSION') return;
+      if (evenement === 'PASSWORD_RECOVERY') setRecuperation(true);
       if (nouvelle) {
         setSession(nouvelle);
       } else if (evenement === 'SIGNED_OUT') {
@@ -135,6 +138,10 @@ function AvecCompte({ client }: { client: SupabaseClient }) {
     );
   }
   if (!compte) return <Connexion client={client} />;
+  if (recuperation && session) return <NouveauMotDePasse client={client} onTerminer={() => {
+    window.history.replaceState(null, '', window.location.pathname);
+    setRecuperation(false);
+  }} />;
   if (sortie) {
     return (
       <EcranMessage>

@@ -254,7 +254,7 @@ describe('paiements Stripe → ventes', () => {
         montantCentimes: 1990,
         fraisCentimes: 125,
         rembourse: false,
-        produit: 'Guide detailing',
+        produit: '',
       },
     ]);
   });
@@ -299,7 +299,7 @@ describe('paiements Stripe → ventes', () => {
         devise: 'eur',
         description: null,
         origine: 'ch_1',
-        detailFrais: [{ type: 'stripe_fee', montantCentimes: 125, description: 'Stripe processing fees' }],
+        detailFrais: [{ type: 'stripe_fee', montantCentimes: 125, description: null }],
       },
     ]);
   });
@@ -590,5 +590,38 @@ describe('frais Managed Payments : leur lecture ne bloque jamais les ventes', ()
       '/v1/balance_transactions?type=stripe_fee&limit=100',
       '/v1/balance_transactions?type=stripe_fee&limit=100&starting_after=txn_1',
     ]);
+  });
+});
+
+
+describe('fiabilité Stripe : données incomplètes et confidentialité', () => {
+  it('refuse une pagination de charges tronquée au lieu de réussir', async () => {
+    const { toutesLesCharges } = await import('../src/serveur/stripe');
+    const recuperer = vi.fn(async () => new Response(JSON.stringify({ data: [charge('ch_suite')], has_more: true })));
+    await expect(toutesLesCharges('rk_live_x', recuperer as typeof fetch)).rejects.toThrow('incomplet');
+  });
+
+  it('garde les frais inconnus quand leur historique est tronqué', async () => {
+    const { toutesLesTransactionsFrais } = await import('../src/serveur/stripe');
+    const journal = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const recuperer = vi.fn(async () => new Response(JSON.stringify({ data: [{ id: 'txn_suite', type: 'stripe_fee', amount: -73, currency: 'eur', description: 'Managed Payments Transaction Fee (2026-10-05)' }], has_more: true })));
+      expect(await toutesLesTransactionsFrais('rk_live_x', recuperer as typeof fetch)).toBeNull();
+      expect(journal).toHaveBeenCalled();
+    } finally {
+      journal.mockRestore();
+    }
+  });
+
+  it('ne présente pas les frais comme connus quand Managed Payments est possible sans preuve', () => {
+    expect(chargesVersVentes([charge('ch_premiere')], new Map(), true).ventes[0]!.fraisCentimes).toBeNull();
+  });
+
+  it('retire les descriptions libres des ventes et mouvements', () => {
+    const description = 'Commande de Client client@example.fr';
+    expect(chargesVersVentes([charge('ch_prive', { description })]).ventes[0]!.produit).toBe('');
+    const [m] = transactionsVersMouvements([{ description, fee_details: [{ description }] }]);
+    expect(m!.description).toBeNull();
+    expect(m!.detailFrais[0]!.description).toBeNull();
   });
 });
