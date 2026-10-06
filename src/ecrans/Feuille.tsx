@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, type ReactNode } from 'react';
+import { IconeCroix } from './Icones';
 
 /** Fenêtre qui monte du bas sur téléphone, centrée sur ordinateur. Croix, Échap ou clic à côté pour fermer. */
 export function Feuille({ titre, onFermer, children }: { titre: string; onFermer: () => void; children: ReactNode }) {
@@ -26,7 +27,7 @@ export function Feuille({ titre, onFermer, children }: { titre: string; onFermer
         <div className="feuille-tete">
           <h2 id={idTitre}>{titre}</h2>
           <button type="button" className="fermer-feuille" aria-label="Fermer la fenêtre" onClick={onFermer}>
-            ✕
+            <IconeCroix />
           </button>
         </div>
         {children}

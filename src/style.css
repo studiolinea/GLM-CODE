@@ -70,6 +70,10 @@ button {
   justify-content: space-between;
   gap: 16px;
 }
+.entete-titre {
+  flex: 1;
+  min-width: 0;
+}
 .marque {
   display: flex;
   align-items: center;
@@ -78,6 +82,28 @@ button {
   font-weight: 700;
   font-size: 1.2rem;
   letter-spacing: 0.18em;
+}
+/* Le petit compte-tours de l'icône, devant « PILOTAGE » */
+.logo {
+  flex: none;
+  margin-right: -2px;
+}
+.logo-piste {
+  stroke: #343b45;
+}
+.logo-arc {
+  stroke: var(--ambre);
+}
+.logo-aiguille {
+  stroke: var(--aiguille);
+}
+.logo-moyeu {
+  fill: var(--aiguille);
+}
+/* Les icônes au trait (Icones.tsx) prennent la couleur du texte */
+.icone {
+  display: block;
+  flex: none;
 }
 .tag {
   font-family: var(--police-titre);
@@ -138,11 +164,16 @@ button {
   margin-right: 4px;
 }
 .lien-bandeau {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  margin-top: 2px;
   background: none;
   border: 0;
   padding: 0;
   color: var(--ambre);
   font-weight: 600;
+  text-align: left;
   text-decoration: underline;
   text-underline-offset: 3px;
 }
@@ -193,6 +224,11 @@ button {
 .jauge-valeur {
   stroke: var(--ambre);
   filter: drop-shadow(0 0 5px rgba(255, 176, 58, 0.6));
+}
+/* Objectif atteint : la jauge passe au vert */
+.jauge-valeur.atteint {
+  stroke: var(--vert);
+  filter: drop-shadow(0 0 5px rgba(70, 223, 136, 0.6));
 }
 .jauge-cran {
   stroke: var(--cran);
@@ -301,6 +337,11 @@ button {
   color: var(--vert);
   font-size: 1.35rem;
   text-shadow: 0 0 12px rgba(70, 223, 136, 0.35);
+}
+/* « — » : pas de valeur, donc ni vert ni halo */
+.lecture b.vide {
+  color: var(--doux);
+  text-shadow: none;
 }
 .note {
   margin: 10px 0 0;
@@ -482,6 +523,35 @@ a.bouton {
   padding-inline: 14px;
   font-size: 1rem;
 }
+/* « Actualiser », avec l'heure de la dernière actualisation réussie en dessous */
+.bouton.actualiser {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  line-height: 1.15;
+}
+.actualiser-texte,
+.a-jour {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.a-jour {
+  font-family: var(--police);
+  font-weight: 600;
+  font-size: 0.74rem;
+  letter-spacing: 0;
+  text-transform: none;
+  opacity: 0.78;
+}
+.bouton.icone-seule {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
 @media (min-width: 760px) {
   .page {
     padding-bottom: 40px;
@@ -545,6 +615,10 @@ a.bouton {
 }
 .fermer-feuille {
   flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
   width: 44px;
   height: 44px;
   border: 1px solid var(--bord);
@@ -730,6 +804,9 @@ a.bouton {
 }
 .selecteur-business-action {
   flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   color: var(--ambre);
   font-family: var(--police-titre);
   font-weight: 600;
@@ -753,8 +830,26 @@ a.bouton {
 .chiffres-ensemble .lecture b {
   font-size: 1.05rem;
 }
+/* « Vue d'ensemble de mes business » : un lien ambre, au-dessus de la période */
 .lien-ensemble {
-  margin: 0 0 4px;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  margin: 0;
+  padding: 0;
+  background: none;
+  border: 0;
+  color: var(--ambre);
+  font-family: var(--police);
+  font-weight: 600;
+  font-size: 0.92rem;
+  text-align: left;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.lien-ensemble:focus-visible {
+  outline: 2px solid var(--ambre);
+  outline-offset: 2px;
 }
 .tableau-business {
   display: grid;

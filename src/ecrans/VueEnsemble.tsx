@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { formatEuros } from '../argent';
 import { calculerEnsemble, type DonneesBusiness } from '../calculs/ensemble';
 import { PERIODES, type Periode } from '../calculs/resume';
+import { PHRASE_GAINS } from '../texte';
 import { Feuille } from './Feuille';
 
 const COURTS: Record<Periode, string> = { '7j': '7 J', '1m': '1 M', '3m': '3 M' };
@@ -131,7 +132,7 @@ export function VueEnsemble({
               </li>
             ))}
           </ul>
-          <p className="note">Gains = ventes moins commissions et frais, avant impôts et cotisations.</p>
+          <p className="note">{PHRASE_GAINS}</p>
         </>
       )}
     </Feuille>
@@ -142,7 +143,7 @@ function Chiffre({ nom, valeur, gains = false }: { nom: string; valeur: string; 
   return (
     <div className={`lecture ${gains ? 'gains' : ''}`}>
       <span className="etiquette">{nom}</span>
-      <b>{valeur}</b>
+      <b className={valeur === '—' ? 'vide' : undefined}>{valeur}</b>
     </div>
   );
 }

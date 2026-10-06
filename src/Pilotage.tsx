@@ -17,12 +17,13 @@ import { useDonnees, type Source } from './donnees/useDonnees';
 import { useSynchroBoutique } from './donnees/useSynchroBoutique';
 import { AjoutFichier, type BilanImport } from './ecrans/AjoutFichier';
 import { EcranMessage } from './ecrans/EcranMessage';
+import { IconeCroix, IconeReglages } from './ecrans/Icones';
 import { MesBusiness } from './ecrans/MesBusiness';
 import { VueEnsemble } from './ecrans/VueEnsemble';
 import { Reglages, type Compte } from './ecrans/Reglages';
 import { SaisieVideo } from './ecrans/SaisieVideo';
 import { TableauDeBord } from './ecrans/TableauDeBord';
-import { dateParis } from './temps';
+import { dateParis, heureParis, quandParis } from './temps';
 import type { Vente } from './ventes/modele';
 
 type Fenetre =
@@ -159,9 +160,16 @@ function Cockpit({
 
   const reglages = (
     <button className="bouton icone-seule" aria-label="Réglages" onClick={() => setFenetre({ type: 'reglages' })}>
-      ⚙
+      <IconeReglages />
     </button>
   );
+  // « À jour à 04h47 » : la dernière actualisation réussie d'un compte relié (le jour aussi, si ce n'est pas aujourd'hui).
+  const derniere = relies?.reduce<string | null>((plus, c) => (c.derniereSynchro && (!plus || c.derniereSynchro > plus) ? c.derniereSynchro : plus), null);
+  const aJour = derniere
+    ? dateParis(new Date(derniere)) === aujourdhui
+      ? `à jour à ${heureParis(new Date(derniere)).replace(':', 'h')}`
+      : `à jour le ${quandParis(new Date(derniere))}`
+    : null;
   // En ligne, tout arrive des comptes reliés : on actualise, ou on relie. Sur l'appareil seul, on note à la main.
   const actions = enLigne ? (
     <nav className="barre" aria-label="Actions">
@@ -170,8 +178,9 @@ function Cockpit({
           Relier mes comptes
         </button>
       ) : (
-        <button className="bouton principal" disabled={boutique.enCours} onClick={() => void boutique.synchroniser()}>
-          {boutique.enCours ? 'Actualisation…' : 'Actualiser'}
+        <button className="bouton principal actualiser" disabled={boutique.enCours} onClick={() => void boutique.synchroniser()}>
+          <span className="actualiser-texte">{boutique.enCours ? 'Actualisation…' : 'Actualiser'}</span>
+          {aJour && !boutique.enCours && <span className="a-jour">{aJour}</span>}
         </button>
       )}
       {reglages}
@@ -193,8 +202,8 @@ function Cockpit({
       {erreur && (
         <div className="bandeau-erreur" role="alert">
           <span>{erreur}</span>
-          <button className="bouton discret" onClick={effacerErreur} aria-label="Fermer le message">
-            ✕
+          <button className="bouton discret icone-seule" onClick={effacerErreur} aria-label="Fermer le message">
+            <IconeCroix />
           </button>
         </div>
       )}
@@ -204,8 +213,8 @@ function Cockpit({
           <button className="bouton discret" onClick={() => setFenetre({ type: 'reglages' })}>
             Voir mes comptes reliés
           </button>
-          <button className="bouton discret" onClick={boutique.effacerErreur} aria-label="Fermer le message">
-            ✕
+          <button className="bouton discret icone-seule" onClick={boutique.effacerErreur} aria-label="Fermer le message">
+            <IconeCroix />
           </button>
         </div>
       )}
