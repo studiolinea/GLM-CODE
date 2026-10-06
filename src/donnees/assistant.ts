@@ -2,7 +2,7 @@ import type { Periode } from '../calculs/resume';
 import { ETAPES_PREPARATION, type EtapePreparation } from './preparation';
 import { appelerServeur } from './comptesRelies';
 
-export type QuestionAssistant = 'preparation' | 'priorites' | 'ventes' | 'videos' | 'frais';
+export type QuestionAssistant = 'preparation' | 'priorites' | 'ventes' | 'videos' | 'frais' | 'essai-synthetique';
 export interface ReponseAssistant { texte: string; genereLe: string; modele: string; avertissement?: string; actions?: { id: EtapePreparation; raison: string }[] }
 
 /** Aucun chiffre ni texte libre envoyé par le navigateur : le serveur lit les agrégats autorisés. */
@@ -25,4 +25,9 @@ export function empreinteAnalyse(ventes: readonly import('../ventes/modele').Ven
     ventes: ventes.map((v) => [v.plateforme, v.numeroCommande, v.instant, v.montantCentimes, v.fraisCentimes, v.tvaCentimes ?? null, v.rembourse, v.produit]).sort((a, b) => String(a[0]).localeCompare(String(b[0])) || String(a[1]).localeCompare(String(b[1]))),
     videos: videos.map((v) => [v.id, v.instant, v.reseau, v.vues ?? null]).sort((a, b) => String(a[0]).localeCompare(String(b[0]))),
   });
+}
+
+/** Un essai ne propose aucune commande susceptible de modifier la préparation réelle. */
+export function actionsApplicables(question: QuestionAssistant, reponse: ReponseAssistant): NonNullable<ReponseAssistant['actions']> {
+  return question === 'essai-synthetique' ? [] : reponse.actions ?? [];
 }

@@ -1,3 +1,4 @@
+import { contexteEssaisSynthetiques } from './essais';
 import { recupererSansRedirection } from './redirections';
 import { entetesSupabaseServeur } from "./authSupabase";
 
@@ -11,6 +12,7 @@ import type { Recuperateur } from './commun';
 
 export interface ConfigurationIA {
   IA_ACTIVEE?: string;
+  IA_ESSAIS_ACTIVES?: string;
   IA_MODE?: string;
   IA_PLAN_VERIFIE?: string;
   IA_TRANSFERT_AUTORISE?: string;
@@ -23,12 +25,12 @@ export interface ConfigurationIA {
   SUPABASE_URL: string;
   SUPABASE_CLE_PUBLIQUE: string;
 }
-export type QuestionIA = 'priorites' | 'ventes' | 'videos' | 'frais' | 'preparation';
+export type QuestionIA = 'priorites' | 'ventes' | 'videos' | 'frais' | 'preparation' | 'essai-synthetique';
 export interface ActionAssistant {
   id: 'boutique' | 'paiement' | 'publications' | 'rythme';
   raison: string;
 }
-export const QUESTIONS_IA: readonly string[] = ['priorites', 'ventes', 'videos', 'frais', 'preparation'];
+export const QUESTIONS_IA: readonly string[] = ['priorites', 'ventes', 'videos', 'frais', 'preparation', 'essai-synthetique'];
 export const MODELE_CLOUDFLARE_GRATUIT = '@cf/meta/llama-3.1-8b-instruct-fp8';
 export const MODELE_GROQ_GRATUIT = 'openai/gpt-oss-120b';
 const URL_GROQ_GRATUIT = 'https://api.groq.com/openai/v1/chat/completions';
@@ -112,6 +114,8 @@ export async function analyserBusiness(
   limiter: LimiteurAssistant = limiteurAssistant,
   empreinteConnue?: string | null,
 ): Promise<{ texte: string; genereLe: string; modele: string; avertissement: string; actions: ActionAssistant[]; empreinte: string; inchange?: boolean }> {
+  const synthetique = question === 'essai-synthetique';
+  if (synthetique && env.IA_ESSAIS_ACTIVES !== 'oui') throw new ErreurAssistant(403, 'Les essais synthétiques sont désactivés sur le serveur.');
   if (env.IA_ACTIVEE !== 'oui') {
     throw new ErreurAssistant(503, 'L’IA distante est désactivée : le budget d’appels payants est fixé à zéro.');
   }
@@ -138,78 +142,82 @@ export async function analyserBusiness(
     }
     if (!limiter(userId, businessId)) throw new ErreurAssistant(429, 'Attends une minute avant une nouvelle analyse de ce business.');
 
-    // Un jour de marge couvre le décalage UTC/Paris. Les calculs retirent ensuite cette marge.
-    const debut = ajouterJours(bornesPeriode(periode, dateParis(maintenant)).debut, -1);
-    const debutVideos = ajouterJours(dateParis(maintenant), -7);
-    const lireTable = async (table: string, select: string, ordre: string, depuis: string): Promise<Record<string, unknown>[]> => {
-      const lignes: Record<string, unknown>[] = [];
-      for (let offset = 0; offset <= LIGNES_MAX; offset += PAGE) {
-        const lot = await lireJSON(await base(table, { ...filtre, select, order: ordre,
-          instant: `gte.${depuis}T00:00:00Z`, limit: String(PAGE), offset: String(offset) }));
-        if (!Array.isArray(lot)) throw indisponible();
-        if (lignes.length + lot.length > LIGNES_MAX) {
-          throw new ErreurAssistant(503, 'Trop de lignes pour cette analyse (limite de 10 000 par type de données). Choisis une période plus courte.');
+    const lireDonneesReelles = async () => {
+      // Un jour de marge couvre le décalage UTC/Paris. Les calculs retirent ensuite cette marge.
+      const debut = ajouterJours(bornesPeriode(periode, dateParis(maintenant)).debut, -1);
+      const debutVideos = ajouterJours(dateParis(maintenant), -7);
+      const lireTable = async (table: string, select: string, ordre: string, depuis: string): Promise<Record<string, unknown>[]> => {
+        const lignes: Record<string, unknown>[] = [];
+        for (let offset = 0; offset <= LIGNES_MAX; offset += PAGE) {
+          const lot = await lireJSON(await base(table, { ...filtre, select, order: ordre,
+            instant: `gte.${depuis}T00:00:00Z`, limit: String(PAGE), offset: String(offset) }));
+          if (!Array.isArray(lot)) throw indisponible();
+          if (lignes.length + lot.length > LIGNES_MAX) {
+            throw new ErreurAssistant(503, 'Trop de lignes pour cette analyse (limite de 10 000 par type de données). Choisis une période plus courte.');
+          }
+          lignes.push(...lot.map(objet));
+          if (lot.length < PAGE) return lignes;
         }
-        lignes.push(...lot.map(objet));
-        if (lot.length < PAGE) return lignes;
-      }
-      throw indisponible();
-    };
-    const [lignesVentes, lignesVideos, reglages, comptesRelies] = await Promise.all([
-      lireTable('ventes', 'plateforme,instant,montant_centimes,frais_centimes,tva_centimes,rembourse', 'instant.asc,plateforme.asc,numero_commande.asc', debut),
-      lireTable('videos', 'instant,reseau,vues', 'instant.asc,id.asc', debutVideos),
-      base('reglages', { ...filtre, select: 'objectif_par_jour,couverture', limit: '1' }).then(lireJSON),
-      // Facultatif : une ancienne base peut ne pas proposer les comptes reliés.
-      base('comptes_relies', { ...filtre, select: 'source,derniere_synchro,derniere_erreur', limit: '100' }).then(lireJSON).catch(() => null),
-    ]);
-    if (!Array.isArray(reglages) || reglages.length > 1) throw indisponible();
-    const reglage = reglages[0] === undefined ? null : objet(reglages[0]);
-    const objectif = reglage ? entier(reglage.objectif_par_jour) : null;
-    const couverture = reglage?.couverture == null ? null : instant(reglage.couverture);
-    const ventes: Vente[] = lignesVentes.map((ligne) => {
-      if (typeof ligne.plateforme !== 'string' || typeof ligne.rembourse !== 'boolean') throw indisponible();
-      return {
-        plateforme: ligne.plateforme, instant: instant(ligne.instant), montantCentimes: entier(ligne.montant_centimes),
-        fraisCentimes: ligne.frais_centimes === null ? null : entier(ligne.frais_centimes),
-        ...(ligne.tva_centimes == null ? {} : { tvaCentimes: entier(ligne.tva_centimes) }),
-        rembourse: ligne.rembourse, produit: '', numeroCommande: '',
+        throw indisponible();
       };
-    }).filter((vente) => !vente.plateforme.endsWith('-test'));
-    const videos: Video[] = lignesVideos.map((ligne) => {
-      if (ligne.reseau !== 'tiktok' && ligne.reseau !== 'instagram') throw indisponible();
-      return { id: '', instant: instant(ligne.instant), reseau: ligne.reseau,
-        ...(ligne.vues == null ? {} : { vues: entier(ligne.vues) }) };
-    });
-    const semaine = rythmeSemaine(videos, objectif ?? 0, maintenant);
-    const donnees = {
-      resume: calculerResume(ventes, periode, maintenant),
-      jourParis: dateParis(maintenant),
-      resumeJour: {
-        ...calculerResume(ventes.filter((vente) => dateParis(new Date(vente.instant)) === dateParis(maintenant)), '7j', maintenant),
-        periode: 'jour', debut: dateParis(maintenant), fin: dateParis(maintenant),
-      },
-      rythme: { publiees: semaine.publiees, objectif: objectif === null ? null : semaine.objectif },
-      videos: {
-        debut: ajouterJours(dateParis(maintenant), -6), fin: dateParis(maintenant),
-        parReseau: (['tiktok', 'instagram'] as const).map((reseau) => {
-          const liste = videos.filter((video) => video.reseau === reseau && dateParis(new Date(video.instant)) >= ajouterJours(dateParis(maintenant), -6)
-            && dateParis(new Date(video.instant)) <= dateParis(maintenant));
-          return { reseau, publiees: liste.length,
-            vuesConnues: liste.reduce((total, video) => total + (video.vues ?? 0), 0),
-            videosSansVues: liste.filter((video) => video.vues === undefined).length };
-        }),
-        precision: 'Les vues sont le cumul connu des vidéos publiées dans cette fenêtre ; elles ne sont pas les vues gagnées pendant la fenêtre.',
-      },
-      couvertureVentes: couverture,
-      sources: Array.isArray(comptesRelies) ? comptesRelies.map((valeur) => {
-        const ligne = objet(valeur);
-        if (!['stripe', 'lemonsqueezy', 'tiktok', 'instagram', 'shopify'].includes(String(ligne.source))) throw indisponible();
-        return { source: ligne.source, derniereSynchro: ligne.derniere_synchro == null ? null : instant(ligne.derniere_synchro),
-          enErreur: ligne.derniere_erreur != null };
-      }) : null,
-      coutsPublicitairesEtAutresDepenses: null,
-      uniteMontants: 'centimes d’euros', fuseau: 'Europe/Paris',
+      const [lignesVentes, lignesVideos, reglages, comptesRelies] = await Promise.all([
+        lireTable('ventes', 'plateforme,instant,montant_centimes,frais_centimes,tva_centimes,rembourse', 'instant.asc,plateforme.asc,numero_commande.asc', debut),
+        lireTable('videos', 'instant,reseau,vues', 'instant.asc,id.asc', debutVideos),
+        base('reglages', { ...filtre, select: 'objectif_par_jour,couverture', limit: '1' }).then(lireJSON),
+        // Facultatif : une ancienne base peut ne pas proposer les comptes reliés.
+        base('comptes_relies', { ...filtre, select: 'source,derniere_synchro,derniere_erreur', limit: '100' }).then(lireJSON).catch(() => null),
+      ]);
+      if (!Array.isArray(reglages) || reglages.length > 1) throw indisponible();
+      const reglage = reglages[0] === undefined ? null : objet(reglages[0]);
+      const objectif = reglage ? entier(reglage.objectif_par_jour) : null;
+      const couverture = reglage?.couverture == null ? null : instant(reglage.couverture);
+      const ventes: Vente[] = lignesVentes.map((ligne) => {
+        if (typeof ligne.plateforme !== 'string' || typeof ligne.rembourse !== 'boolean') throw indisponible();
+        return {
+          plateforme: ligne.plateforme, instant: instant(ligne.instant), montantCentimes: entier(ligne.montant_centimes),
+          fraisCentimes: ligne.frais_centimes === null ? null : entier(ligne.frais_centimes),
+          ...(ligne.tva_centimes == null ? {} : { tvaCentimes: entier(ligne.tva_centimes) }),
+          rembourse: ligne.rembourse, produit: '', numeroCommande: '',
+        };
+      }).filter((vente) => !vente.plateforme.endsWith('-test'));
+      const videos: Video[] = lignesVideos.map((ligne) => {
+        if (ligne.reseau !== 'tiktok' && ligne.reseau !== 'instagram') throw indisponible();
+        return { id: '', instant: instant(ligne.instant), reseau: ligne.reseau,
+          ...(ligne.vues == null ? {} : { vues: entier(ligne.vues) }) };
+      });
+      const semaine = rythmeSemaine(videos, objectif ?? 0, maintenant);
+      const donnees = {
+        resume: calculerResume(ventes, periode, maintenant),
+        jourParis: dateParis(maintenant),
+        resumeJour: {
+          ...calculerResume(ventes.filter((vente) => dateParis(new Date(vente.instant)) === dateParis(maintenant)), '7j', maintenant),
+          periode: 'jour', debut: dateParis(maintenant), fin: dateParis(maintenant),
+        },
+        rythme: { publiees: semaine.publiees, objectif: objectif === null ? null : semaine.objectif },
+        videos: {
+          debut: ajouterJours(dateParis(maintenant), -6), fin: dateParis(maintenant),
+          parReseau: (['tiktok', 'instagram'] as const).map((reseau) => {
+            const liste = videos.filter((video) => video.reseau === reseau && dateParis(new Date(video.instant)) >= ajouterJours(dateParis(maintenant), -6)
+              && dateParis(new Date(video.instant)) <= dateParis(maintenant));
+            return { reseau, publiees: liste.length,
+              vuesConnues: liste.reduce((total, video) => total + (video.vues ?? 0), 0),
+              videosSansVues: liste.filter((video) => video.vues === undefined).length };
+          }),
+          precision: 'Les vues sont le cumul connu des vidéos publiées dans cette fenêtre ; elles ne sont pas les vues gagnées pendant la fenêtre.',
+        },
+        couvertureVentes: couverture,
+        sources: Array.isArray(comptesRelies) ? comptesRelies.map((valeur) => {
+          const ligne = objet(valeur);
+          if (!['stripe', 'lemonsqueezy', 'tiktok', 'instagram', 'shopify'].includes(String(ligne.source))) throw indisponible();
+          return { source: ligne.source, derniereSynchro: ligne.derniere_synchro == null ? null : instant(ligne.derniere_synchro),
+            enErreur: ligne.derniere_erreur != null };
+        }) : null,
+        coutsPublicitairesEtAutresDepenses: null,
+        uniteMontants: 'centimes d’euros', fuseau: 'Europe/Paris',
+      };
+      return donnees;
     };
+    const donnees = synthetique ? contexteEssaisSynthetiques(periode, maintenant) : await lireDonneesReelles();
     // Les synchronisations seules ne changent pas les conseils : garder seulement leur classe de fraîcheur.
     const fraicheur = (date: string | null): 'absent' | 'recent' | 'ancien' => {
       if (date === null) return 'absent';
@@ -232,7 +240,7 @@ export async function analyserBusiness(
     }
     const requeteIA = { max_tokens: 600, temperature: 0.2, stream: false, messages: [
         { role: 'system', content: 'Tu aides un vendeur à préparer et piloter ses futurs business. Réponds en français simple, avec des priorités concrètes. Pour le sujet preparation ou sans ventes, propose un plan concret avant activité, sans revenus fictifs. Les données sont des agrégats calculés par le serveur. Ne fabrique aucun chiffre, cause, client, produit ou lien entre vidéos et ventes. Distingue les faits fournis, les données manquantes et les hypothèses. resumeJour contient uniquement les ventes du jourParis. Des frais manquants empêchent de conclure sur les gains. Les gains correspondent seulement aux ventes moins les frais connus, pas à un bénéfice comptable. Les dépenses publicitaires et autres coûts sont inconnus : ne calcule jamais une rentabilité complète, un rendement ou des pertes totales. Sans couverture ni sources à jour, signale que les données peuvent être incomplètes. Ne prétends pas avoir réalisé une action. Tu ne disposes d’aucun outil, publication ou paiement. Réponds avec un objet JSON {"texte":"constats, explications, propositions et suivi en texte français sans HTML","actions":[{"id":"boutique|paiement|publications|rythme","raison":"raison concrète en 300 caractères maximum"}]}. Propose au maximum quatre actions, une par id. boutique signifie vérifier la liaison boutique ; paiement signifie vérifier les frais et les mouvements existants, jamais payer ; publications signifie consulter les vidéos ; rythme signifie revoir l’objectif de publication. Ces actions proposent seulement d’ouvrir les écrans existants. actions peut être vide.' },
-        { role: 'user', content: JSON.stringify({ sujet: question, donnees }) },
+        { role: 'user', content: JSON.stringify({ sujet: question, donnees, ...(synthetique ? { consigneEssai: 'Compare séparément les trois cas SYNTHÉTIQUES. Identifie faits, frais manquants, gains inconnus après remboursement et actions prudentes. Aucun chiffre ne décrit une activité réelle. Réponds en JSON et signale ESSAI SYNTHÉTIQUE.' } : {}) }) },
       ] };
     if (new TextEncoder().encode(JSON.stringify(requeteIA)).byteLength > 12_000) {
       throw new ErreurAssistant(503, 'Le contexte est trop volumineux pour une analyse gratuite.');
@@ -277,23 +285,31 @@ export async function analyserBusiness(
       const reponse = await recuperer(URL_GROQ_GRATUIT, {
         method: 'POST', signal: controleur.signal,
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${env.IA_CLE}` },
-        body: JSON.stringify({ model: modele, ...requeteIA }),
+        body: JSON.stringify({ model: modele, messages: requeteIA.messages, temperature: requeteIA.temperature, stream: false, max_completion_tokens: 1800, reasoning_effort: "low", include_reasoning: false, response_format: { type: "json_object" } }),
       });
       if (reponse.status === 429) {
         throw new ErreurAssistant(429, 'Le quota gratuit Groq est atteint. Aucun autre fournisseur n’est utilisé. Réessaie plus tard.');
       }
-      const resultat = objet(await lireJSON(reponse, 65_536));
+      if (!reponse.ok) throw new ErreurAssistant(503, `Le fournisseur Groq a refusé l’analyse (statut HTTP ${reponse.status}). Aucun détail privé n’est affiché.`);
+      let resultat: Record<string, unknown>;
+      try { resultat = objet(await lireJSON(reponse, 65_536)); }
+      catch { throw new ErreurAssistant(503, 'Le fournisseur a renvoyé une réponse illisible (JSON invalide).'); }
       const choix = resultat.choices;
       if (!Array.isArray(choix) || !choix[0]) throw indisponible();
-      message = objet(objet(choix[0]).message);
+      const completion = objet(choix[0]);
+      if (completion.finish_reason === 'length') throw new ErreurAssistant(503, 'L’analyse a été interrompue : sortie trop courte pour fournir une réponse complète. Réessaie plus tard.');
+      message = objet(completion.message);
     }
     const contenu = message.content;
-    if (typeof contenu !== 'string' || !contenu.trim() || contenu.length > 12_000 || message.tool_calls || message.function_call) throw indisponible();
+    if (typeof contenu !== 'string' || !contenu.trim()) throw new ErreurAssistant(503, 'Le modèle n’a fourni aucun texte : contenu absent.');
+    if (contenu.length > 12_000 || message.tool_calls || message.function_call) throw indisponible();
     let texte = contenu.trim();
     let actions: ActionAssistant[] = [];
     const sansBloc = texte.replace(/^```(?:json)?\s*\n?([\s\S]*?)\n?```$/, '$1').trim();
     if (sansBloc.startsWith('{')) {
-      const structure = objet(JSON.parse(sansBloc));
+      let structure: Record<string, unknown>;
+      try { structure = objet(JSON.parse(sansBloc)); }
+      catch { throw new ErreurAssistant(503, 'Le modèle a fourni une réponse illisible (JSON invalide).'); }
       if (typeof structure.texte !== 'string' || !structure.texte.trim() || structure.texte.length > 12_000) throw indisponible();
       texte = structure.texte.trim();
       if (structure.actions !== undefined) {
@@ -309,7 +325,7 @@ export async function analyserBusiness(
       }
     }
     return {
-      texte, actions, genereLe: maintenant.toISOString(), modele, empreinte,
+      texte: synthetique ? "ESSAI SYNTHÉTIQUE — aucun chiffre réel. " + texte : texte, actions, genereLe: maintenant.toISOString(), modele, empreinte,
       avertissement: 'Cette réponse de l’IA peut contenir des erreurs et des hypothèses. Vérifie les conseils avec les chiffres de l’application avant de décider.',
     };
   } catch (e) {

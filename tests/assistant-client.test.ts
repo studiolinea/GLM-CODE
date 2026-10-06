@@ -40,3 +40,10 @@ describe('empreinte données pour analyse automatique', () => {
     expect(empreinteAnalyse([vente, autre], [video], null, 1)).toBe(empreinteAnalyse([autre, vente], [video], null, 1));
   });
 });
+
+it('un essai synthétique ne peut jamais proposer de modifier la vraie checklist', async () => {
+  const { actionsApplicables } = await import('../src/donnees/assistant');
+  const reponse = { texte: 'Essai', genereLe: '2026-10-06T12:00:00Z', modele: 'modele', actions: [{ id: 'paiement' as const, raison: 'Synthétique' }] };
+  expect(actionsApplicables('essai-synthetique', reponse)).toEqual([]);
+  expect(actionsApplicables('frais', reponse)).toEqual(reponse.actions);
+});

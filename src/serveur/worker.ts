@@ -40,6 +40,7 @@ export interface Env extends ConfigurationIA {
   IA_CLE?: string;
   /** Absent par défaut : aucune requête IA distante tant que l’activation explicite ne vaut pas « oui ». */
   IA_ACTIVEE?: string;
+  IA_ESSAIS_ACTIVES?: string;
 }
 
 /** Les boutiques que l'appli sait relier. */

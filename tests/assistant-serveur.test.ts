@@ -301,7 +301,7 @@ describe('Groq gratuit proposé sans activation implicite', () => {
     expect((await traiterApi(appel(), { ...env, IA_URL: 'https://site-interdit.test/voler-cle' }, recuperer)).status).toBe(200);
     const fournisseur = recuperer.mock.calls.find(([adresse]) => new URL(String(adresse)).host === 'api.groq.com');
     expect(String(fournisseur?.[0])).toBe('https://api.groq.com/openai/v1/chat/completions');
-    expect(JSON.parse(String(fournisseur?.[1]?.body))).toMatchObject({ model: 'openai/gpt-oss-120b', max_tokens: 600 });
+    expect(JSON.parse(String(fournisseur?.[1]?.body))).toMatchObject({ model: 'openai/gpt-oss-120b', max_completion_tokens: 1800, reasoning_effort: 'low', include_reasoning: false, response_format: { type: 'json_object' } });
     expect(recuperer.mock.calls.some(([adresse]) => new URL(String(adresse)).host === 'site-interdit.test')).toBe(false);
   });
 
@@ -350,4 +350,40 @@ it.each(['/auth/v1/user', '/rest/v1/business', '/rest/v1/rpc/reserver_analyse_as
   expect(recuperer.mock.calls.some(([u]) => String(u).includes('tiers-interdit'))).toBe(false);
   const provider = recuperer.mock.calls.some(([u]) => String(u).includes('api.groq.com'));
   expect(provider).toBe(chemin === '/openai/v1/chat/completions');
+});
+
+it('requête normale Groq réserve le budget et sépare raisonnement et sortie JSON', async () => {
+  const recuperer = faux();
+  expect((await traiterApi(appel(), env, recuperer)).status).toBe(200);
+  expect(recuperer.mock.calls.filter(([adresse]) => String(adresse).includes('reserver_analyse_assistant'))).toHaveLength(1);
+  const ia = recuperer.mock.calls.find(([adresse]) => String(adresse).includes('api.groq.com'));
+  const corps = JSON.parse(String(ia?.[1]?.body));
+  expect(corps).toMatchObject({ max_completion_tokens: 1800, reasoning_effort: 'low', include_reasoning: false, response_format: { type: 'json_object' } });
+  expect(corps.max_tokens).toBeUndefined();
+});
+
+it('explique une sortie tronquée sans révéler le contenu fournisseur', async () => {
+  const normal = faux();
+  const recuperer: typeof fetch = (adresse, init) => String(adresse).includes('api.groq.com')
+    ? Promise.resolve(Response.json({ choices: [{ finish_reason: 'length', message: { content: 'SECRET_BRUT' } }] })) : normal(adresse, init);
+  const reponse = await traiterApi(appel(), env, recuperer);
+  expect(reponse.status).toBe(503);
+  const texte = JSON.stringify(await reponse.json());
+  expect(texte).toContain('sortie trop courte');
+  expect(texte).not.toContain('SECRET_BRUT');
+});
+
+it.each([
+  { reponse: () => new Response('SECRET_BRUT', { status: 400 }), attendu: 'statut HTTP 400' },
+  { reponse: () => Response.json({ choices: [{ message: { content: '' } }] }), attendu: 'contenu absent' },
+  { reponse: () => Response.json({ choices: [{ message: { content: '{"SECRET_BRUT"' } }] }), attendu: 'réponse illisible' },
+  { reponse: () => new Response('SECRET_BRUT', { status: 200 }), attendu: 'réponse illisible' },
+])('diagnostic sûr $attendu', async ({ reponse: fournisseur, attendu }) => {
+  const normal = faux();
+  const recuperer: typeof fetch = (adresse, init) => String(adresse).includes('api.groq.com') ? Promise.resolve(fournisseur()) : normal(adresse, init);
+  const reponse = await traiterApi(appel(), env, recuperer);
+  expect(reponse.status).toBe(503);
+  const texte = JSON.stringify(await reponse.json());
+  expect(texte).toContain(attendu);
+  expect(texte).not.toContain('SECRET_BRUT');
 });

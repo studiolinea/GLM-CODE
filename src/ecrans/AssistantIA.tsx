@@ -1,17 +1,18 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Action } from '../alertes/alertes';
 import { PERIODES, type Periode } from '../calculs/resume';
-import { analyserAvecIA, type QuestionAssistant, type ReponseAssistant } from '../donnees/assistant';
+import { actionsApplicables, analyserAvecIA, type QuestionAssistant, type ReponseAssistant } from '../donnees/assistant';
 import { appelerServeur } from '../donnees/comptesRelies';
 import { preparationFaite, type EtapePreparation } from '../donnees/preparation';
 import { useVeille } from '../donnees/useVeille';
 import type { EtatAlerte } from '../modele';
 import { quandParis } from '../temps';
 
-const QUESTIONS: Record<QuestionAssistant, string> = { preparation: 'Préparer mon lancement', priorites: 'Que prioriser ?', ventes: 'Lire mes ventes', videos: 'Lire mon rythme', frais: 'Comprendre mes frais' };
+const QUESTIONS: Record<QuestionAssistant, string> = { preparation: 'Préparer mon lancement', priorites: 'Que prioriser ?', ventes: 'Lire mes ventes', videos: 'Lire mon rythme', frais: 'Comprendre mes frais', 'essai-synthetique': 'Essai synthétique' };
 interface Disponibilite { disponible: boolean; mode: 'cloudflare-gratuit' | 'groq-gratuit'; raison: string }
 
 export function AssistantIA({ businessId, periode, exemple, etatsPreparation, onPreparation, onAction }: { businessId?: string; periode: Periode; exemple: boolean; etatsPreparation: Record<string, EtatAlerte>; onPreparation: (etape: EtapePreparation, fait: boolean) => void; onAction: (action: Action) => void }) {
+  const essaisVisibles = new URLSearchParams(window.location.search).get("essai-ia") === "synthetique";
   const [historique, setHistorique] = useState<{ question: QuestionAssistant; periode: Periode; reponse: ReponseAssistant }[]>([]);
   const [disponibilite, setDisponibilite] = useState<Disponibilite | null>(null);
   const [occupe, setOccupe] = useState(false);
@@ -44,7 +45,7 @@ export function AssistantIA({ businessId, periode, exemple, etatsPreparation, on
     {exemple ? <p className="note">Commence avec un business vide pour préparer ton lancement. Les données d’exemple ne sont jamais envoyées à l’IA.</p> : !businessId ? <p className="note">La veille à distance nécessite un compte en ligne. La lecture locale reste disponible sur cet appareil.</p> : <>
       <p className="note">{disponibilite ? disponibilite.disponible ? `IA gratuite ${disponibilite.mode === 'groq-gratuit' ? 'Groq' : 'Cloudflare'} disponible, dans les limites du quota.` : disponibilite.raison : 'Vérification de l’IA gratuite…'}</p>
       <p className="note">Les ventes, frais et le rythme agrégés de ce business sont transmis à {disponibilite?.mode === 'groq-gratuit' ? 'Groq' : 'Cloudflare'}. Période à la demande : {PERIODES[periode].libelle}.</p>
-      <div className="assistant-questions">{(Object.keys(QUESTIONS) as QuestionAssistant[]).map((question) => <button key={question} className="bouton contour" disabled={occupe || !disponibilite?.disponible} onClick={() => void demander(question)}>{QUESTIONS[question]}</button>)}</div>
+      <div className="assistant-questions">{(Object.keys(QUESTIONS) as QuestionAssistant[]).filter((q) => q !== "essai-synthetique" || essaisVisibles).map((question) => <button key={question} className="bouton contour" disabled={occupe || !disponibilite?.disponible} onClick={() => void demander(question)}>{QUESTIONS[question]}</button>)}</div>
       <div className="assistant-veille"><h3>Veille à distance</h3><label className="assistant-auto"><input type="checkbox" checked={veille.etat?.active ?? false} disabled={veille.occupe || (!veille.etat?.active && !disponibilite?.disponible)} onChange={(e) => void veille.activer(e.target.checked)} /><span>Activer les contrôles périodiques dans le cloud</span></label>
       <p className="note">En l’activant, tu autorises la lecture des comptes reliés et l’analyse des agrégats sur {disponibilite?.mode === 'groq-gratuit' ? 'Groq' : 'Cloudflare'}. Contrôles selon la file et les quotas. IA seulement quand les données changent : au maximum 4 analyses par jour pour ce business et 40 analyses par jour pour toute l’application, jours en UTC, sous réserve du quota gratuit du fournisseur. Les résultats apparaissent ici ; aucun message extérieur.</p>
       <button className="bouton discret" disabled={veille.occupe} onClick={() => void veille.lire()}>Lire le dernier résultat</button>
@@ -53,6 +54,6 @@ export function AssistantIA({ businessId, periode, exemple, etatsPreparation, on
     </>}
     <div role="status">{occupe && <p className="texte-doux">Analyse en cours…</p>}</div>
     {erreur && <p className="erreur" role="alert">{erreur} La lecture locale des chiffres reste disponible.</p>}
-    <div className="assistant-historique" aria-live="polite">{historique.map((tour, i) => <article key={i} className="assistant-reponse"><h3>{QUESTIONS[tour.question]} · {PERIODES[tour.periode].libelle}</h3><p className="note">{quandParis(new Date(tour.reponse.genereLe))} · modèle : {tour.reponse.modele}</p><p className="assistant-texte">{tour.reponse.texte}</p>{plan(tour.reponse.actions)}{tour.reponse.avertissement && <p className="note">{tour.reponse.avertissement}</p>}<p className="note">Conseils à vérifier avec les chiffres. Historique temporaire effacé au changement de business.</p></article>)}</div>
+    <div className="assistant-historique" aria-live="polite">{historique.map((tour, i) => <article key={i} className="assistant-reponse"><h3>{QUESTIONS[tour.question]} · {PERIODES[tour.periode].libelle}</h3><p className="note">{quandParis(new Date(tour.reponse.genereLe))} · modèle : {tour.reponse.modele}</p><p className="assistant-texte">{tour.question === "essai-synthetique" && <strong className="tag">ESSAI SYNTHÉTIQUE · aucun chiffre réel</strong>}{tour.reponse.texte}</p>{plan(actionsApplicables(tour.question, tour.reponse))}{tour.reponse.avertissement && <p className="note">{tour.reponse.avertissement}</p>}<p className="note">Conseils à vérifier avec les chiffres. Historique temporaire effacé au changement de business.</p></article>)}</div>
   </section>;
 }
