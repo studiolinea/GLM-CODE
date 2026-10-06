@@ -530,8 +530,36 @@ a.bouton {
     border-radius: 20px;
   }
 }
+.feuille-tete {
+  position: sticky;
+  top: -20px;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: -20px -18px 16px;
+  padding: 16px 18px 12px;
+  background: var(--panneau);
+  border-bottom: 1px solid var(--bord);
+}
+.fermer-feuille {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--bord);
+  border-radius: 999px;
+  background: var(--case);
+  color: var(--texte);
+  font-size: 1.1rem;
+  cursor: pointer;
+}
+.fermer-feuille:focus-visible {
+  outline: 2px solid var(--ambre);
+  outline-offset: 2px;
+}
 .feuille h2 {
-  margin: 0 0 16px;
+  margin: 0;
   font-family: var(--police-titre);
   font-weight: 700;
   font-size: 1rem;
