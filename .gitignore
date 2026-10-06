@@ -4,3 +4,9 @@ dist/
 *.log
 .env.local
 .env.*.local
+.dev.vars
+.dev.vars.*
+.wrangler/
+
+# Copies de travail temporaires des agents
+.claude/worktrees/

@@ -38,15 +38,26 @@ function base64url(octets: Uint8Array): string {
   return btoa(texte).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
+function cleEtat(secret: string): Promise<CryptoKey> {
+  return crypto.subtle.importKey('raw', encodeur.encode(`etat-tiktok:${secret}`), { name: 'HMAC', hash: 'SHA-256' }, false, [
+    'sign',
+    'verify',
+  ]);
+}
+
 async function signature(contenu: string, secret: string): Promise<string> {
-  const cle = await crypto.subtle.importKey(
-    'raw',
-    encodeur.encode(`etat-tiktok:${secret}`),
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign'],
-  );
-  return base64url(new Uint8Array(await crypto.subtle.sign('HMAC', cle, encodeur.encode(contenu))));
+  return base64url(new Uint8Array(await crypto.subtle.sign('HMAC', await cleEtat(secret), encodeur.encode(contenu))));
+}
+
+/** Vérifie la signature sans fuite de temps (crypto.subtle.verify compare en temps constant). */
+async function signatureValable(contenu: string, signe: string, secret: string): Promise<boolean> {
+  try {
+    const brut = atob(signe.replace(/-/g, '+').replace(/_/g, '/'));
+    const octets = Uint8Array.from(brut, (c) => c.charCodeAt(0));
+    return await crypto.subtle.verify('HMAC', await cleEtat(secret), octets, encodeur.encode(contenu));
+  } catch {
+    return false;
+  }
 }
 
 /** L'état garde aussi le business à relier : le retour de TikTok va dans le bon business. */
@@ -58,7 +69,7 @@ export async function creerEtat(userId: string, businessId: string, secret: stri
 /** Le business de l'état s'il est intact, pas expiré, et fait pour cette personne ; sinon null. */
 export async function verifierEtat(etat: string, userId: string, secret: string, maintenant = Date.now()): Promise<string | null> {
   const [contenu, signe] = etat.split('.');
-  if (!contenu || !signe || signe !== (await signature(contenu, secret))) return null;
+  if (!contenu || !signe || !(await signatureValable(contenu, signe, secret))) return null;
   try {
     const brut = atob(contenu.replace(/-/g, '+').replace(/_/g, '/'));
     const { u, b, e } = JSON.parse(brut) as { u?: unknown; b?: unknown; e?: unknown };

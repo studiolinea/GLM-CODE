@@ -17,6 +17,13 @@ describe('chiffrement des clés d’accès', () => {
   it('refuse de déchiffrer avec un autre secret', async () => {
     await expect(dechiffrer(await chiffrer('cle', SECRET), 'autre-secret')).rejects.toThrow();
   });
+
+  it('v2 : une clé chiffrée copiée dans la ligne d’un autre compte devient illisible', async () => {
+    const chez = (u: string) => `${u}|biz|stripe|`;
+    const pourB = await chiffrer('rk_live_cle_de_b', SECRET, chez('compte-b'));
+    expect(await dechiffrer(pourB, SECRET, chez('compte-b'))).toBe('rk_live_cle_de_b');
+    await expect(dechiffrer(pourB, SECRET, chez('compte-a'))).rejects.toThrow();
+  });
 });
 
 const commande = (id: string, attributes: CommandeLemonSqueezy['attributes']): CommandeLemonSqueezy => ({ id, attributes });
@@ -41,7 +48,7 @@ describe('commandes Lemon Squeezy → ventes', () => {
     expect(ventes).toEqual([
       {
         plateforme: 'lemonsqueezy',
-        numeroCommande: '101',
+        numeroCommande: '1',
         instant: '2026-10-05T08:15:00.000Z',
         montantCentimes: 1990,
         fraisCentimes: null,
@@ -58,9 +65,9 @@ describe('commandes Lemon Squeezy → ventes', () => {
       commande('4', { order_number: 104, currency: 'EUR', total: 1990, status: 'paid', created_at: '2026-10-04T12:00:00Z', test_mode: true }),
     ]);
     expect(ventes.map((v) => [v.numeroCommande, v.montantCentimes, v.rembourse, v.plateforme])).toEqual([
-      ['102', 1990, true, 'lemonsqueezy'],
-      ['103', 1990, false, 'lemonsqueezy'],
-      ['104', 1990, false, 'lemonsqueezy-test'],
+      ['2', 1990, true, 'lemonsqueezy'],
+      ['3', 1990, false, 'lemonsqueezy'],
+      ['4', 1990, false, 'lemonsqueezy-test'],
     ]);
   });
 
@@ -70,8 +77,19 @@ describe('commandes Lemon Squeezy → ventes', () => {
       commande('6', { order_number: 106, currency: 'USD', total: 1990, status: 'paid', created_at: '2026-10-04T12:00:00Z' }),
     ]);
     expect(ventes).toEqual([]);
-    expect(ignorees.map((i) => i.numero)).toEqual(['105', '106']);
-    expect(ignorees[1]!.raison).toContain('euros');
+    expect(ignorees.map((i) => i.numero)).toEqual(['5', '6']);
+    expect(ignorees[1]!.raison).toBe('vente en USD (seules les ventes en euros sont lues)');
+  });
+
+  it('deux boutiques avec la même commande n°1 : deux ventes, et leur numéro ne change pas quand une boutique s’ajoute', () => {
+    const premiere = commande('1001', { store_id: 1, order_number: 1, currency: 'EUR', total: 1990, status: 'paid', created_at: '2026-10-04T12:00:00Z' });
+    const avant = commandesVersVentes([premiere]).ventes.map((v) => v.numeroCommande);
+    const apres = commandesVersVentes([
+      premiere,
+      commande('2002', { store_id: 2, order_number: 1, currency: 'EUR', total: 4900, status: 'paid', created_at: '2026-10-05T12:00:00Z' }),
+    ]).ventes.map((v) => v.numeroCommande);
+    expect(avant).toEqual(['1001']);
+    expect(apres).toEqual(['1001', '2002']);
   });
 });
 
@@ -136,6 +154,13 @@ describe('serveur : comptes reliés Lemon Squeezy', () => {
     expect(r.status).toBe(401);
   });
 
+  it.each([500, 503, 429])('Supabase Auth en panne (%i) : « réessaie », pas « connexion expirée »', async (statut) => {
+    const recuperer = (async () => new Response('{}', { status: statut })) as typeof fetch;
+    const r = await traiterApi(appel('/api/comptes/lemonsqueezy/synchroniser'), env, recuperer);
+    expect(r.status).toBe(503);
+    expect(((await r.json()) as { erreur: string }).erreur).toContain('Réessaie dans un moment');
+  });
+
   it('chaque compte relié appartient à un business : sans business, rien n’est fait', async () => {
     const f = faux();
     const r = await traiterApi(appel('/api/comptes/lemonsqueezy/relier', { cle: CLE_LS, business: 'pas-un-business' }), env, f.recuperer);
@@ -153,6 +178,9 @@ describe('serveur : comptes reliés Lemon Squeezy', () => {
     const f = faux();
     const r = await traiterApi(appel('/api/comptes/lemonsqueezy/relier', { cle: CLE_LS }), { ...env, CLE_CHIFFREMENT: undefined }, f.recuperer);
     expect(r.status).toBe(503);
+    const { erreur } = (await r.json()) as { erreur: string };
+    expect(erreur).toContain('Réglage du serveur à faire');
+    expect(erreur).toContain('CLE_CHIFFREMENT');
   });
 
   it('refuse une clé que Lemon Squeezy n’accepte pas', async () => {
@@ -168,7 +196,7 @@ describe('serveur : comptes reliés Lemon Squeezy', () => {
     expect(r.status).toBe(200);
     expect(await r.json()).toEqual({ libelle: 'Detailing Pro' });
     expect(f.ligne.libelle).toBe('Detailing Pro');
-    expect(f.ligne.cle_chiffree).toMatch(/^v1:/);
+    expect(f.ligne.cle_chiffree).toMatch(/^v2:/);
     expect(f.ligne.cle_chiffree).not.toContain(CLE_LS);
   });
 
@@ -178,7 +206,7 @@ describe('serveur : comptes reliés Lemon Squeezy', () => {
     const r = await traiterApi(appel('/api/comptes/lemonsqueezy/synchroniser'), env, f.recuperer);
     expect(r.status).toBe(200);
     const corps = (await r.json()) as { ventes: { numeroCommande: string }[]; synchroniseLe: string };
-    expect(corps.ventes.map((v) => v.numeroCommande)).toEqual(['101', '102']);
+    expect(corps.ventes.map((v) => v.numeroCommande)).toEqual(['1', '2']);
     expect(f.ligne.derniere_synchro).toBe(corps.synchroniseLe);
     expect(f.ligne.derniere_erreur).toBeNull();
   });
@@ -309,6 +337,8 @@ describe('paiements Stripe → ventes', () => {
     const { ventes, ignorees } = chargesVersVentes([charge('ch_6', { status: 'failed', paid: false }), charge('ch_7', { currency: 'usd' })]);
     expect(ventes).toEqual([]);
     expect(ignorees.map((i) => i.numero)).toEqual(['ch_6', 'ch_7']);
+    // Le code de la devise en majuscules, et un seul « : » dans « • ch_7 : … »
+    expect(ignorees[1]!.raison).toBe('vente en USD (seules les ventes en euros sont lues)');
   });
 });
 
@@ -442,7 +472,9 @@ describe('serveur : boutique Stripe', () => {
     }) as typeof fetch;
     const r = await traiterApi(appel('/api/comptes/stripe/relier', { cle: 'rk_test_bonne_cle_0123456789' }), env, recuperer);
     expect(r.status).toBe(502);
-    expect(((await r.json()) as { erreur: string }).erreur).toContain('03-boutique-stripe.sql');
+    const { erreur } = (await r.json()) as { erreur: string };
+    expect(erreur).toContain('03-boutique-stripe.sql');
+    expect(erreur).toMatch(/^Réglage du serveur à faire/);
   });
 
   it('une panne pendant l’enregistrement donne un message clair, sans faire tomber le serveur', async () => {

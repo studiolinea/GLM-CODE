@@ -74,7 +74,20 @@ export class DepotSupabase implements Depot {
     const bid = this.businessId;
     const avecBusiness = <T extends object>(ligne: T) => ({ ...ligne, business_id: bid });
 
-    // D'abord les suppressions (utile pour la restauration d'une sauvegarde)…
+    // D'abord les ajouts et les modifications : si la base en refuse un, rien n'a encore été supprimé.
+    for (const lot of paquets(c.ventes.enregistrer.map((v) => avecBusiness(venteVersLigne(v, uid))), PAQUET)) {
+      const { error } = await this.client.from('ventes').upsert(lot, { onConflict: 'user_id,business_id,plateforme,numero_commande' });
+      verifier(error);
+    }
+    for (const lot of paquets(c.videos.enregistrer.map((v) => avecBusiness(videoVersLigne(v, uid))), PAQUET)) {
+      const { error } = await this.client.from('videos').upsert(lot, { onConflict: 'user_id,business_id,id' });
+      verifier(error);
+    }
+    for (const lot of paquets(c.etatsAlertes.enregistrer.map((e) => avecBusiness(etatVersLigne(e.id, e.etat, uid))), PAQUET)) {
+      const { error } = await this.client.from('etats_alertes').upsert(lot, { onConflict: 'user_id,business_id,alerte_id' });
+      verifier(error);
+    }
+    // … puis les suppressions (utiles pour la restauration d'une sauvegarde). Les deux listes ne se recoupent pas.
     const parPlateforme = new Map<string, string[]>();
     for (const v of c.ventes.supprimer) parPlateforme.set(v.plateforme, [...(parPlateforme.get(v.plateforme) ?? []), v.numeroCommande]);
     for (const [plateforme, numeros] of parPlateforme) {
@@ -92,19 +105,6 @@ export class DepotSupabase implements Depot {
       verifier(error);
     }
 
-    // … puis les ajouts et les modifications.
-    for (const lot of paquets(c.ventes.enregistrer.map((v) => avecBusiness(venteVersLigne(v, uid))), PAQUET)) {
-      const { error } = await this.client.from('ventes').upsert(lot, { onConflict: 'user_id,business_id,plateforme,numero_commande' });
-      verifier(error);
-    }
-    for (const lot of paquets(c.videos.enregistrer.map((v) => avecBusiness(videoVersLigne(v, uid))), PAQUET)) {
-      const { error } = await this.client.from('videos').upsert(lot, { onConflict: 'user_id,business_id,id' });
-      verifier(error);
-    }
-    for (const lot of paquets(c.etatsAlertes.enregistrer.map((e) => avecBusiness(etatVersLigne(e.id, e.etat, uid))), PAQUET)) {
-      const { error } = await this.client.from('etats_alertes').upsert(lot, { onConflict: 'user_id,business_id,alerte_id' });
-      verifier(error);
-    }
     if (c.reglages) {
       const { error } = await this.client
         .from('reglages')

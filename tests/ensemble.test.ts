@@ -53,6 +53,7 @@ describe('vue d’ensemble de tous les business', () => {
       fraisCentimes: 212,
       gainsCentimes: 6758,
       businessSansGains: [],
+      ventesInconnues: false,
       tvaCentimes: 109,
       remboursementsCentimes: 0,
       videos: 2,
@@ -73,9 +74,100 @@ describe('vue d’ensemble de tous les business', () => {
     expect(e.total.ventesCentimes).toBe(3980);
   });
 
+  it('le même paiement Stripe relié dans deux business ne compte qu’une fois', () => {
+    const e = calculerEnsemble(
+      [
+        business('a', 'A', { ventes: [vente('ch_1', '2026-10-05T10:00:00Z')] }),
+        business('b', 'B', { ventes: [vente('ch_1', '2026-10-05T10:00:00Z')] }),
+      ],
+      '7j',
+      maintenant,
+    );
+    expect(e.total).toMatchObject({ ventesCentimes: 1990, commandes: 1 });
+  });
+
+  it('deux ventes de fichier avec le même numéro dans deux business sont deux ventes différentes', () => {
+    const e = calculerEnsemble(
+      [
+        business('a', 'A', { ventes: [vente('1', '2026-10-05T10:00:00Z', { plateforme: 'exemple' })] }),
+        business('b', 'B', { ventes: [vente('1', '2026-10-05T11:00:00Z', { plateforme: 'exemple', montantCentimes: 4900 })] }),
+      ],
+      '7j',
+      maintenant,
+    );
+    expect(e.total).toMatchObject({ ventesCentimes: 6890, commandes: 2 });
+  });
+
+  it('aucune vente lue nulle part : le total des ventes est inconnu, pas « 0 € »', () => {
+    const e = calculerEnsemble(
+      [business('a', 'Mon premier business', { couverture: null }), business('b', 'Tout neuf', { couverture: null })],
+      '7j',
+      maintenant,
+    );
+    expect(e.total.ventesInconnues).toBe(true);
+    const avecUneVente = calculerEnsemble(
+      [business('a', 'Guide', { ventes: [vente('1', '2026-10-05T10:00:00Z')] }), business('b', 'Tout neuf', { couverture: null })],
+      '7j',
+      maintenant,
+    );
+    expect(avecUneVente.total.ventesInconnues).toBe(false);
+  });
+
   it('un business vide est signalé, et compte pour 0 vente', () => {
     const e = calculerEnsemble([business('a', 'Tout neuf')], '1m', maintenant);
     expect(e.lignes[0]).toMatchObject({ vide: true, videos: 0 });
     expect(e.total).toMatchObject({ ventesCentimes: 0, commandes: 0, gainsCentimes: 0, tvaCentimes: null });
+  });
+});
+
+describe('vue d’ensemble : l’état réel de chaque business', () => {
+  const rien = { boutique: false, reseau: false, derniereSynchro: null };
+  const etat = (b: DonneesBusiness) => calculerEnsemble([b], '7j', maintenant).lignes[0]!;
+
+  it('boutique reliée mais aucune vente : on le dit, avec l’heure de la dernière actualisation (Paris)', () => {
+    const l = etat(
+      business('a', 'Kit', {
+        couverture: '2026-10-06T07:30:00Z',
+        exempleTermine: true,
+        relies: { boutique: true, reseau: false, derniereSynchro: '2026-10-06T07:30:00Z' },
+      }),
+    );
+    expect(l.etatVide).toBe('Boutique reliée, aucune vente pour l’instant.');
+    expect(l.aJour).toBe('à jour le 06/10 à 09h30');
+  });
+
+  it('rien de relié : on invite à relier, sans « à jour »', () => {
+    const l = etat(business('a', 'Tout neuf', { couverture: null, exempleTermine: true, relies: rien }));
+    expect(l.etatVide).toBe('Rien de relié pour l’instant : relie sa boutique et ses comptes.');
+    expect(l.aJour).toBeNull();
+  });
+
+  it('jamais commencé (son écran montre l’exemple) : « Données d’exemple seulement. »', () => {
+    const l = etat(business('a', 'Mon premier business', { couverture: null, exempleTermine: false, relies: rien }));
+    expect(l.etatVide).toBe('Données d’exemple seulement.');
+  });
+
+  it('seulement TikTok relié, sans vidéo : sa boutique n’est pas reliée', () => {
+    const l = etat(
+      business('a', 'Kit', { couverture: null, exempleTermine: true, relies: { boutique: false, reseau: true, derniereSynchro: null } }),
+    );
+    expect(l.etatVide).toBe('Aucune vidéo pour l’instant, et sa boutique n’est pas reliée.');
+    expect(l.aJour).toBe('pas encore actualisé');
+  });
+
+  it('un business avec des ventes n’a pas de phrase « vide », mais garde son « à jour »', () => {
+    const l = etat(
+      business('a', 'Guide', {
+        ventes: [vente('1', '2026-10-05T10:00:00Z')],
+        couverture: '2026-10-05T12:00:00Z',
+        relies: { boutique: true, reseau: true, derniereSynchro: '2026-10-05T12:00:00Z' },
+      }),
+    );
+    expect(l.etatVide).toBeNull();
+    expect(l.aJour).toBe('à jour le 05/10 à 14h00');
+  });
+
+  it('sans savoir ce qui est relié, on ne dit rien de faux', () => {
+    expect(etat(business('a', 'Inconnu')).etatVide).toBe('Pas encore de données : relie sa boutique et ses comptes.');
   });
 });

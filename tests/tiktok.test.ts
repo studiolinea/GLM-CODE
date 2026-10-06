@@ -36,7 +36,7 @@ describe('TikTok : le lien d’accord', () => {
   });
 
   it('l’appli lit le retour de TikTok dans son adresse', () => {
-    expect(lireRetourTikTok('?tiktok=retour&code=abc&etat=xyz')).toEqual({ code: 'abc', etat: 'xyz' });
+    expect(lireRetourTikTok('?tiktok=retour&code_tiktok=abc&etat=xyz')).toEqual({ code: 'abc', etat: 'xyz' });
     expect(lireRetourTikTok('?tiktok=retour&erreur=access_denied')).toEqual({ erreur: 'access_denied' });
     expect(lireRetourTikTok('?autre=1')).toBeNull();
   });
@@ -181,7 +181,7 @@ describe('serveur : TikTok', () => {
     const f = fauxTikTok();
     const ok = await traiterApi(new Request('https://pilotage.test/api/tiktok/retour?code=abc*1!&state=xyz&scopes=video.list'), env, f.recuperer);
     expect(ok.status).toBe(302);
-    expect(Object.fromEntries(new URL(ok.headers.get('Location')!).searchParams)).toEqual({ tiktok: 'retour', code: 'abc*1!', etat: 'xyz' });
+    expect(Object.fromEntries(new URL(ok.headers.get('Location')!).searchParams)).toEqual({ tiktok: 'retour', code_tiktok: 'abc*1!', etat: 'xyz' });
     const refus = await traiterApi(new Request('https://pilotage.test/api/tiktok/retour?error=access_denied&state=xyz'), env, f.recuperer);
     expect(new URL(refus.headers.get('Location')!).searchParams.get('erreur')).toBe('access_denied');
     expect(f.appels).toEqual([]);
@@ -191,7 +191,10 @@ describe('serveur : TikTok', () => {
     const f = fauxTikTok();
     const r = await traiterApi(appel('/api/comptes/tiktok/connexion', { business: BUSINESS }), { ...env, TIKTOK_CLIENT_SECRET: undefined }, f.recuperer);
     expect(r.status).toBe(503);
-    expect(((await r.json()) as { erreur: string }).erreur).toContain('Cloudflare');
+    const { erreur } = (await r.json()) as { erreur: string };
+    expect(erreur).toContain('Cloudflare');
+    expect(erreur).toMatch(/^Réglage du serveur à faire/);
+    expect(erreur).toContain('TIKTOK_CLIENT_SECRET');
   });
 
   it('relie le compte dans le bon business : les jetons sont enregistrés chiffrés, jamais en clair', async () => {
@@ -208,9 +211,9 @@ describe('serveur : TikTok', () => {
     });
     const ligne = f.lignes.get('open-1')!;
     expect(ligne).toMatchObject({ business_id: BUSINESS, identifiant: 'open-1', libelle: 'Detailing Pro' });
-    expect(ligne.cle_chiffree).toMatch(/^v1:/);
+    expect(ligne.cle_chiffree).toMatch(/^v2:/);
     expect(ligne.cle_chiffree).not.toContain('acces-1');
-    expect(JSON.parse(await dechiffrer(ligne.cle_chiffree, SECRET))).toMatchObject({ openId: 'open-1', acces: 'acces-1-1' });
+    expect(JSON.parse(await dechiffrer(ligne.cle_chiffree, SECRET, `u1|${BUSINESS}|tiktok|open-1`))).toMatchObject({ openId: 'open-1', acces: 'acces-1-1' });
   });
 
   it('refuse un lien périmé ou fait pour quelqu’un d’autre', async () => {
@@ -236,7 +239,7 @@ describe('serveur : TikTok', () => {
     expect(f.formulaires[1]).toMatchObject({ grant_type: 'refresh_token', refresh_token: 'renouvellement-1-1' });
     expect(f.appels).toContain('jeton Bearer acces-1-2');
     const ligne = f.lignes.get('open-1')!;
-    expect(JSON.parse(await dechiffrer(ligne.cle_chiffree, SECRET))).toMatchObject({ openId: 'open-1', acces: 'acces-1-2' });
+    expect(JSON.parse(await dechiffrer(ligne.cle_chiffree, SECRET, `u1|${BUSINESS}|tiktok|open-1`))).toMatchObject({ openId: 'open-1', acces: 'acces-1-2' });
     expect(ligne.derniere_synchro).toBeTruthy();
   });
 

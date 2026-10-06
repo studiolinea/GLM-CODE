@@ -48,10 +48,18 @@ export default {
   },
 };
 
+/** En-têtes de toutes les réponses du serveur : jamais gardées en cache, jamais affichées dans une autre page. */
+const ENTETES_API = {
+  'Cache-Control': 'no-store',
+  'X-Content-Type-Options': 'nosniff',
+  'Referrer-Policy': 'no-referrer',
+  'Content-Security-Policy': "default-src 'none'; frame-ancestors 'none'",
+};
+
 function json(statut: number, corps: unknown): Response {
   return new Response(JSON.stringify(corps), {
     status: statut,
-    headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' },
+    headers: { 'Content-Type': 'application/json; charset=utf-8', ...ENTETES_API },
   });
 }
 
@@ -81,6 +89,8 @@ async function utilisateurConnecte(ctx: Pick<Contexte, 'env' | 'jeton' | 'recupe
   const reponse = await ctx.recuperer(`${ctx.env.SUPABASE_URL}/auth/v1/user`, {
     headers: { apikey: ctx.env.SUPABASE_CLE_PUBLIQUE, Authorization: `Bearer ${ctx.jeton}` },
   });
+  // Supabase en panne ou surchargé : ce n'est pas la connexion de la personne qui a expiré.
+  if (reponse.status >= 500 || reponse.status === 429) throw new Error(`Supabase Auth a répondu ${reponse.status}`);
   if (!reponse.ok) return null;
   const utilisateur = (await reponse.json()) as { id?: string };
   return utilisateur.id ?? null;
@@ -94,22 +104,33 @@ function filtreCompte(ctx: Contexte, source: string, identifiant?: string): stri
   return identifiant === undefined ? filtre : `${filtre}&identifiant=eq.${encodeURIComponent(identifiant)}`;
 }
 
+/** Lie chaque clé chiffrée à sa ligne : copiée dans une autre ligne (ou un autre compte), elle devient illisible. */
+function contexteLigne(ctx: Contexte, source: string, identifiant: string): string {
+  return `${ctx.userId}|${ctx.businessId}|${source}|${identifiant}`;
+}
+
 export async function traiterApi(requete: Request, env: Env, recuperer: Recuperateur): Promise<Response> {
   try {
     const adresse = new URL(requete.url);
     // Retour de TikTok après l'accord : simple renvoi vers l'appli, qui finit la liaison au nom de la personne.
     if (requete.method === 'GET' && adresse.pathname === '/api/tiktok/retour') return retourTikTok(adresse);
     if (!env.CLE_CHIFFREMENT) {
-      return json(503, { erreur: 'Le serveur n’est pas encore configuré : il manque la clé de chiffrement dans Cloudflare.' });
+      return json(503, { erreur: 'Réglage du serveur à faire : ajoute le secret « CLE_CHIFFREMENT » dans Cloudflare.' });
     }
     const secret = env.CLE_CHIFFREMENT;
     const jeton = (requete.headers.get('Authorization') ?? '').replace(/^Bearer\s+/i, '').trim();
-    const userId = jeton ? await utilisateurConnecte({ env, jeton, recuperer }) : null;
+    let userId: string | null = null;
+    try {
+      userId = jeton ? await utilisateurConnecte({ env, jeton, recuperer }) : null;
+    } catch (e) {
+      console.error('Vérification de la connexion impossible', e);
+      return json(503, { erreur: 'La vérification de ta connexion ne répond pas. Réessaie dans un moment.' });
+    }
     if (!userId) return json(401, { erreur: 'Connecte-toi d’abord.' });
 
     const tiktok = /^\/api\/comptes\/tiktok\/(connexion|relier|synchroniser)$/.exec(adresse.pathname);
     const chemin = /^\/api\/comptes\/([a-z]+)\/(relier|synchroniser|mouvements)$/.exec(adresse.pathname);
-    const connecteur = chemin ? BOUTIQUES[chemin[1]!] : undefined;
+    const connecteur = chemin && Object.hasOwn(BOUTIQUES, chemin[1]!) ? BOUTIQUES[chemin[1]!] : undefined;
     if (requete.method !== 'POST' || !(tiktok || (chemin && connecteur))) return json(404, { erreur: 'Adresse inconnue.' });
 
     let corps: Record<string, unknown> = {};
@@ -161,7 +182,7 @@ async function relier(
     return json(502, { erreur: `${connecteur.nom} ne répond pas. Réessaie dans un moment.` });
   }
 
-  const echec = await enregistrerCompte(ctx, source, '', await chiffrer(cle, secret), libelle);
+  const echec = await enregistrerCompte(ctx, source, '', await chiffrer(cle, secret, contexteLigne(ctx, source, '')), libelle);
   return echec ?? json(200, { libelle });
 }
 
@@ -193,7 +214,7 @@ async function enregistrerCompte(
   const detail = (await enregistrement.json().catch(() => null)) as { code?: string } | null;
   if (detail?.code === '23514') {
     return json(502, {
-      erreur: 'La base de l’appli n’accepte pas encore cette boutique : dans Supabase, lance le texte SQL « 03-boutique-stripe.sql », puis réessaie.',
+      erreur: 'Réglage du serveur à faire : la base n’accepte pas encore cette boutique. Dans Supabase, lance le texte SQL « 03-boutique-stripe.sql », puis réessaie.',
     });
   }
   return json(502, { erreur: 'Impossible d’enregistrer le compte relié. Réessaie.' });
@@ -235,7 +256,7 @@ async function cleEnregistree(
   const ligne = lues.lignes[0];
   if (!ligne) return { reponse: json(404, { erreur: `Aucun compte ${nom} relié.` }) };
   try {
-    return { cle: await dechiffrer(ligne.cle_chiffree, secret) };
+    return { cle: await dechiffrer(ligne.cle_chiffree, secret, contexteLigne(ctx, source, '')) };
   } catch {
     await noter(ctx, source, '', { derniere_erreur: 'Clé illisible : relie la boutique à nouveau.' });
     return {
@@ -288,7 +309,7 @@ async function mouvements(ctx: Contexte, source: string, connecteur: Connecteur,
 const MESSAGE_DROITS_TIKTOK =
   'TikTok n’a pas donné l’accès à tes vidéos : relie ton compte à nouveau et accepte l’accès à tes vidéos publiques.';
 const MESSAGE_TIKTOK_PAS_CONFIGURE =
-  'TikTok n’est pas encore configuré sur le serveur : il manque la clé TikTok dans Cloudflare.';
+  'Réglage du serveur à faire : ajoute les secrets « TIKTOK_CLIENT_KEY » et « TIKTOK_CLIENT_SECRET » dans Cloudflare.';
 
 function clesTikTok(env: Env): ClesTikTok | null {
   return env.TIKTOK_CLIENT_KEY && env.TIKTOK_CLIENT_SECRET
@@ -303,12 +324,12 @@ function retourTikTok(adresse: URL): Response {
   const code = adresse.searchParams.get('code');
   const etat = adresse.searchParams.get('state');
   if (code && etat) {
-    vers.searchParams.set('code', code);
+    vers.searchParams.set('code_tiktok', code);
     vers.searchParams.set('etat', etat);
   } else {
     vers.searchParams.set('erreur', adresse.searchParams.get('error') ?? 'inconnue');
   }
-  return new Response(null, { status: 302, headers: { Location: vers.toString(), 'Cache-Control': 'no-store' } });
+  return new Response(null, { status: 302, headers: { Location: vers.toString(), ...ENTETES_API } });
 }
 
 async function routeTikTok(action: string, ctx: Contexte, secret: string, origine: string): Promise<Response> {
@@ -332,7 +353,7 @@ async function relierTikTok(
   const code = String(corps.code ?? '');
   const businessId = code ? await verifierEtat(String(corps.etat ?? ''), sansBusiness.userId, secret) : null;
   if (!businessId) {
-    return json(400, { erreur: 'Ce lien TikTok n’est plus valable. Appuie à nouveau sur « Relier un compte TikTok ».' });
+    return json(400, { erreur: 'Ce lien TikTok n’est plus valable. Recommence depuis la carte TikTok des réglages.' });
   }
   const ctx: Contexte = { ...sansBusiness, businessId };
   let jetons: JetonsTikTok;
@@ -343,11 +364,12 @@ async function relierTikTok(
   } catch (e) {
     if (e instanceof DroitsInsuffisants) return json(400, { erreur: MESSAGE_DROITS_TIKTOK });
     if (e instanceof CleRefusee) {
-      return json(400, { erreur: 'TikTok a refusé la liaison. Réessaie avec le bouton « Relier un compte TikTok ».' });
+      return json(400, { erreur: 'TikTok a refusé la liaison. Recommence depuis la carte TikTok des réglages.' });
     }
     return json(502, { erreur: 'TikTok ne répond pas. Réessaie dans un moment.' });
   }
-  const echec = await enregistrerCompte(ctx, 'tiktok', jetons.openId, await chiffrer(JSON.stringify(jetons), secret), libelle);
+  const contexte = contexteLigne(ctx, 'tiktok', jetons.openId);
+  const echec = await enregistrerCompte(ctx, 'tiktok', jetons.openId, await chiffrer(JSON.stringify(jetons), secret, contexte), libelle);
   return echec ?? json(200, { libelle });
 }
 
@@ -359,13 +381,21 @@ async function synchroniserTikTok(ctx: Contexte, secret: string, cles: ClesTikTo
 
   const videos: Video[] = [];
   const erreurs: string[] = [];
-  let injoignable = false;
+  let injoignables = 0;
   for (const ligne of lues.lignes) {
     const noterCe = (champs: Parameters<typeof noter>[3]) => noter(ctx, 'tiktok', ligne.identifiant, champs);
+    const contexte = contexteLigne(ctx, 'tiktok', ligne.identifiant);
     try {
-      const jetons = JSON.parse(await dechiffrer(ligne.cle_chiffree, secret)) as JetonsTikTok;
+      const jetons = JSON.parse(await dechiffrer(ligne.cle_chiffree, secret, contexte)) as JetonsTikTok;
       const valables = await jetonsValables(jetons, cles, ctx.recuperer);
-      if (valables.renouveles) await noterCe({ cle_chiffree: await chiffrer(JSON.stringify(valables.jetons), secret) });
+      if (valables.renouveles) {
+        // TikTok vient de donner un nouvel accès : s'il n'est pas enregistré, la liaison casserait au prochain renouvellement.
+        const enregistre = await noterCe({ cle_chiffree: await chiffrer(JSON.stringify(valables.jetons), secret, contexte) });
+        if (!enregistre.ok) {
+          erreurs.push('Impossible d’enregistrer l’accès TikTok renouvelé. Réessaie dans un moment.');
+          continue;
+        }
+      }
       videos.push(...videosVersVideos(await toutesLesVideos(valables.jetons.acces, ctx.recuperer)));
       await noterCe({ derniere_synchro: new Date().toISOString(), derniere_erreur: null });
     } catch (e) {
@@ -377,11 +407,11 @@ async function synchroniserTikTok(ctx: Contexte, secret: string, cles: ClesTikTo
         await noterCe({ derniere_erreur: message });
         erreurs.push(message);
       } else {
-        injoignable = true;
+        injoignables++;
       }
     }
   }
-  if (videos.length === 0 && erreurs.length + (injoignable ? 1 : 0) === lues.lignes.length) {
+  if (videos.length === 0 && erreurs.length + injoignables === lues.lignes.length) {
     if (erreurs[0]) return json(400, { erreur: erreurs[0] });
     return json(502, { erreur: 'TikTok ne répond pas. Réessaie dans un moment.' });
   }

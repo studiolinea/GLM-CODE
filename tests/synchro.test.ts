@@ -3,9 +3,12 @@ import { donneesVides, enregistrerVideo, importerVentes, quitterExemple, rangerA
 import { calculerChangements, versDonnees, type Changements, type Depot, type DonneesCompte } from '../src/donnees/depot';
 import { donneesExemple } from '../src/donnees/exemple';
 import { businessAOuvrir, nomValide } from '../src/donnees/business';
+import { resumeVentesTest } from '../src/calculs/ventesTest';
+import { avecNomCompte, ConnexionExpiree, messageBoutiqueReliee } from '../src/donnees/comptesRelies';
 import { ligneVersVente, ligneVersVideo, venteVersLigne, videoVersLigne } from '../src/donnees/lignes';
-import { Synchro } from '../src/donnees/synchro';
+import { messageEchecEnregistrement, Synchro } from '../src/donnees/synchro';
 import type { Donnees, Video } from '../src/modele';
+import { majuscule } from '../src/texte';
 import type { Vente } from '../src/ventes/modele';
 
 const maintenant = new Date('2026-10-05T16:00:00Z');
@@ -187,6 +190,21 @@ describe('Synchro', () => {
     expect(depot.envois).toHaveLength(1);
     expect(depot.compte.videos.map((v) => v.id)).toEqual(['v1']);
   });
+
+  it('dit à l’écran si le changement est enregistré : vrai, puis faux pendant une coupure', async () => {
+    const depot = new DepotMemoire();
+    const synchro = new Synchro(depot, donneesVides(), () => undefined);
+    const avecVideo = enregistrerVideo(donneesVides(), video);
+    await expect(synchro.enregistrer(donneesVides(), avecVideo)).resolves.toBe(true);
+    depot.enPanne = true;
+    const premier = synchro.enregistrer(avecVideo, enregistrerVideo(avecVideo, { ...video, id: 'v2' }));
+    // Abandonné, car le précédent a échoué : pas enregistré non plus.
+    const suivant = synchro.enregistrer(avecVideo, enregistrerVideo(avecVideo, { ...video, id: 'v3' }));
+    await expect(premier).resolves.toBe(false);
+    await expect(suivant).resolves.toBe(false);
+    // Rien à changer : rien à attendre.
+    await expect(synchro.enregistrer(avecVideo, avecVideo)).resolves.toBe(true);
+  });
 });
 
 describe('ventes reçues de la boutique reliée', () => {
@@ -241,5 +259,164 @@ describe('plusieurs business', () => {
     expect(businessAOuvrir(liste, 'disparu')?.nom).toBe('Premier');
     expect(businessAOuvrir(liste, null)?.nom).toBe('Premier');
     expect(businessAOuvrir([], 'a')).toBeNull();
+  });
+});
+
+describe('ventes du mode test : on dit ce qui a été reçu, sans le compter', () => {
+  const test = (numero: string, autres: Partial<Vente> = {}): Vente => ({
+    ...vente,
+    plateforme: 'stripe-test',
+    numeroCommande: numero,
+    fraisCentimes: 125,
+    tvaCentimes: 332,
+    ...autres,
+  });
+
+  it('une vente : singulier, montant, frais et TVA', () => {
+    expect(resumeVentesTest([test('ch_1')])).toBe(
+      '1 vente en mode test reçue, pas comptée dans tes vrais chiffres : 19,90 €, frais 1,25 €, TVA 3,32 €.',
+    );
+  });
+
+  it('plusieurs ventes : vrai pluriel, et les sommes', () => {
+    expect(resumeVentesTest([test('ch_1'), test('ch_2')])).toBe(
+      '2 ventes en mode test reçues, pas comptées dans tes vrais chiffres : 39,80 €, frais 2,50 €, TVA 6,64 €.',
+    );
+  });
+
+  it('les remboursements sont dits après le nombre de ventes, jamais après la TVA', () => {
+    expect(resumeVentesTest([test('ch_1'), test('ch_2', { rembourse: true })])).toBe(
+      '2 ventes en mode test reçues (dont 1 remboursée), pas comptées dans tes vrais chiffres : 39,80 €, frais 2,50 €, TVA 6,64 €.',
+    );
+    expect(resumeVentesTest([test('ch_1'), test('ch_2', { rembourse: true }), test('ch_3', { rembourse: true })])).toBe(
+      '3 ventes en mode test reçues (dont 2 remboursées), pas comptées dans tes vrais chiffres : 59,70 €, frais 3,75 €, TVA 9,96 €.',
+    );
+    expect(resumeVentesTest([test('ch_1', { rembourse: true }), test('ch_2', { rembourse: true })])).toBe(
+      '2 ventes en mode test reçues (toutes remboursées), pas comptées dans tes vrais chiffres : 39,80 €, frais 2,50 €, TVA 6,64 €.',
+    );
+    expect(resumeVentesTest([test('ch_1', { rembourse: true })])).toBe(
+      '1 vente en mode test reçue (remboursée), pas comptée dans tes vrais chiffres : 19,90 €, frais 1,25 €, TVA 3,32 €.',
+    );
+  });
+
+  it('frais manquants : « frais inconnus », jamais un total deviné ; TVA absente : pas écrite', () => {
+    const sansFrais = test('ch_1', { fraisCentimes: null, tvaCentimes: undefined });
+    expect(resumeVentesTest([sansFrais, test('ch_2', { tvaCentimes: undefined })])).toBe(
+      '2 ventes en mode test reçues, pas comptées dans tes vrais chiffres : 39,80 €, frais inconnus.',
+    );
+    expect(resumeVentesTest([])).toBeNull();
+  });
+
+  it('lireComptesRelies garde les ventes de test de chaque boutique, à part des vraies', async () => {
+    const { lireComptesRelies } = await import('../src/donnees/useSynchroBoutique');
+    let d: Donnees = donneesVides();
+    const bilan = await lireComptesRelies(
+      'b1',
+      [{ source: 'stripe', identifiant: '', libelle: 'Stripe', relieLe: '', derniereSynchro: null, derniereErreur: null }],
+      {
+        boutique: async () => ({ ventes: [test('ch_t'), { ...vente, plateforme: 'stripe', numeroCommande: 'ch_r' }], ignorees: [], synchroniseLe: maintenant.toISOString() }),
+        tiktok: async () => ({ videos: [] }),
+      },
+      (f) => (d = f(d)),
+    );
+    expect(bilan.ventesTest.stripe?.map((v) => v.numeroCommande)).toEqual(['ch_t']);
+    expect(d.ventes.map((v) => v.numeroCommande)).toEqual(['ch_r']);
+  });
+});
+
+describe('boutique reliée : une phrase claire, avec le nom de la boutique', () => {
+  it('« Boutique Stripe reliée (mode test). », et le nom de la boutique Lemon Squeezy entre guillemets', () => {
+    expect(messageBoutiqueReliee('stripe', 'Stripe (mode test)')).toBe('Boutique Stripe reliée (mode test).');
+    expect(messageBoutiqueReliee('stripe', 'Stripe')).toBe('Boutique Stripe reliée.');
+    expect(messageBoutiqueReliee('lemonsqueezy', 'Ma boutique')).toBe('Boutique Lemon Squeezy reliée (« Ma boutique »).');
+    expect(messageBoutiqueReliee('lemonsqueezy', 'Lemon Squeezy (mode test)')).toBe('Boutique Lemon Squeezy reliée (mode test).');
+  });
+
+  it('la ligne d’état commence par une majuscule', () => {
+    expect(majuscule('mode test · ventes à jour le 06/10 à 07h27')).toBe('Mode test · ventes à jour le 06/10 à 07h27');
+    expect(majuscule('« Ma boutique » · pas encore lue')).toBe('« Ma boutique » · pas encore lue');
+    expect(majuscule('')).toBe('');
+  });
+});
+
+describe('erreurs d’actualisation : chaque message dit le compte concerné', () => {
+  const stripe = { source: 'stripe' as const, identifiant: '', libelle: 'Stripe', relieLe: '', derniereSynchro: null, derniereErreur: null };
+  const tiktok = { source: 'tiktok' as const, identifiant: 'o1', libelle: 'kevin', relieLe: '', derniereSynchro: null, derniereErreur: null };
+
+  it('« Stripe : … », « TikTok : … », et le message de chaque carte sans le nom', async () => {
+    const { lireComptesRelies } = await import('../src/donnees/useSynchroBoutique');
+    const bilan = await lireComptesRelies(
+      'b1',
+      [stripe, tiktok],
+      {
+        boutique: async () => {
+          throw new Error('Le serveur a eu un problème. Réessaie dans un moment.');
+        },
+        tiktok: async () => {
+          throw new Error('Accès refusé.');
+        },
+      },
+      () => {},
+    );
+    expect(bilan.erreurs).toEqual(['Stripe : Le serveur a eu un problème. Réessaie dans un moment.', 'TikTok : Accès refusé.']);
+    expect(bilan.parCompte).toEqual({ stripe: 'Le serveur a eu un problème. Réessaie dans un moment.', tiktok: 'Accès refusé.' });
+    expect(bilan.expiree).toBe(false);
+  });
+
+  it('session expirée : on le sait, pour proposer de se reconnecter', async () => {
+    const { lireComptesRelies } = await import('../src/donnees/useSynchroBoutique');
+    const bilan = await lireComptesRelies(
+      'b1',
+      [stripe],
+      {
+        boutique: async () => {
+          throw new ConnexionExpiree();
+        },
+        tiktok: async () => ({ videos: [] }),
+      },
+      () => {},
+    );
+    expect(bilan.expiree).toBe(true);
+    expect(bilan.erreurs).toEqual(['Stripe : Ta connexion a expiré : reconnecte-toi.']);
+  });
+
+  it('un message qui nomme déjà le compte n’est pas doublé', () => {
+    expect(avecNomCompte('stripe', 'Stripe refuse cette clé.')).toBe('Stripe refuse cette clé.');
+    expect(avecNomCompte('lemonsqueezy', 'Clé refusée.')).toBe('Lemon Squeezy : Clé refusée.');
+  });
+
+  it('les ventes reçues automatiquement sont marquées comme telles (pas « ta dernière action »)', async () => {
+    const { lireComptesRelies } = await import('../src/donnees/useSynchroBoutique');
+    const origines: (string | undefined)[] = [];
+    await lireComptesRelies(
+      'b1',
+      [stripe, tiktok],
+      {
+        boutique: async () => ({ ventes: [], ignorees: [], synchroniseLe: maintenant.toISOString() }),
+        tiktok: async () => ({ videos: [] }),
+      },
+      (_f, origine) => origines.push(origine),
+    );
+    expect(origines).toEqual(['ventes', 'videos']);
+  });
+});
+
+describe('enregistrement qui échoue : le message dit ce qui n’a pas été enregistré', () => {
+  it('une action de la personne, ou une actualisation automatique', () => {
+    expect(messageEchecEnregistrement()).toBe('Ta dernière action n’a pas été enregistrée. Vérifie ta connexion, puis réessaie.');
+    expect(messageEchecEnregistrement('ventes')).toBe('Tes dernières ventes n’ont pas pu être enregistrées. Réessaie dans un moment.');
+    expect(messageEchecEnregistrement('videos')).toBe('Tes dernières vidéos n’ont pas pu être enregistrées. Réessaie dans un moment.');
+  });
+
+  it('Synchro transmet l’origine du changement qui a échoué', async () => {
+    const depot = new DepotMemoire();
+    depot.enPanne = true;
+    const origines: (string | undefined)[] = [];
+    const synchro = new Synchro(depot, donneesVides(), (_e, origine) => origines.push(origine));
+    synchro.enregistrer(donneesVides(), importerVentes(donneesVides(), [vente], maintenant.toISOString()).donnees, 'ventes');
+    await synchro.attendre();
+    synchro.enregistrer(donneesVides(), enregistrerVideo(donneesVides(), video));
+    await synchro.attendre();
+    expect(origines).toEqual(['ventes', undefined]);
   });
 });

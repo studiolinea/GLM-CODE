@@ -5,6 +5,9 @@ import {
   enregistrerVideo,
   importerVentes,
   lireSauvegarde,
+  nomFichierSauvegarde,
+  ouvrirSauvegarde,
+  questionRestauration,
   rangerAlerte,
   supprimerVideo,
   versSauvegarde,
@@ -109,5 +112,105 @@ describe('rangement des alertes et sauvegarde', () => {
     expect(typeof lireSauvegarde('{"bonjour": 1}')).toBe('string');
     expect(typeof lireSauvegarde('pas du json')).toBe('string');
     expect(typeof lireSauvegarde('{"format":"pilotage-sauvegarde","donnees":{"ventes":3}}')).toBe('string');
+  });
+});
+
+describe('sauvegarde : elle reconnaît son business', () => {
+  const d = donneesVides();
+  const guide = { id: 'b-guide', nom: 'Guide detailing' };
+  const kit = { id: 'b-kit', nom: 'Kit Alibaba' };
+
+  it('le fichier garde le nom et l’identifiant du business, et se relit avec', () => {
+    const texte = versSauvegarde(d, guide);
+    expect(JSON.parse(texte).business).toEqual(guide);
+    expect(ouvrirSauvegarde(texte)).toEqual({ donnees: d, business: guide });
+  });
+
+  it('une ancienne sauvegarde (sans business) reste acceptée', () => {
+    const ancienne = JSON.stringify({ format: 'pilotage-sauvegarde', version: 1, donnees: d });
+    expect(ouvrirSauvegarde(ancienne)).toEqual({ donnees: d, business: null });
+    expect(ouvrirSauvegarde(versSauvegarde(d))).toEqual({ donnees: d, business: null });
+  });
+
+  it('un business abîmé dans le fichier est ignoré, pas les données', () => {
+    const texte = JSON.stringify({ format: 'pilotage-sauvegarde', version: 1, business: { id: 3 }, donnees: d });
+    expect(ouvrirSauvegarde(texte)).toEqual({ donnees: d, business: null });
+  });
+
+  it('le nom du fichier : pilotage-<nom simplifié>-<date>.json', () => {
+    expect(nomFichierSauvegarde('Guide detailing', '2026-10-06')).toBe('pilotage-guide-detailing-2026-10-06.json');
+    expect(nomFichierSauvegarde('  Kévin & Cie : Été 2026 !', '2026-10-06')).toBe('pilotage-kevin-cie-ete-2026-2026-10-06.json');
+    expect(nomFichierSauvegarde('« »', '2026-10-06')).toBe('pilotage-sauvegarde-2026-10-06.json');
+    expect(nomFichierSauvegarde(undefined, '2026-10-06')).toBe('pilotage-sauvegarde-2026-10-06.json');
+  });
+
+  it('la question avant de restaurer : simple pour le même business, ou une ancienne sauvegarde', () => {
+    const question = 'Remplacer les données de « Guide detailing » par cette sauvegarde ? Ça ne peut pas être annulé.';
+    expect(questionRestauration(guide, guide)).toBe(question);
+    expect(questionRestauration(null, guide)).toBe(question);
+    // Renommé depuis (même identifiant), ou recréé avec le même nom : c'est le même business.
+    expect(questionRestauration({ id: 'b-guide', nom: 'Ancien nom' }, guide)).toBe(question);
+    expect(questionRestauration({ id: null, nom: 'guide  DETAILING' }, guide)).toBe(question);
+  });
+
+  it('la question dit quand la sauvegarde vient d’un autre business', () => {
+    expect(questionRestauration(guide, kit)).toBe(
+      'Cette sauvegarde vient de « Guide detailing », pas de « Kit Alibaba ». Remplacer quand même les données de « Kit Alibaba » ? Ça ne peut pas être annulé.',
+    );
+  });
+
+  it('sur l’appareil seul : la même confirmation, sans business', () => {
+    expect(questionRestauration(guide, undefined)).toBe(
+      'Remplacer les données de cet appareil par cette sauvegarde ? Ça ne peut pas être annulé.',
+    );
+  });
+});
+
+describe('sauvegarde abîmée ou piégée : refusée en entier, rien n’est modifié', () => {
+  const base = { ...donneesVides(), couverture: '2026-10-05T09:00:00.000Z' };
+  const vente = {
+    plateforme: 'stripe',
+    numeroCommande: 'ch_1',
+    instant: '2026-10-05T10:00:00.000Z',
+    montantCentimes: 1990,
+    fraisCentimes: null,
+    rembourse: false,
+    produit: 'Guide',
+  };
+  const fichier = (donnees: unknown) => JSON.stringify({ format: 'pilotage-sauvegarde', version: 1, donnees });
+  const abimee = 'Cette sauvegarde est abîmée : rien n’a été modifié.';
+
+  it('une sauvegarde correcte passe, avec la TVA et les dates venues de la base (+00:00)', () => {
+    const d = { ...base, ventes: [{ ...vente, instant: '2026-10-05T10:00:00+00:00', tvaCentimes: 332 }] };
+    expect(lireSauvegarde(fichier(d))).toEqual(d);
+  });
+
+  it.each([
+    ['une date illisible', { ventes: [{ ...vente, instant: 'à remplir' }] }],
+    ['une date sans fuseau (lue à l’heure de l’appareil)', { ventes: [{ ...vente, instant: '06/10/2026' }] }],
+    ['un montant non entier', { ventes: [{ ...vente, montantCentimes: 12.5 }] }],
+    ['un montant négatif', { ventes: [{ ...vente, montantCentimes: -5000 }] }],
+    ['des frais qui ne sont pas un nombre', { ventes: [{ ...vente, fraisCentimes: 'abc' }] }],
+    ['une vente sans plateforme', { ventes: [{ ...vente, plateforme: undefined }] }],
+    ['une vente du mode test dans de vraies données', { ventes: [{ ...vente, plateforme: 'stripe-test' }] }],
+    ['un objectif hors de 0 à 20', { reglages: { objectifParJour: 999 } }],
+    ['une vidéo avec une date illisible', { videos: [{ id: 'v', instant: 'zzz', reseau: 'tiktok' }] }],
+    ['une vidéo d’un réseau inconnu', { videos: [{ id: 'v', instant: '2026-10-05T10:00:00Z', reseau: 'myspace' }] }],
+    ['une vidéo avec un lien qui n’est pas https', { videos: [{ id: 'v', instant: '2026-10-05T10:00:00Z', reseau: 'tiktok', lien: 'javascript:alert(1)' }] }],
+    ['un voyant au statut inconnu', { etatsAlertes: { a: { statut: 'supprime', le: '2026-10-05' } } }],
+    ['une date des ventes illisible', { couverture: 'n’importe quoi' }],
+  ])('%s', (_, change) => {
+    expect(lireSauvegarde(fichier({ ...base, ...change }))).toBe(abimee);
+  });
+
+  it('les champs en trop (nom, e-mail d’un client) ne sont pas gardés', () => {
+    const d = lireSauvegarde(fichier({ ...base, ventes: [{ ...vente, nomClient: 'Jean Dupont', email: 'jean@exemple.fr' }] }));
+    expect(d).toEqual({ ...base, ventes: [vente] });
+    expect(JSON.stringify(d)).not.toContain('jean@exemple.fr');
+  });
+
+  it('les ventes du mode test restent possibles dans les données d’exemple (fichier d’essai)', () => {
+    const d = { ...base, exemple: true, ventes: [{ ...vente, plateforme: 'stripe-test' }] };
+    expect(lireSauvegarde(fichier(d))).toEqual(d);
   });
 });

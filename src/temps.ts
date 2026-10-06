@@ -59,7 +59,13 @@ export function instantParis(date: string, heure = '00:00'): Date {
   const h = RE_HEURE.exec(heure);
   if (!d || !h) throw new Error(`Date ou heure invalide : ${date} ${heure}`);
   const commeUtc = Date.UTC(+d[1]!, +d[2]! - 1, +d[3]!, +h[1]!, +h[2]!, +(h[3] ?? 0));
-  // Deux passes : la seconde corrige le cas où l'heure d'été change entre les deux.
+  // Fin octobre, l'heure de 2 h à 3 h passe deux fois : on prend la première (sinon « J'ai publié »
+  // croit l'heure actuelle dans le futur). On essaie le décalage de la veille et celui du lendemain.
+  const possibles = [commeUtc - MS_JOUR, commeUtc + MS_JOUR]
+    .map((t) => commeUtc - decalageParis(new Date(t)))
+    .filter((t) => decalageParis(new Date(t)) === commeUtc - t);
+  if (possibles.length > 0) return new Date(Math.min(...possibles));
+  // Heure qui n'existe pas (fin mars, de 2 h à 3 h) : deux passes, comme avant.
   let instant = commeUtc - decalageParis(new Date(commeUtc));
   instant = commeUtc - decalageParis(new Date(instant));
   return new Date(instant);

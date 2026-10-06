@@ -15,6 +15,12 @@ export interface VenteIgnoree {
   raison: string;
 }
 
+/** « vente en USD (seules les ventes en euros sont lues) » : la raison d'une vente écartée à cause de sa devise. */
+export function raisonAutreDevise(devise: string | null | undefined): string {
+  const code = (devise ?? '').trim().toUpperCase();
+  return `${code ? `vente en ${code}` : 'devise inconnue'} (seules les ventes en euros sont lues)`;
+}
+
 export interface VentesLues {
   ventes: Vente[];
   ignorees: VenteIgnoree[];

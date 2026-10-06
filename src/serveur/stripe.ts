@@ -5,6 +5,7 @@ import type { Vente } from '../ventes/modele';
 import {
   CleRefusee,
   DroitsInsuffisants,
+  raisonAutreDevise,
   type Connecteur,
   type MouvementBoutique,
   type Recuperateur,
@@ -74,13 +75,18 @@ export async function toutesLesCharges(cle: string, recuperer: Recuperateur = fe
 export function chargesVersVentes(charges: ChargeStripe[]): { ventes: Vente[]; ignorees: VenteIgnoree[] } {
   const ventes: Vente[] = [];
   const ignorees: VenteIgnoree[] = [];
+  // Dès qu'un paiement porte de la TVA retenue, le compte est en Managed Payments : ses 3,5 % sont comptés à part
+  // pour tous ses paiements, même ceux sans TVA. Les frais restent alors inconnus partout.
+  const geresParStripe = charges.some(
+    (c) => typeof c.balance_transaction === 'object' && c.balance_transaction?.fee_details?.some((f) => f.type === 'withheld_tax'),
+  );
   for (const c of charges) {
     if (c.status !== 'succeeded' || !c.paid) {
       ignorees.push({ numero: c.id, raison: 'paiement non abouti' });
       continue;
     }
     if ((c.currency ?? '').toLowerCase() !== 'eur') {
-      ignorees.push({ numero: c.id, raison: `devise ${c.currency} : seules les ventes en euros sont lues` });
+      ignorees.push({ numero: c.id, raison: raisonAutreDevise(c.currency) });
       continue;
     }
     const solde =
@@ -99,7 +105,7 @@ export function chargesVersVentes(charges: ChargeStripe[]): { ventes: Vente[]; i
       montantCentimes: Math.max(0, paye - tvaGardee),
       // Avec Managed Payments, ses frais de 3,5 % ne sont pas dans ce paiement : Stripe les compte à part.
       // Tant que l'appli ne les lit pas, les frais restent inconnus plutôt que faux.
-      fraisCentimes: solde && tva === 0 ? solde.fee : null,
+      fraisCentimes: solde && !geresParStripe ? solde.fee : null,
       ...(tvaGardee > 0 ? { tvaCentimes: tvaGardee } : {}),
       rembourse: c.refunded,
       produit: c.description ?? '',
@@ -151,9 +157,9 @@ export const connecteurStripe: Connecteur = {
   nom: 'Stripe',
   refuserCle(cle) {
     if (cle.startsWith('sk_')) {
-      return 'Cette clé donne tous les droits sur ton compte Stripe. Crée plutôt une clé limitée en lecture : elle commence par « rk_ ».';
+      return 'Cette clé donne tous les droits sur ton compte Stripe. Crée plutôt une clé limitée en lecture : elle commence par « rk_ ».';
     }
-    if (!cle.startsWith('rk_')) return 'Ce n’est pas une clé limitée Stripe : elle doit commencer par « rk_ ».';
+    if (!cle.startsWith('rk_')) return 'Ce n’est pas une clé limitée Stripe : elle doit commencer par « rk_ ».';
     return null;
   },
   async verifier(cle, recuperer) {
@@ -168,5 +174,5 @@ export const connecteurStripe: Connecteur = {
     return transactionsVersMouvements(reponse.data ?? []);
   },
   messageDroits:
-    'Il manque une autorisation à cette clé Stripe : mets « Lecture » pour « Charges » et pour « Balance », puis recrée la clé.',
+    'Il manque une autorisation à cette clé Stripe : mets « Lecture » pour « Charges » et pour « Balance », puis recrée la clé.',
 };

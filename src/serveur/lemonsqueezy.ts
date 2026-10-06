@@ -2,7 +2,7 @@
 // Aucun nom ni e-mail de client n'est gardé.
 
 import type { Vente } from '../ventes/modele';
-import { CleRefusee, DroitsInsuffisants, type Connecteur, type Recuperateur, type VenteIgnoree } from './commun';
+import { CleRefusee, DroitsInsuffisants, raisonAutreDevise, type Connecteur, type Recuperateur, type VenteIgnoree } from './commun';
 
 export { CleRefusee };
 export type { Recuperateur };
@@ -14,6 +14,7 @@ const PAGES_MAX = 50;
 export interface CommandeLemonSqueezy {
   id: string;
   attributes: {
+    store_id?: number;
     order_number?: number;
     currency?: string;
     total?: number;
@@ -83,15 +84,17 @@ export function commandesVersVentes(commandes: CommandeLemonSqueezy[]): {
   const ignorees: CommandeIgnoree[] = [];
   for (const c of commandes) {
     const a = c.attributes ?? {};
-    const numero = String(a.order_number ?? c.id);
+    // L'identifiant de la commande, unique entre toutes les boutiques et qui ne change jamais. Le numéro affiché
+    // (order_number) repart de 1 dans chaque boutique : une commande en écraserait une autre.
+    const numero = String(c.id);
     const ignorer = (raison: string) => ignorees.push({ numero, raison });
 
     if (a.status !== 'paid' && a.status !== 'refunded' && a.status !== 'partial_refund') {
-      ignorer(`commande non payée (statut « ${a.status ?? 'inconnu'} »)`);
+      ignorer(`commande non payée (statut « ${a.status ?? 'inconnu'} »)`);
       continue;
     }
     if ((a.currency ?? '').toUpperCase() !== 'EUR') {
-      ignorer(`devise ${a.currency ?? 'inconnue'} : seules les ventes en euros sont lues`);
+      ignorer(raisonAutreDevise(a.currency));
       continue;
     }
     const instant = a.created_at ? new Date(a.created_at) : null;

@@ -6,13 +6,18 @@ import type { Vente } from '../ventes/modele';
 
 export type Ton = 'attention' | 'bonne-nouvelle' | 'info';
 
+/** La carte des réglages à montrer : celle de la boutique, ou celle de TikTok. */
+export type CompteAVoir = 'boutique' | 'tiktok';
+
+const RELIER_BOUTIQUE: Action = { libelle: 'Relier ma boutique', cible: 'comptes', compte: 'boutique' };
+
 export type Action =
   | { libelle: string; cible: 'saisie-video' }
   | { libelle: string; cible: 'import' }
   | { libelle: string; cible: 'lien'; url: string }
   | { libelle: string; cible: 'modifier-video'; videoId: string }
-  /** Ouvre les réglages, là où l'on relie ses comptes. */
-  | { libelle: string; cible: 'comptes' }
+  /** Ouvre les réglages, là où l'on relie ses comptes (et va jusqu'à la carte du compte concerné, s'il est précisé). */
+  | { libelle: string; cible: 'comptes'; compte?: CompteAVoir }
   /** Relit tout de suite les comptes reliés. */
   | { libelle: string; cible: 'actualiser' };
 
@@ -26,7 +31,8 @@ export interface Alerte {
   dapres: string;
   /** Précaution affichée sous l'alerte. */
   note?: string;
-  action: Action;
+  /** Le bouton qui aide à agir ; absent quand il n'y a rien à faire de plus que « Fait » ou « Plus tard ». */
+  action?: Action;
 }
 
 export interface ContexteAlertes {
@@ -55,6 +61,15 @@ export function calculerAlertes(ctx: ContexteAlertes): Alerte[] {
   if (publication) alertes.push(publication);
   alertes.push(...alertesVideos(ctx));
   return alertes;
+}
+
+/**
+ * Le compteur des voyants : seulement ceux à traiter (ton « attention »). Les infos et les bonnes nouvelles
+ * ne demandent rien : elles ne comptent pas.
+ */
+export function compteurVoyants(alertes: Alerte[]): string {
+  const n = alertes.filter((a) => a.ton === 'attention').length;
+  return n === 0 ? 'rien à traiter' : `${n} à traiter`;
 }
 
 /** Retire les alertes rangées avec « Fait », et celles mises à « Plus tard » aujourd'hui. */
@@ -105,7 +120,7 @@ function alerteBoutique(ctx: ContexteAlertes, reliee: boolean): Alerte | null {
       dapres: ctx.couverture
         ? `D’après : dernières ventes chargées le ${jourMois(dateParis(new Date(ctx.couverture)))}. Reliée, ta boutique les envoie toute seule.`
         : 'D’après : aucune vente chargée pour l’instant, les chiffres restent vides.',
-      action: { libelle: 'Relier ma boutique', cible: 'comptes' },
+      action: RELIER_BOUTIQUE,
     };
   }
   if (!ctx.couverture) return null; // la première lecture est en cours
@@ -117,7 +132,7 @@ function alerteBoutique(ctx: ContexteAlertes, reliee: boolean): Alerte | null {
     ton: 'attention',
     titre: 'Tes ventes ne se mettent plus à jour',
     dapres: `D’après : dernières ventes lues le ${jourMois(dateParis(couverture))}. Regarde la boutique reliée dans les réglages.`,
-    action: { libelle: 'Voir la boutique reliée', cible: 'comptes' },
+    action: { libelle: 'Voir la boutique reliée', cible: 'comptes', compte: 'boutique' },
   };
 }
 
@@ -133,13 +148,13 @@ function alertePublication(ctx: ContexteAlertes): Alerte | null {
 
   let constat: string;
   if (duJour > 0) {
-    constat = `Tu as publié ${duJour} vidéo${duJour > 1 ? 's' : ''} aujourd’hui.`;
+    constat = `tu as publié ${duJour} vidéo${duJour > 1 ? 's' : ''} aujourd’hui.`;
   } else if (dates.length === 0) {
-    constat = ctx.comptes ? 'Aucune vidéo pour l’instant.' : 'Aucune vidéo notée pour l’instant.';
+    constat = ctx.comptes ? 'aucune vidéo pour l’instant.' : 'aucune vidéo notée pour l’instant.';
   } else {
     const derniere = dates.reduce((a, b) => (a > b ? a : b));
     const n = joursEntre(derniere, aujourdhui);
-    constat = n === 1 ? 'Ton dernier post date d’hier.' : `Ton dernier post date de ${n} jours.`;
+    constat = n === 1 ? 'ta dernière vidéo date d’hier.' : `ta dernière vidéo remonte à ${n} jours.`;
   }
 
   const manque = objectif - duJour;
@@ -156,7 +171,7 @@ function alertePublication(ctx: ContexteAlertes): Alerte | null {
       ? { libelle: 'J’ai publié', cible: 'saisie-video' }
       : ctx.comptes.videos
         ? { libelle: 'Actualiser', cible: 'actualiser' }
-        : { libelle: 'Relier TikTok', cible: 'comptes' },
+        : { libelle: 'Relier TikTok', cible: 'comptes', compte: 'tiktok' },
   };
 }
 
@@ -177,12 +192,14 @@ function alerteVideo(video: Video, ctx: ContexteAlertes): Alerte {
   const debut = new Date(video.instant);
   const fin = new Date(debut.getTime() + FENETRE_VIDEO_MS);
   const nom = `Ta vidéo ${NOMS_RESEAUX[video.reseau]} du ${jourMois(dateParis(debut))}`;
-  const action: Action = video.lien
+  // Une vidéo TikTok sans lien, TikTok relié : elle se met à jour toute seule, pas de bouton.
+  // Une vidéo Instagram (pas encore reliée) se complète à la main.
+  const action: Action | undefined = video.lien
     ? { libelle: 'Voir la vidéo', cible: 'lien', url: video.lien }
-    : ctx.comptes?.videos
-      ? { libelle: 'Actualiser', cible: 'actualiser' }
+    : ctx.comptes?.videos && video.reseau === 'tiktok'
+      ? undefined
       : { libelle: 'Compléter la vidéo', cible: 'modifier-video', videoId: video.id };
-  const base = { type: 'video' as const, action };
+  const base = { type: 'video' as const, ...(action ? { action } : {}) };
 
   // Pas encore 48 h, ou ventes pas chargées jusqu'au bout : on ne conclut pas.
   if (ctx.maintenant.getTime() < fin.getTime()) {
@@ -195,9 +212,12 @@ function alerteVideo(video: Video, ctx: ContexteAlertes): Alerte {
     };
   }
   if (!ctx.couverture || Date.parse(ctx.couverture) < fin.getTime()) {
-    const charge = ctx.couverture ? `Ventes chargées jusqu’au ${quandParis(new Date(ctx.couverture))}` : 'Aucune vente chargée';
+    const charge = ctx.couverture ? `ventes chargées jusqu’au ${quandParis(new Date(ctx.couverture))}` : 'aucune vente chargée';
+    // En ligne, sans boutique reliée, les ventes n'arriveront pas toutes seules : on propose de la relier.
+    const sansBoutique = ctx.comptes && !ctx.comptes.boutique;
     return {
       ...base,
+      ...(sansBoutique ? { action: RELIER_BOUTIQUE } : {}),
       id: `video-${video.id}-tot`,
       ton: 'info',
       titre: `${nom} : trop tôt pour conclure`,
