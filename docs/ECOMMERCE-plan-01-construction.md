@@ -174,7 +174,10 @@ Kévin veut que l'appli récupère les données toute seule, sans saisie ni fich
 
 - Une petite partie « serveur » dans le Worker Cloudflare déjà en ligne : connexion aux comptes, et relevé
   automatique chaque jour. Les clés secrètes restent dans les réglages Cloudflare, jamais dans le code.
-- « J'ai publié » et l'ajout de fichier restent disponibles en secours.
+- « J'ai publié » et l'ajout de fichier restent disponibles en secours. Depuis le 6 octobre (demande de Kévin :
+  « c'est pas moi qui dois rentrer les données à la main »), ils ne sont plus sur l'écran principal en ligne : en bas,
+  « Actualiser » (ou « Relier mes comptes » s'il n'y a rien de relié), et les voyants proposent de relier la boutique
+  ou TikTok. La saisie à la main reste dans les réglages, « À la main, en secours » (pour Instagram en attendant).
 - Coût visé : 0 € (API gratuites, offres gratuites de Cloudflare et Supabase). À revérifier au moment de le faire.
 
 Ordre : choisir la boutique en tenant compte de ce branchement (étape 7) → créer les comptes TikTok et

@@ -10,7 +10,11 @@ export type Action =
   | { libelle: string; cible: 'saisie-video' }
   | { libelle: string; cible: 'import' }
   | { libelle: string; cible: 'lien'; url: string }
-  | { libelle: string; cible: 'modifier-video'; videoId: string };
+  | { libelle: string; cible: 'modifier-video'; videoId: string }
+  /** Ouvre les réglages, là où l'on relie ses comptes. */
+  | { libelle: string; cible: 'comptes' }
+  /** Relit tout de suite les comptes reliés. */
+  | { libelle: string; cible: 'actualiser' };
 
 export interface Alerte {
   /** Identifiant stable : sert à retenir « Fait » et « Plus tard ». */
@@ -33,6 +37,11 @@ export interface ContexteAlertes {
   couverture: string | null;
   exemple: boolean;
   maintenant: Date;
+  /**
+   * Avec la base en ligne : ce qui est relié. Les données arrivent alors toutes seules, et les alertes
+   * proposent de relier un compte plutôt que de noter à la main. Absent sur l'appareil seul.
+   */
+  comptes?: { boutique: boolean; videos: boolean };
 }
 
 export const NOTE_DATES = 'Correspondance par dates, pas une preuve.';
@@ -61,6 +70,7 @@ export function alertesVisibles(alertes: Alerte[], etats: Record<string, EtatAle
 // Alerte C : les ventes chargées sont trop anciennes, ou absentes.
 function alerteFichier(ctx: ContexteAlertes): Alerte | null {
   if (ctx.exemple) return null;
+  if (ctx.comptes) return alerteBoutique(ctx, ctx.comptes.boutique);
   const action: Action = { libelle: 'Ajouter le fichier', cible: 'import' };
   if (!ctx.couverture) {
     return {
@@ -84,6 +94,33 @@ function alerteFichier(ctx: ContexteAlertes): Alerte | null {
   };
 }
 
+// Alerte C, avec la base en ligne : la boutique n'est pas reliée, ou ses ventes ne se mettent plus à jour.
+function alerteBoutique(ctx: ContexteAlertes, reliee: boolean): Alerte | null {
+  if (!reliee) {
+    return {
+      id: 'boutique-a-relier',
+      type: 'fichier',
+      ton: 'attention',
+      titre: 'Relie ta boutique',
+      dapres: ctx.couverture
+        ? `D’après : dernières ventes chargées le ${jourMois(dateParis(new Date(ctx.couverture)))}. Reliée, ta boutique les envoie toute seule.`
+        : 'D’après : aucune vente chargée pour l’instant, les chiffres restent vides.',
+      action: { libelle: 'Relier ma boutique', cible: 'comptes' },
+    };
+  }
+  if (!ctx.couverture) return null; // la première lecture est en cours
+  const couverture = new Date(ctx.couverture);
+  if (ctx.maintenant.getTime() - couverture.getTime() <= FENETRE_VIDEO_MS) return null;
+  return {
+    id: `boutique-${ctx.couverture}`,
+    type: 'fichier',
+    ton: 'attention',
+    titre: 'Tes ventes ne se mettent plus à jour',
+    dapres: `D’après : dernières ventes lues le ${jourMois(dateParis(couverture))}. Regarde la boutique reliée dans les réglages.`,
+    action: { libelle: 'Voir la boutique reliée', cible: 'comptes' },
+  };
+}
+
 // Alerte A : rythme de publication.
 function alertePublication(ctx: ContexteAlertes): Alerte | null {
   const objectif = ctx.reglages.objectifParJour;
@@ -98,7 +135,7 @@ function alertePublication(ctx: ContexteAlertes): Alerte | null {
   if (duJour > 0) {
     constat = `Tu as publié ${duJour} vidéo${duJour > 1 ? 's' : ''} aujourd’hui.`;
   } else if (dates.length === 0) {
-    constat = 'Aucune vidéo notée pour l’instant.';
+    constat = ctx.comptes ? 'Aucune vidéo pour l’instant.' : 'Aucune vidéo notée pour l’instant.';
   } else {
     const derniere = dates.reduce((a, b) => (a > b ? a : b));
     const n = joursEntre(derniere, aujourdhui);
@@ -115,7 +152,11 @@ function alertePublication(ctx: ContexteAlertes): Alerte | null {
         ? 'Tu n’as pas publié aujourd’hui'
         : `Encore ${manque} vidéo${manque > 1 ? 's' : ''} pour ton objectif du jour`,
     dapres: `D’après : ${constat} Ton objectif : ${objectif} par jour.`,
-    action: { libelle: 'J’ai publié', cible: 'saisie-video' },
+    action: !ctx.comptes
+      ? { libelle: 'J’ai publié', cible: 'saisie-video' }
+      : ctx.comptes.videos
+        ? { libelle: 'Actualiser', cible: 'actualiser' }
+        : { libelle: 'Relier TikTok', cible: 'comptes' },
   };
 }
 
@@ -138,7 +179,9 @@ function alerteVideo(video: Video, ctx: ContexteAlertes): Alerte {
   const nom = `Ta vidéo ${NOMS_RESEAUX[video.reseau]} du ${jourMois(dateParis(debut))}`;
   const action: Action = video.lien
     ? { libelle: 'Voir la vidéo', cible: 'lien', url: video.lien }
-    : { libelle: 'Compléter la vidéo', cible: 'modifier-video', videoId: video.id };
+    : ctx.comptes?.videos
+      ? { libelle: 'Actualiser', cible: 'actualiser' }
+      : { libelle: 'Compléter la vidéo', cible: 'modifier-video', videoId: video.id };
   const base = { type: 'video' as const, action };
 
   // Pas encore 48 h, ou ventes pas chargées jusqu'au bout : on ne conclut pas.

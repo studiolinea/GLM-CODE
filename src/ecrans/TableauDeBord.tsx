@@ -23,6 +23,7 @@ export function TableauDeBord({
   maintenant,
   nomBusiness,
   onBusiness,
+  automatique = false,
   exemple,
   couverture,
   periode,
@@ -39,6 +40,8 @@ export function TableauDeBord({
   /** Le business affiché (avec la base en ligne) ; un appui ouvre « Mes business ». */
   nomBusiness?: string;
   onBusiness?: () => void;
+  /** Vrai avec la base en ligne : ventes et vidéos arrivent des comptes reliés. */
+  automatique?: boolean;
   exemple: boolean;
   couverture: string | null;
   periode: Periode;
@@ -96,7 +99,9 @@ export function TableauDeBord({
       {exemple && (
         <div className="bandeau-exemple" role="note">
           <strong>DONNÉES D’EXEMPLE</strong> Ces chiffres sont inventés pour te montrer l’appli. Ils disparaissent dès que
-          tu notes une vraie vidéo ou que tu ajoutes un vrai fichier de ventes.{' '}
+          {automatique
+            ? ' tes comptes reliés envoient de vraies ventes ou de vraies vidéos.'
+            : ' tu notes une vraie vidéo ou que tu ajoutes un vrai fichier de ventes.'}{' '}
           <button className="lien-bandeau" onClick={onQuitterExemple}>
             Commencer avec mes vraies données
           </button>
@@ -143,7 +148,7 @@ export function TableauDeBord({
           )}
           <p className="note">Gains = ventes moins commissions et frais. Avant impôts et cotisations.</p>
           <p className="note">
-            {couverture ? `Ventes chargées jusqu’au ${quandParis(new Date(couverture))}.` : 'Aucun fichier de ventes ajouté.'}
+            {couverture ? `Ventes chargées jusqu’au ${quandParis(new Date(couverture))}.` : automatique ? 'Aucune vente lue pour l’instant.' : 'Aucun fichier de ventes ajouté.'}
           </p>
         </section>
 

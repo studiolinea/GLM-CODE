@@ -19,6 +19,8 @@ export function Reglages({
   compte,
   boutique,
   onObjectif,
+  onSaisieManuelle,
+  onImportManuel,
   onRestaurer,
   onRemettreExemple,
   onFermer,
@@ -30,6 +32,9 @@ export function Reglages({
   /** Les comptes reliés (boutique, réseaux), seulement avec la base en ligne. */
   boutique?: SynchroBoutique;
   onObjectif: (objectifParJour: number) => void;
+  /** En secours seulement (en ligne, tout arrive des comptes reliés). */
+  onSaisieManuelle?: () => void;
+  onImportManuel?: () => void;
   onRestaurer: (donnees: Donnees) => void;
   onRemettreExemple: () => void;
   onFermer: () => void;
@@ -71,6 +76,27 @@ export function Reglages({
         <>
           <hr className="separateur" />
           <ComptesRelies boutique={boutique} />
+          {(onSaisieManuelle || onImportManuel) && (
+            <>
+              <h3 className="titre-reglage">À la main, en secours</h3>
+              <p className="texte-doux">
+                Tout arrive tout seul de tes comptes reliés. Ces boutons ne servent qu’en secours : une vidéo Instagram
+                (pas encore reliée) ou un fichier de ventes d’une autre plateforme.
+              </p>
+              <div className="pied" style={{ justifyContent: 'flex-start' }}>
+                {onSaisieManuelle && (
+                  <button type="button" className="bouton discret" onClick={onSaisieManuelle}>
+                    Noter une vidéo
+                  </button>
+                )}
+                {onImportManuel && (
+                  <button type="button" className="bouton discret" onClick={onImportManuel}>
+                    Ajouter un fichier de ventes
+                  </button>
+                )}
+              </div>
+            </>
+          )}
         </>
       )}
 
