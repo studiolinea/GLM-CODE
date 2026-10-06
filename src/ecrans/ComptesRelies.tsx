@@ -406,7 +406,11 @@ function CompteTikTok({ boutique }: { boutique: SynchroBoutique }) {
   const [occupe, setOccupe] = useState(false);
   const [message, setMessage] = useState<MessageCompte | null>(null);
   const affiche = message ?? boutique.messageTikTok;
-  const erreurActualisation = boutique.connexionExpiree ? undefined : boutique.erreursComptes.tiktok;
+  // Le serveur note aussi l'erreur sur chaque compte en panne : elle est déjà écrite sous ce compte, pas une deuxième fois.
+  const erreurActualisation =
+    boutique.connexionExpiree || relies.some((c) => c.derniereErreur === boutique.erreursComptes.tiktok)
+      ? undefined
+      : boutique.erreursComptes.tiktok;
 
   const relier = async () => {
     setMessage(null);
