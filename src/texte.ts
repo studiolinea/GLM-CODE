@@ -23,6 +23,11 @@ export function memeNom(a: string, b: string): boolean {
   return simple(a) === simple(b);
 }
 
+/** « mode test · ventes à jour » → « Mode test · ventes à jour » : une majuscule au début, rien d'autre ne change. */
+export function majuscule(texte: string): string {
+  return texte.charAt(0).toLocaleUpperCase('fr-FR') + texte.slice(1);
+}
+
 /** Le mot au singulier pour 0 et 1, au pluriel à partir de 2 (règle française). */
 export function accord(n: number, singulier: string, pluriel = `${singulier}s`): string {
   return Math.abs(n) >= 2 ? pluriel : singulier;

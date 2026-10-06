@@ -10,7 +10,7 @@ import {
 } from '../donnees/comptesRelies';
 import type { MessageCompte, SynchroBoutique } from '../donnees/useSynchroBoutique';
 import { quandParis } from '../temps';
-import { fr } from '../texte';
+import { fr, majuscule } from '../texte';
 import { avecSouris } from './Feuille';
 import { IconeChevron } from './Icones';
 
@@ -207,7 +207,7 @@ function Boutique({ fiche, boutique }: { fiche: FicheBoutique; boutique: Synchro
 
       {relie ? (
         <>
-          <p className="texte-doux">{apport ? `${apport} · ${etat}` : etat}</p>
+          <p className="texte-doux">{majuscule(apport ? `${apport} · ${etat}` : etat)}</p>
           {/* L'erreur de cette actualisation, sinon la dernière notée par le serveur. */}
           {erreurActualisation ? (
             <p className="erreur">{fr(erreurActualisation)}</p>

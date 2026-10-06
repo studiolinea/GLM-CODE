@@ -4,15 +4,14 @@ import type { Vente } from '../ventes/modele';
 import { importerVentes, quitterExemple } from './actions';
 import {
   adresseConnexionTikTok,
-  apportLibelle,
   avecNomCompte,
   BOUTIQUES,
   ConnexionExpiree,
   deconnecterCompte,
   listerComptes,
   MESSAGE_CONNEXION_EXPIREE,
+  messageBoutiqueReliee,
   mouvementsBoutique,
-  NOMS_COMPTES,
   relierBoutique,
   relierTikTok,
   synchroniserBoutique,
@@ -281,8 +280,7 @@ export function useSynchroBoutique(
       try {
         const libelle = await relierBoutique(businessId, source, cle);
         await synchroniser();
-        const apport = apportLibelle(libelle, NOMS_COMPTES[source]);
-        finir({ type: 'succes', texte: apport ? `Boutique reliée : ${apport}.` : 'Boutique reliée.' });
+        finir({ type: 'succes', texte: messageBoutiqueReliee(source, libelle) });
         return true;
       } catch (e) {
         if (e instanceof ConnexionExpiree && monte.current) setConnexionExpiree(true);
