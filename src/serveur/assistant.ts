@@ -1,3 +1,5 @@
+import { entetesSupabaseServeur } from "./authSupabase";
+
 // L’IA reçoit uniquement des totaux calculés ici, jamais les lignes des boutiques.
 import { bornesPeriode, calculerResume, type Periode } from '../calculs/resume';
 import { rythmeSemaine } from '../calculs/rythme';
@@ -117,7 +119,9 @@ export async function analyserBusiness(
   const cloudflare = env.IA_MODE === 'cloudflare-gratuit';
   const controleur = new AbortController();
   const minuteur = setTimeout(() => controleur.abort(), DELAI_MAX_MS);
-  const headers = { apikey: env.SUPABASE_CLE_PUBLIQUE, Authorization: `Bearer ${jeton}` };
+  const headers = jeton === env.SUPABASE_CLE_SERVEUR
+    ? entetesSupabaseServeur(jeton)
+    : { apikey: env.SUPABASE_CLE_PUBLIQUE, Authorization: `Bearer ${jeton}` };
   const filtre = { user_id: `eq.${userId}`, business_id: `eq.${businessId}` };
   const base = (table: string, parametres: Record<string, string>) => recuperer(
     `${env.SUPABASE_URL}/rest/v1/${table}?${new URLSearchParams(parametres)}`,
@@ -234,7 +238,7 @@ export async function analyserBusiness(
     {
       const reservation = await recuperer(`${env.SUPABASE_URL}/rest/v1/rpc/reserver_analyse_assistant`, {
         method: 'POST', redirect: 'error', signal: controleur.signal,
-        headers: { apikey: env.SUPABASE_CLE_SERVEUR!, Authorization: `Bearer ${env.SUPABASE_CLE_SERVEUR}`, 'Content-Type': 'application/json' },
+        headers: { ...entetesSupabaseServeur(env.SUPABASE_CLE_SERVEUR!), 'Content-Type': 'application/json' },
         body: JSON.stringify({ p_jour: maintenant.toISOString().slice(0, 10), p_user_id: userId, p_business_id: businessId }),
       });
       const reserve = await lireJSON(reservation, 1024);

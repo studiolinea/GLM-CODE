@@ -318,3 +318,23 @@ describe('Groq gratuit proposé sans activation implicite', () => {
     expect(await reponse.json()).toMatchObject({ disponible: true, mode: 'groq-gratuit' });
   });
 });
+
+it.each(['sb_secret_factice', 'service-role-jwt-factice'])('sépare session utilisateur et clé serveur (%s)', async (cle) => {
+  const recuperer = faux();
+  const configuration = { ...env, SUPABASE_CLE_SERVEUR: cle };
+  await analyserBusiness(configuration, 'session-utilisateur', 'utilisateur', business, '7j', 'priorites', recuperer, new Date(), () => true);
+  for (const [url, init] of recuperer.mock.calls) {
+    if (!String(url).includes('/rest/v1/')) continue;
+    const h = new Headers(init?.headers);
+    const rpc = String(url).includes('/rpc/');
+    expect(h.get('apikey')).toBe(rpc ? cle : 'publique');
+    expect(h.get('Authorization')).toBe(rpc ? (cle.startsWith('sb_secret_') ? null : `Bearer ${cle}`) : 'Bearer session-utilisateur');
+  }
+  recuperer.mockClear();
+  await analyserBusiness(configuration, cle, 'utilisateur', business, '7j', 'priorites', recuperer, new Date(), () => true);
+  for (const [url, init] of recuperer.mock.calls) if (String(url).includes('/rest/v1/')) {
+    const h = new Headers(init?.headers);
+    expect(h.get('apikey')).toBe(cle);
+    expect(h.get('Authorization')).toBe(cle.startsWith('sb_secret_') ? null : `Bearer ${cle}`);
+  }
+});
