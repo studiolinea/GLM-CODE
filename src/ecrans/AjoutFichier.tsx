@@ -20,8 +20,8 @@ function decrire(bilan: BilanImport, lignesIgnorees: LigneIgnoree[]): string[] {
   ];
   if (bilan.exempleRetire) lignes.push('Les données d’exemple ont été retirées.');
   if (lignesIgnorees.length > 0) {
-    lignes.push(`${nombre(lignesIgnorees.length, 'ligne refusée', 'lignes refusées')} :`);
-    for (const l of lignesIgnorees.slice(0, 5)) lignes.push(`• ligne ${l.ligne} : ${l.raison}`);
+    lignes.push(`${nombre(lignesIgnorees.length, 'ligne refusée', 'lignes refusées')} :`);
+    for (const l of lignesIgnorees.slice(0, 5)) lignes.push(`• ligne ${l.ligne} : ${l.raison}`);
   }
   return lignes;
 }
@@ -59,7 +59,7 @@ export function AjoutFichier({
     const bilan = onImporter(lecture.ventes, maintenant.toISOString(), true);
     setMessage({
       type: 'succes',
-      lignes: [...decrire(bilan, lecture.lignesIgnorees), 'Ce sont des ventes d’essai : tout reste marqué comme exemple.'],
+      lignes: [...decrire(bilan, lecture.lignesIgnorees), 'Ce sont des ventes d’essai : tout reste marqué comme exemple.'],
     });
   };
 
@@ -71,7 +71,7 @@ export function AjoutFichier({
       </p>
       <p className="texte-doux">
         Pour l’instant, seul le format d’exemple est lu.
-        {enLigne && ' Ta boutique Stripe, elle, se relie dans les réglages : pas besoin de fichier.'}
+        {enLigne && ' Ta boutique Stripe, elle, se relie dans les réglages : pas besoin de fichier.'}
       </p>
       {/* Le champ reste dans la page (caché à l'œil) : on l'atteint aussi au clavier, avec Tab. */}
       <label className="bouton principal choix-fichier fichier-ventes">
@@ -101,7 +101,7 @@ export function AjoutFichier({
         <>
           <hr className="separateur" />
           <p className="texte-doux">
-            Pas encore de fichier ? Ajoute quelques ventes d’essai pour voir les chiffres et les alertes changer. Elles
+            Pas encore de fichier ? Ajoute quelques ventes d’essai pour voir les chiffres et les alertes changer. Elles
             restent marquées comme exemple.
           </p>
         </>

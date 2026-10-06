@@ -90,7 +90,7 @@ export function TableauDeBord({
               {jourEnTete(maintenant)}
             </p>
             {onBusiness && (
-              <button className="selecteur-business" onClick={onBusiness} aria-label={`Business ouvert : ${nomBusiness}. Changer de business`}>
+              <button className="selecteur-business" onClick={onBusiness} aria-label={`Business ouvert : ${nomBusiness}. Changer de business`}>
                 <span className="selecteur-business-texte">
                   <span className="etiquette">Business</span>
                   <span className="selecteur-business-nom">{nomBusiness}</span>
@@ -164,19 +164,19 @@ export function TableauDeBord({
           {!sansDonnees && resume.gainsCentimes === null && (
             <p className="note alerte-note">
               Frais non fournis par la boutique pour {resume.ventesSansFrais} vente
-              {resume.ventesSansFrais > 1 ? 's' : ''} : pas de gains devinés.
+              {resume.ventesSansFrais > 1 ? 's' : ''} : pas de gains devinés.
             </p>
           )}
           {resume.tvaCentimes !== null && (
             <p className="note">
-              TVA retenue par la boutique : {euros(resume.tvaCentimes)}. Elle est payée par tes clients et reversée à
+              TVA retenue par la boutique : {euros(resume.tvaCentimes)}. Elle est payée par tes clients et reversée à
               l’État, donc pas comptée dans tes ventes.
             </p>
           )}
           {ventesEcartees > 0 && (
             <p className="note alerte-note">
               {ventesEcartees} vente{ventesEcartees > 1 ? 's' : ''} de ta boutique pas comptée{ventesEcartees > 1 ? 's' : ''} ici
-              (autre devise…) : le détail est dans les réglages.
+              (autre devise…) : le détail est dans les réglages.
             </p>
           )}
           <p className="note">{PHRASE_GAINS}</p>
@@ -194,7 +194,7 @@ export function TableauDeBord({
             <p className="rien">
               {automatique
                 ? 'Aucun voyant allumé. Tes ventes et tes vidéos arrivent toutes seules.'
-                : 'Aucun voyant allumé. Note ta prochaine vidéo avec « J’ai publié ».'}
+                : 'Aucun voyant allumé. Note ta prochaine vidéo avec « J’ai publié ».'}
             </p>
           ) : (
             <ul className="alertes">

@@ -69,7 +69,7 @@ export function Reglages({
           Objectif
         </h3>
         <p id="question-objectif" className="texte-doux">
-          Combien de vidéos par jour ? Mets 0 pour ne plus avoir de rappel.
+          Combien de vidéos par jour ? Mets 0 pour ne plus avoir de rappel.
         </p>
         <div className="objectif" role="group" aria-labelledby="question-objectif">
           <button
@@ -106,7 +106,7 @@ export function Reglages({
               <hr className="separateur" />
               <h3 className="titre-reglage">À la main, en secours</h3>
               <p className="texte-doux">
-                Tout arrive tout seul de tes comptes reliés. Ces boutons ne servent qu’en secours : une vidéo Instagram
+                Tout arrive tout seul de tes comptes reliés. Ces boutons ne servent qu’en secours : une vidéo Instagram
                 (pas encore reliée) ou un fichier de ventes d’une autre plateforme.
               </p>
               <div className="pied" style={{ justifyContent: 'flex-start' }}>
@@ -130,7 +130,7 @@ export function Reglages({
       <h3 className="titre-reglage">Sauvegarde</h3>
       <p className="texte-doux">
         {enLigne
-          ? 'Tes données sont dans ta base en ligne : les mêmes sur le Mac et le téléphone. La sauvegarde en fait une copie dans un fichier, au cas où.'
+          ? 'Tes données sont dans ta base en ligne : les mêmes sur le Mac et le téléphone. La sauvegarde en fait une copie dans un fichier, au cas où.'
           : 'Tes données sont gardées sur cet appareil. La sauvegarde en fait une copie dans un fichier, au cas où.'}
       </p>
       {message && (

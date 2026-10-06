@@ -5,7 +5,7 @@ import { fr } from '../texte';
 const VOYANTS: Record<Ton, string> = { attention: '!', 'bonne-nouvelle': '✓', info: 'i' };
 
 /** Ce que dit la couleur du voyant, pour qui écoute l'écran au lieu de le voir. */
-const TONS_LUS: Record<Ton, string> = { attention: 'À traiter : ', 'bonne-nouvelle': 'Bonne nouvelle : ', info: 'Info : ' };
+const TONS_LUS: Record<Ton, string> = { attention: 'À traiter : ', 'bonne-nouvelle': 'Bonne nouvelle : ', info: 'Info : ' };
 
 export function CarteAlerte({
   alerte,

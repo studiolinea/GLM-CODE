@@ -24,9 +24,9 @@ const FICHES: FicheBoutique[] = [
     placeholder: 'Colle ici ta clé limitée (rk_…)',
     aide: (
       <>
-        Où la trouver : dans Stripe, « Développeurs », puis « Clés API », puis « Créer une clé limitée ». Nom :
-        « Pilotage ». Mets « Lecture » pour « Charges » et pour « Balance », et « Aucune » pour tout le reste. Copie
-        la clé, qui commence par « rk_ ». Elle ne peut que lire, rien modifier, et elle est chiffrée avant d’être
+        Où la trouver : dans Stripe, « Développeurs », puis « Clés API », puis « Créer une clé limitée ». Nom :
+        « Pilotage ». Mets « Lecture » pour « Charges » et pour « Balance », et « Aucune » pour tout le reste. Copie
+        la clé, qui commence par « rk_ ». Elle ne peut que lire, rien modifier, et elle est chiffrée avant d’être
         enregistrée.
       </>
     ),
@@ -39,8 +39,8 @@ const FICHES: FicheBoutique[] = [
     placeholder: 'Colle ici ta clé d’accès',
     aide: (
       <>
-        Où la trouver : dans Lemon Squeezy, « Settings », puis « API », puis le bouton « + ». Donne-lui le nom
-        « Pilotage », puis copie la clé. Elle est chiffrée avant d’être enregistrée.
+        Où la trouver : dans Lemon Squeezy, « Settings », puis « API », puis le bouton « + ». Donne-lui le nom
+        « Pilotage », puis copie la clé. Elle est chiffrée avant d’être enregistrée.
       </>
     ),
   },
@@ -52,7 +52,7 @@ const FICHES: FicheBoutique[] = [
  */
 function apportLibelle(libelle: string, plateforme: string): string | null {
   if (libelle.startsWith(plateforme)) return libelle.slice(plateforme.length).replace(/[()]/g, '').trim() || null;
-  return libelle.trim() ? `« ${libelle.trim()} »` : null;
+  return libelle.trim() ? `« ${libelle.trim()} »` : null;
 }
 
 /** « Mes comptes reliés » : chacun relie et déconnecte lui-même ses propres comptes. */
@@ -84,11 +84,11 @@ export function ComptesRelies({ boutique }: { boutique: SynchroBoutique }) {
         <div className="note alerte-note" role="status">
           <p>
             {boutique.ignorees.length} vente{boutique.ignorees.length > 1 ? 's' : ''} de ta boutique{' '}
-            {boutique.ignorees.length > 1 ? 'ne sont pas comptées' : 'n’est pas comptée'} dans tes chiffres :
+            {boutique.ignorees.length > 1 ? 'ne sont pas comptées' : 'n’est pas comptée'} dans tes chiffres :
           </p>
           {boutique.ignorees.slice(0, 5).map((i) => (
             <p key={i.numero}>
-              • {i.numero} : {fr(i.raison)}
+              • {i.numero} : {fr(i.raison)}
             </p>
           ))}
         </div>
@@ -122,7 +122,7 @@ function Boutique({ fiche, boutique }: { fiche: FicheBoutique; boutique: Synchro
       const libelle = await boutique.relier(fiche.source, cle.trim());
       setCle('');
       const apport = apportLibelle(libelle, fiche.plateforme);
-      setMessage({ type: 'succes', texte: apport ? `Boutique reliée : ${apport}.` : 'Boutique reliée.' });
+      setMessage({ type: 'succes', texte: apport ? `Boutique reliée : ${apport}.` : 'Boutique reliée.' });
     } catch (e) {
       setMessage({ type: 'erreur', texte: e instanceof Error ? e.message : 'La liaison a échoué. Réessaie.' });
     } finally {
@@ -172,7 +172,7 @@ function Boutique({ fiche, boutique }: { fiche: FicheBoutique; boutique: Synchro
             </>
           ) : (
             <div role="alert">
-              <p className="erreur">Déconnecter la boutique ? Ta clé sera effacée. Tes ventes déjà chargées restent.</p>
+              <p className="erreur">Déconnecter la boutique ? Ta clé sera effacée. Tes ventes déjà chargées restent.</p>
               <div className="pied" style={{ justifyContent: 'flex-start' }}>
                 <button type="button" className="bouton danger" disabled={occupe} onClick={() => void deconnecter()}>
                   Oui, déconnecter
@@ -191,7 +191,7 @@ function Boutique({ fiche, boutique }: { fiche: FicheBoutique; boutique: Synchro
             void relier();
           }}
         >
-          <p className="texte-doux">Relie ta boutique : tes ventes arriveront toutes seules à chaque ouverture de l’appli.</p>
+          <p className="texte-doux">Relie ta boutique : tes ventes arriveront toutes seules à chaque ouverture de l’appli.</p>
           <label className="champ">
             <span>Clé d’accès</span>
             <input
@@ -263,7 +263,7 @@ function somme(centimes: number | null, devise: string): string {
 function detailBrut(m: MouvementBoutique): string {
   const type = m.type || '—';
   const morceaux = [m.categorie && m.categorie !== m.type ? `${type} (${m.categorie})` : type, m.description ?? '—', m.origine ?? '—'];
-  for (const f of m.detailFrais) morceaux.push(`frais ${f.type || '—'}${f.description ? ` « ${f.description} »` : ''}`);
+  for (const f of m.detailFrais) morceaux.push(`frais ${f.type || '—'}${f.description ? ` « ${f.description} »` : ''}`);
   return morceaux.join(' · ');
 }
 
@@ -299,7 +299,7 @@ function Verification({ source, plateforme, boutique }: { source: SourceBoutique
   return (
     <div className="verification">
       <p className="note">
-        Ce que la boutique a enregistré : ses 25 derniers mouvements d’argent, du plus récent au plus ancien. Rien
+        Ce que la boutique a enregistré : ses 25 derniers mouvements d’argent, du plus récent au plus ancien. Rien
         n’est gardé.
       </p>
       {enCours && <p className="texte-doux">Lecture…</p>}
@@ -319,12 +319,12 @@ function Verification({ source, plateforme, boutique }: { source: SourceBoutique
               </div>
               {m.detailFrais.map((f, j) => (
                 <div key={j} className="texte-doux">
-                  dont {traduire(f.description) ?? nomType(f.type)} : {somme(f.montantCentimes, m.devise)}
+                  dont {traduire(f.description) ?? nomType(f.type)} : {somme(f.montantCentimes, m.devise)}
                 </div>
               ))}
               {traduire(m.description) && <div className="texte-doux">{traduire(m.description)}</div>}
               <div className="note detail-brut">
-                Détail {plateforme} : {detailBrut(m)}
+                Détail {plateforme} : {detailBrut(m)}
               </div>
             </li>
           ))}
@@ -372,17 +372,17 @@ function CompteTikTok({ boutique }: { boutique: SynchroBoutique }) {
         </span>
       </div>
       {relies.length === 0 ? (
-        <p className="texte-doux">Relie ton compte : tes vidéos et leurs vues arriveront toutes seules, sans rien noter.</p>
+        <p className="texte-doux">Relie ton compte : tes vidéos et leurs vues arriveront toutes seules, sans rien noter.</p>
       ) : (
         relies.map((c) => <CompteTikTokRelie key={c.identifiant} compte={c} boutique={boutique} onMessage={setMessage} />)
       )}
       <p className="note">
-        TikTok te demandera ton accord. Pilotage lit seulement tes vidéos publiques et leurs vues : il ne publie rien.
+        TikTok te demandera ton accord. Pilotage lit seulement tes vidéos publiques et leurs vues : il ne publie rien.
       </p>
       {relies.length === 0 && (
         <p className="note">
-          Pendant la phase de test, seuls les comptes ajoutés dans ton espace TikTok pour développeurs (liste « Target
-          Users ») peuvent se relier.
+          Pendant la phase de test, seuls les comptes ajoutés dans ton espace TikTok pour développeurs (liste « Target
+          Users ») peuvent se relier.
         </p>
       )}
       <div className="pied" style={{ justifyContent: 'flex-start' }}>
@@ -420,7 +420,7 @@ function CompteTikTokRelie({
     setOccupe(true);
     try {
       await boutique.deconnecter('tiktok', compte.identifiant);
-      onMessage({ type: 'succes', texte: `« ${compte.libelle} » déconnecté. Ses vidéos déjà chargées restent.` });
+      onMessage({ type: 'succes', texte: `« ${compte.libelle} » déconnecté. Ses vidéos déjà chargées restent.` });
     } catch (e) {
       onMessage({ type: 'erreur', texte: e instanceof Error ? e.message : 'La déconnexion a échoué. Réessaie.' });
       setOccupe(false);
@@ -430,7 +430,7 @@ function CompteTikTokRelie({
   return (
     <div className="compte-reseau">
       <p className="texte-doux">
-        « {compte.libelle} » ·{' '}
+        « {compte.libelle} » ·{' '}
         {boutique.enCours
           ? 'actualisation…'
           : compte.derniereSynchro
@@ -444,7 +444,7 @@ function CompteTikTokRelie({
         </button>
       ) : (
         <div role="alert">
-          <p className="erreur">Déconnecter « {compte.libelle} » ? L’accès sera effacé. Ses vidéos déjà chargées restent.</p>
+          <p className="erreur">Déconnecter « {compte.libelle} » ? L’accès sera effacé. Ses vidéos déjà chargées restent.</p>
           <div className="pied" style={{ justifyContent: 'flex-start' }}>
             <button type="button" className="bouton danger" disabled={occupe} onClick={() => void deconnecter()}>
               Oui, déconnecter
@@ -466,7 +466,7 @@ function Bientot({ nom }: { nom: string }) {
         <span className="compte-nom">{nom}</span>
         <span className="puce">Bientôt</span>
       </div>
-      <p className="texte-doux">Bientôt : tu pourras relier ton compte {nom} ici.</p>
+      <p className="texte-doux">Bientôt : tu pourras relier ton compte {nom} ici.</p>
     </div>
   );
 }

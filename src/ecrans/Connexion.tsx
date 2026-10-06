@@ -30,7 +30,7 @@ export function Connexion({ client }: { client: SupabaseClient }) {
       if (mode === 'connexion') {
         const { error } = await client.auth.signInWithPassword({ email: adresse, password: motDePasse });
         if (error) {
-          console.warn('Connexion refusée :', error.message);
+          console.warn('Connexion refusée :', error.message);
           setErreur(traduireErreurConnexion(error.message));
         }
       } else {
@@ -40,7 +40,7 @@ export function Connexion({ client }: { client: SupabaseClient }) {
           options: { emailRedirectTo: window.location.origin + window.location.pathname },
         });
         if (error) {
-          console.warn('Création de compte refusée :', error.message);
+          console.warn('Création de compte refusée :', error.message);
           setErreur(traduireErreurConnexion(error.message));
         } else if (!data.session) {
           setInfo(
@@ -62,7 +62,7 @@ export function Connexion({ client }: { client: SupabaseClient }) {
     <EcranMessage>
       <p className="sous-titre">
         {inscription
-          ? 'Crée ton compte : il gardera tes chiffres, les mêmes sur le Mac et le téléphone.'
+          ? 'Crée ton compte : il gardera tes chiffres, les mêmes sur le Mac et le téléphone.'
           : 'Connecte-toi pour retrouver tes chiffres, les mêmes sur le Mac et le téléphone.'}
       </p>
       <form className="tableau formulaire" onSubmit={valider} noValidate>
@@ -109,7 +109,7 @@ export function Connexion({ client }: { client: SupabaseClient }) {
             setInfo('');
           }}
         >
-          {inscription ? 'J’ai déjà un compte' : 'Première fois ? Créer mon compte'}
+          {inscription ? 'J’ai déjà un compte' : 'Première fois ? Créer mon compte'}
         </button>
       </form>
       <LiensLegaux />

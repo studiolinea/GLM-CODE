@@ -217,7 +217,7 @@ function Cockpit({
       )}
       {enLigne && boutique.erreur && fenetre.type !== 'reglages' && (
         <div className="bandeau-erreur" role="alert">
-          <span className="bandeau-texte">{fr(`Actualisation incomplète : ${boutique.erreur}`)}</span>
+          <span className="bandeau-texte">{fr(`Actualisation incomplète : ${boutique.erreur}`)}</span>
           <button className="bouton discret bandeau-action" onClick={() => setFenetre({ type: 'reglages' })}>
             Voir mes comptes reliés
           </button>

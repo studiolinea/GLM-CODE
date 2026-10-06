@@ -40,7 +40,7 @@ export function MesBusiness({
     <Feuille titre="Mes business" onFermer={onFermer}>
       <p className="texte-doux">
         Chaque business a ses ventes, ses vidéos, ses voyants et ses comptes reliés.
-        {business.liste.length > 1 && ' Appuie sur « Ouvrir » pour passer de l’un à l’autre.'}
+        {business.liste.length > 1 && ' Appuie sur « Ouvrir » pour passer de l’un à l’autre.'}
       </p>
       {business.liste.length > 1 && (
         <div className="pied" style={{ justifyContent: 'flex-start' }}>
@@ -63,7 +63,7 @@ export function MesBusiness({
               onFermer();
             }}
             onRenommer={(nom) => agir(() => business.renommer(b.id, nom), 'Nom enregistré.')}
-            onSupprimer={() => agir(() => business.supprimer(b.id), `« ${b.nom} » est supprimé.`)}
+            onSupprimer={() => agir(() => business.supprimer(b.id), `« ${b.nom} » est supprimé.`)}
           />
         ))}
       </ul>
@@ -85,13 +85,13 @@ export function MesBusiness({
           <input
             id="nouveau-business"
             maxLength={NOM_MAX}
-            placeholder="Par exemple : Guide detailing"
+            placeholder="Par exemple : Guide detailing"
             enterKeyHint="done"
             value={nouveau}
             onChange={(e) => setNouveau(e.target.value)}
           />
         </label>
-        <p className="note">Il commence vide : relie sa boutique et ses comptes dans les réglages.</p>
+        <p className="note">Il commence vide : relie sa boutique et ses comptes dans les réglages.</p>
         <div className="pied" style={{ justifyContent: 'flex-start' }}>
           <button type="submit" className="bouton principal" disabled={occupe || !nouveau.trim()}>
             Créer et ouvrir ce business
@@ -186,7 +186,7 @@ function LigneBusiness({
       {mode === 'supprimer' && !seul && (
         <div role="alert">
           <p className="erreur">
-            Supprimer « {b.nom} » ? Ses ventes, ses vidéos, ses voyants et ses comptes reliés seront effacés pour de bon.
+            Supprimer « {b.nom} » ? Ses ventes, ses vidéos, ses voyants et ses comptes reliés seront effacés pour de bon.
             Ça ne peut pas être annulé.
           </p>
           <div className="pied" style={{ justifyContent: 'flex-start' }}>

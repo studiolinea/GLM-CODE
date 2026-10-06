@@ -129,7 +129,7 @@ function AvecBusiness({
       setErreur(e instanceof Error ? e.message.replace(/\s*Réessaie\.$/, '') : 'Impossible de lire tes business.');
       // Le détail technique, pour qui ouvre la console du navigateur.
       console.error(
-        'Lecture des business impossible. Si le problème continue, la base n’est peut-être pas à jour (texte SQL « 05-plusieurs-business.sql »).',
+        'Lecture des business impossible. Si le problème continue, la base n’est peut-être pas à jour (texte SQL « 05-plusieurs-business.sql »).',
         e instanceof Error ? (e.cause ?? e) : e,
       );
     }
@@ -168,7 +168,7 @@ function AvecBusiness({
 
   const supprimer = useCallback(
     async (id: string) => {
-      if ((liste?.length ?? 0) <= 1) throw new Error('Il te faut au moins un business : crée-en un autre avant de supprimer celui-ci.');
+      if ((liste?.length ?? 0) <= 1) throw new Error('Il te faut au moins un business : crée-en un autre avant de supprimer celui-ci.');
       await supprimerBusiness(client, id);
       oublierCopie(`${userId}:${id}`);
       const reste = await listerBusiness(client);

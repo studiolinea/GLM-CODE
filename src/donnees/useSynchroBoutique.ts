@@ -192,7 +192,7 @@ export function useSynchroBoutique(
     }
     relierTikTok(retourTikTok.code, retourTikTok.etat).then(
       (libelle) => {
-        setMessageTikTok({ type: 'succes', texte: `TikTok relié : « ${libelle} ».` });
+        setMessageTikTok({ type: 'succes', texte: `TikTok relié : « ${libelle} ».` });
         void synchroniser();
       },
       (e: unknown) =>

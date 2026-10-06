@@ -50,7 +50,7 @@ export function SaisieVideo({
     }
     const lienPropre = lien.trim();
     if (lienPropre && !/^https?:\/\/\S+$/i.test(lienPropre)) {
-      return setErreur('Le lien doit commencer par « https:// ».');
+      return setErreur('Le lien doit commencer par « https:// ».');
     }
     let nombreVues: number | undefined;
     if (vues.trim() !== '') {
@@ -70,7 +70,7 @@ export function SaisieVideo({
     <Feuille titre={video ? 'Compléter la vidéo' : 'J’ai publié'} onFermer={onFermer}>
       <form onSubmit={valider} noValidate>
         <div className="champ">
-          <span>Sur quel réseau ?</span>
+          <span>Sur quel réseau ?</span>
           <div className="choix">
             {(Object.keys(NOMS_RESEAUX) as Reseau[]).map((r) => (
               <button key={r} type="button" className="periode" aria-pressed={reseau === r} onClick={() => setReseau(r)}>
@@ -108,7 +108,7 @@ export function SaisieVideo({
         {erreur && <p className="erreur">{fr(erreur)}</p>}
         {confirmer && video && onSupprimer ? (
           <div role="alert">
-            <p className="erreur">Supprimer cette vidéo ? Ça ne peut pas être annulé.</p>
+            <p className="erreur">Supprimer cette vidéo ? Ça ne peut pas être annulé.</p>
             <div className="pied">
               <button type="button" className="bouton danger" onClick={() => onSupprimer(video.id)}>
                 Oui, supprimer

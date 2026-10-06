@@ -43,6 +43,8 @@ export function VueEnsemble({
 
   const ensemble = useMemo(() => (donnees ? calculerEnsemble(donnees, periode, maintenant) : null), [donnees, periode, maintenant]);
   const euros = (centimes: number | null) => (centimes === null ? '—' : formatEuros(centimes));
+  const sansVentes = ensemble ? ensemble.lignes.filter((l) => l.ventesInconnues && !l.vide).map((l) => l.nom) : [];
+  const liste = (noms: string[]) => noms.map((n) => `« ${n} »`).join(', ');
 
   return (
     <Feuille titre="Vue d’ensemble" onFermer={onFermer}>
@@ -82,29 +84,29 @@ export function VueEnsemble({
               <Chiffre nom="Gains réels" valeur={euros(ensemble.total.gainsCentimes)} gains />
               <Chiffre nom="Vidéos" valeur={String(ensemble.total.videos)} />
             </div>
-            {ensemble.lignes.some((l) => l.ventesInconnues && !l.vide) && (
+            {sansVentes.length > 0 && (
               <p className="note alerte-note">
-                Aucune vente lue pour{' '}
-                {ensemble.lignes
-                  .filter((l) => l.ventesInconnues && !l.vide)
-                  .map((l) => `« ${l.nom} »`)
-                  .join(', ')}{' '}
-                : sa boutique n’est pas reliée, ses ventes ne sont pas dans le total.
+                {fr(
+                  sansVentes.length === 1
+                    ? `Aucune vente lue pour ${liste(sansVentes)} : sa boutique n’est pas reliée, ses ventes ne sont pas dans le total.`
+                    : `Aucune vente lue pour ${liste(sansVentes)} : leurs boutiques ne sont pas reliées, leurs ventes ne sont pas dans le total.`,
+                )}
               </p>
             )}
             {ensemble.total.businessSansGains.length > 0 && (
               <p className="note alerte-note">
-                Gains inconnus pour {ensemble.total.businessSansGains.map((n) => `« ${n} »`).join(', ')} : des frais ne
-                sont pas fournis par la boutique, donc pas de total deviné.
+                {fr(
+                  `Gains inconnus pour ${liste(ensemble.total.businessSansGains)} : des frais ne sont pas fournis par la boutique, donc pas de total deviné.`,
+                )}
               </p>
             )}
             {ensemble.total.tvaCentimes !== null && (
               <p className="note">
-                TVA retenue par les boutiques : {formatEuros(ensemble.total.tvaCentimes)}, pas comptée dans les ventes.
+                TVA retenue par les boutiques : {formatEuros(ensemble.total.tvaCentimes)}, pas comptée dans les ventes.
               </p>
             )}
             {ensemble.total.remboursementsCentimes > 0 && (
-              <p className="note">Remboursé : {formatEuros(ensemble.total.remboursementsCentimes)}.</p>
+              <p className="note">Remboursé : {formatEuros(ensemble.total.remboursementsCentimes)}.</p>
             )}
           </section>
 
@@ -116,7 +118,7 @@ export function VueEnsemble({
                   {l.id === actuelId && <span className="puce puce-on">Ouvert</span>}
                 </div>
                 {l.vide ? (
-                  <p className="texte-doux">Pas encore de données : relie sa boutique et ses comptes.</p>
+                  <p className="texte-doux">Pas encore de données : relie sa boutique et ses comptes.</p>
                 ) : (
                   <div className="chiffres-ensemble">
                     <Chiffre nom="Ventes" valeur={l.ventesInconnues ? '—' : euros(l.resume.ventesCentimes)} />
