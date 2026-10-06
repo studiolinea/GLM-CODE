@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0f1114" />
+    <link rel="icon" href="./icone.svg" type="image/svg+xml" />
+    <title>Pilotage · Confidentialité</title>
+    <style>
+      :root { color-scheme: dark; --fond: #0f1114; --texte: #eef1f4; --doux: #9aa3ad; --ambre: #ffb03a; }
+      body { margin: 0; background: var(--fond); color: var(--texte); font: 16px/1.6 system-ui, -apple-system, 'Segoe UI', sans-serif; }
+      main { max-width: 720px; margin: 0 auto; padding: 32px 16px 64px; }
+      h1 { margin: 0 0 4px; font-size: 1.6rem; letter-spacing: 0.04em; }
+      h2 { margin: 28px 0 8px; font-size: 1.1rem; color: var(--ambre); }
+      p, li { color: var(--texte); }
+      .date, footer { color: var(--doux); font-size: 0.9rem; }
+      a { color: var(--ambre); }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Pilotage : confidentialité</h1>
+      <p class="date">Mise à jour : 6 octobre 2026</p>
+
+      <p>
+        Pilotage est une appli qui aide un vendeur en ligne à suivre ses ventes et ses vidéos, et lui dit ce qui va et
+        ce qui cloche. Cette page explique quelles données l'appli utilise, et ce qu'elle en fait.
+      </p>
+
+      <h2>Ce que l'appli garde</h2>
+      <ul>
+        <li><strong>Ton compte</strong> : ton adresse e-mail et ton mot de passe. Le mot de passe n'est jamais visible, même par nous.</li>
+        <li>
+          <strong>Les ventes de ta boutique</strong> : pour chaque vente, la date, le montant, les frais, la TVA retenue, le
+          produit, le numéro de commande et s'il y a eu un remboursement. Aucun nom, aucune adresse et aucun e-mail de
+          tes clients ne sont gardés.
+        </li>
+        <li>
+          <strong>Tes vidéos</strong> (TikTok, Instagram, quand tu les relies) : l'identifiant de chaque vidéo, sa date de
+          publication, son lien et son nombre de vues. Pilotage ne publie rien, ne commente rien et ne modifie rien : il
+          lit seulement.
+        </li>
+        <li><strong>Tes réglages</strong> : par exemple ton objectif de vidéos par jour.</li>
+      </ul>
+
+      <h2>Les comptes que tu relies</h2>
+      <p>
+        Tu relies toi-même ta boutique ou tes réseaux dans les réglages, et tu peux les déconnecter à tout moment. La clé
+        d'accès de chaque compte relié est chiffrée avant d'être enregistrée, et elle est effacée dès que tu le
+        déconnectes. Pour une boutique Stripe, l'appli n'accepte qu'une clé limitée en lecture.
+      </p>
+
+      <h2>Où sont tes données</h2>
+      <p>
+        Dans une base de données Supabase située en Europe (Paris), où chaque personne ne peut lire que ses propres
+        données. Le serveur de l'appli tourne chez Cloudflare. Tes données ne sont jamais vendues, jamais utilisées pour de
+        la publicité, et l'appli n'a pas de traceur publicitaire.
+      </p>
+
+      <h2>Tes droits</h2>
+      <p>
+        Tu peux demander à voir, corriger ou effacer tes données. Déconnecter un compte relié efface sa clé tout de suite.
+        Pour effacer tout ton compte Pilotage, écris-nous : tout est supprimé, ventes et vidéos comprises.
+      </p>
+
+      <h2>Contact</h2>
+      <p>Pilotage est édité par Studiolinea. Pour toute question sur tes données, contacte Studiolinea.</p>
+
+      <footer><a href="./conditions.html">Conditions d'utilisation</a> · <a href="./">Ouvrir l'appli</a></footer>
+    </main>
+  </body>
+</html>
