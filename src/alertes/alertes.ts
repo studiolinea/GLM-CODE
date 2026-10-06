@@ -26,7 +26,8 @@ export interface Alerte {
   dapres: string;
   /** Précaution affichée sous l'alerte. */
   note?: string;
-  action: Action;
+  /** Le bouton qui aide à agir ; absent quand il n'y a rien à faire de plus que « Fait » ou « Plus tard ». */
+  action?: Action;
 }
 
 export interface ContexteAlertes {
@@ -133,13 +134,13 @@ function alertePublication(ctx: ContexteAlertes): Alerte | null {
 
   let constat: string;
   if (duJour > 0) {
-    constat = `Tu as publié ${duJour} vidéo${duJour > 1 ? 's' : ''} aujourd’hui.`;
+    constat = `tu as publié ${duJour} vidéo${duJour > 1 ? 's' : ''} aujourd’hui.`;
   } else if (dates.length === 0) {
-    constat = ctx.comptes ? 'Aucune vidéo pour l’instant.' : 'Aucune vidéo notée pour l’instant.';
+    constat = ctx.comptes ? 'aucune vidéo pour l’instant.' : 'aucune vidéo notée pour l’instant.';
   } else {
     const derniere = dates.reduce((a, b) => (a > b ? a : b));
     const n = joursEntre(derniere, aujourdhui);
-    constat = n === 1 ? 'Ton dernier post date d’hier.' : `Ton dernier post date de ${n} jours.`;
+    constat = n === 1 ? 'ta dernière vidéo date d’hier.' : `ta dernière vidéo remonte à ${n} jours.`;
   }
 
   const manque = objectif - duJour;
@@ -177,12 +178,14 @@ function alerteVideo(video: Video, ctx: ContexteAlertes): Alerte {
   const debut = new Date(video.instant);
   const fin = new Date(debut.getTime() + FENETRE_VIDEO_MS);
   const nom = `Ta vidéo ${NOMS_RESEAUX[video.reseau]} du ${jourMois(dateParis(debut))}`;
-  const action: Action = video.lien
+  // Une vidéo TikTok sans lien, TikTok relié : elle se met à jour toute seule, pas de bouton.
+  // Une vidéo Instagram (pas encore reliée) se complète à la main.
+  const action: Action | undefined = video.lien
     ? { libelle: 'Voir la vidéo', cible: 'lien', url: video.lien }
-    : ctx.comptes?.videos
-      ? { libelle: 'Actualiser', cible: 'actualiser' }
+    : ctx.comptes?.videos && video.reseau === 'tiktok'
+      ? undefined
       : { libelle: 'Compléter la vidéo', cible: 'modifier-video', videoId: video.id };
-  const base = { type: 'video' as const, action };
+  const base = { type: 'video' as const, ...(action ? { action } : {}) };
 
   // Pas encore 48 h, ou ventes pas chargées jusqu'au bout : on ne conclut pas.
   if (ctx.maintenant.getTime() < fin.getTime()) {
@@ -195,7 +198,7 @@ function alerteVideo(video: Video, ctx: ContexteAlertes): Alerte {
     };
   }
   if (!ctx.couverture || Date.parse(ctx.couverture) < fin.getTime()) {
-    const charge = ctx.couverture ? `Ventes chargées jusqu’au ${quandParis(new Date(ctx.couverture))}` : 'Aucune vente chargée';
+    const charge = ctx.couverture ? `ventes chargées jusqu’au ${quandParis(new Date(ctx.couverture))}` : 'aucune vente chargée';
     return {
       ...base,
       id: `video-${video.id}-tot`,

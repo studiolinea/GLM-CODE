@@ -4,7 +4,7 @@ import { formatEuros } from '../argent';
 import { PERIODES, type Periode, type Resume } from '../calculs/resume';
 import type { Rythme } from '../calculs/rythme';
 import { quandParis } from '../temps';
-import { PHRASE_GAINS } from '../texte';
+import { nombre, PHRASE_GAINS } from '../texte';
 import { CarteAlerte } from './CarteAlerte';
 import { IconeChevron, Logo } from './Icones';
 import { Jauge } from './Jauge';
@@ -188,7 +188,7 @@ export function TableauDeBord({
         <section className="zone-voyants" aria-labelledby="titre-voyants">
           <div className="titre-section">
             <h2 id="titre-voyants">Voyants</h2>
-            <span className="compteur">{alertes.length === 0 ? 'tout est éteint' : `${alertes.length} à traiter`}</span>
+            <span className="compteur">{alertes.length === 0 ? 'tout est éteint' : nombre(alertes.length, 'allumé')}</span>
           </div>
           {alertes.length === 0 ? (
             <p className="rien">

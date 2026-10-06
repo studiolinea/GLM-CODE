@@ -435,11 +435,22 @@ button {
   margin-top: 3px;
   font-style: italic;
 }
+/* Boutons d'un voyant : en grille sur téléphone (l'action en grand, puis « Fait » et « Plus tard »),
+   en ligne sur grand écran. */
 .alerte-actions {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 8px;
   margin-top: 10px;
+}
+.alerte-actions.avec-action > :first-child {
+  grid-column: 1 / -1;
+}
+@media (min-width: 760px) {
+  .alerte-actions {
+    display: flex;
+    flex-wrap: wrap;
+  }
 }
 .rien {
   margin: 0;
@@ -448,6 +459,19 @@ button {
   border: 1px solid var(--bord);
   border-radius: var(--rayon);
   color: var(--doux);
+}
+
+/* Texte lu à voix haute, mais pas affiché */
+.cache {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 /* ───── Boutons ───── */
