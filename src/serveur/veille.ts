@@ -1,3 +1,4 @@
+import { recupererSansRedirection } from './redirections';
 import { analyserBusiness, etatAssistantGratuit, type ConfigurationIA } from './assistant';
 import { entetesSupabaseServeur } from './authSupabase';
 import { chiffrer, dechiffrer } from './chiffrement';
@@ -107,7 +108,7 @@ export async function executerVeille(env: ConfigurationVeille, recuperer: Recupe
   let appels = 0;
   const borne: Recuperateur = (input, init) => {
     if (++appels > 45) return Promise.reject(new Error('Le passage de veille dépasse sa limite de lectures.'));
-    return recuperer(input, { ...init, redirect: 'error', signal: init?.signal ? AbortSignal.any([controleur.signal, init.signal]) : controleur.signal });
+    return recupererSansRedirection(input, { ...init, signal: init?.signal ? AbortSignal.any([controleur.signal, init.signal]) : controleur.signal }, recuperer);
   };
   let job: AutorisationVeille | undefined;
   try {
