@@ -112,16 +112,15 @@ function Cockpit({
   );
   // Avec la base en ligne, les données viennent des comptes reliés : rien à noter à la main.
   const relies = boutique.comptes;
-  const comptes = useMemo(
-    () =>
-      enLigne && relies
-        ? {
-            boutique: relies.some((c) => (BOUTIQUES as string[]).includes(c.source)),
-            videos: relies.some((c) => c.source === 'tiktok' || c.source === 'instagram'),
-          }
-        : undefined,
-    [enLigne, relies],
-  );
+  const comptes = useMemo(() => {
+    if (!enLigne) return undefined;
+    // Liste pas encore arrivée : on ne propose pas de relier ce qui l'est peut-être déjà.
+    if (!relies) return { boutique: true, videos: true };
+    return {
+      boutique: relies.some((c) => (BOUTIQUES as string[]).includes(c.source)),
+      videos: relies.some((c) => c.source === 'tiktok' || c.source === 'instagram'),
+    };
+  }, [enLigne, relies]);
   const alertes = useMemo(
     () => alertesVisibles(calculerAlertes({ ...donnees, maintenant, comptes }), donnees.etatsAlertes, aujourdhui),
     [donnees, maintenant, aujourdhui, comptes],

@@ -48,13 +48,18 @@ export function ComptesRelies({ boutique }: { boutique: SynchroBoutique }) {
       <h3 id="titre-comptes-relies" className="titre-reglage">
         Mes comptes reliés
       </h3>
-      {boutique.comptes === null && !boutique.erreur && <p className="texte-doux">Chargement…</p>}
+      {boutique.comptes === null && !boutique.erreur && <p className="texte-doux">Lecture de tes comptes reliés…</p>}
       {boutique.erreur && <p className="erreur">{boutique.erreur}</p>}
-      {FICHES.map((fiche) => (
-        <Boutique key={fiche.source} fiche={fiche} boutique={boutique} />
-      ))}
-      <CompteTikTok boutique={boutique} />
-      <Bientot nom="Instagram" />
+      {/* Tant que la liste n'est pas arrivée, on n'affiche rien : sinon tout paraîtrait « pas relié ». */}
+      {boutique.comptes !== null && (
+        <>
+          {FICHES.map((fiche) => (
+            <Boutique key={fiche.source} fiche={fiche} boutique={boutique} />
+          ))}
+          <CompteTikTok boutique={boutique} />
+          <Bientot nom="Instagram" />
+        </>
+      )}
     </section>
   );
 }
