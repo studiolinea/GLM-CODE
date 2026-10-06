@@ -18,15 +18,18 @@ avec les chiffres qui le prouvent.
 | 4. Ce que Kévin peut faire dans l'appli | ✅ |
 | 5. Les mêmes données sur le Mac et le téléphone | ✅ (projet Supabase « Pilotage », compte de Kévin créé le 5 octobre) |
 | 6. Mettre l'appli en ligne | ✅ https://pilotage.studiolinea-pro.workers.dev |
-| 7. Lire les ventes de la boutique | en cours : boutique Stripe reliée en mode test le 6 octobre ; reste à vérifier la TVA et les frais avec un paiement test |
+| 7. Lire les ventes de la boutique | en cours : boutique Stripe reliée en mode test le 6 octobre ; paiement test vérifié (la TVA retenue est enlevée des ventes) ; reste à lire les frais de 3,5 % de Managed Payments dès qu'une ligne « frais Stripe » apparaît dans « Vérifier les frais et la TVA » |
 | 8. Vérifier avec de vraies ventes | à faire |
-| 9. Tout automatique | boutique Stripe reliée (mode test) ; TikTok prêt à relier (appli TikTok en mode test, à relier avec le compte du business quand il existera) ; Instagram à faire |
+| 9. Tout automatique | boutique Stripe reliée (mode test) ; TikTok relié (appli TikTok en mode test, compte « studiolinea0 ») ; le compte TikTok du business à relier quand il existera ; Instagram à faire |
 | 10. Plusieurs business | ✅ le 6 octobre : « Mes business » en haut de l'écran, chaque business a ses chiffres et ses comptes reliés (plusieurs TikTok possibles) ; vue d'ensemble de tous les business ✅ |
+| Relecture complète | ✅ le 6 octobre : sécurité, fiabilité, interface et textes revus ; l'appli s'ouvre aussi sans réseau |
 
 ## La base en ligne (Supabase)
 
 - Tables et règles de sécurité : [supabase/schema.sql](supabase/schema.sql), à coller dans Supabase > SQL Editor,
-  puis les fichiers numérotés dans l'ordre (02, 03, 04, 05). Tous peuvent être relancés sans risque.
+  puis les fichiers numérotés dans l'ordre (02, 03, 04, 05, puis 06 conseillé). Tous peuvent être relancés sans risque.
+- Durcissement ([supabase/06-durcissement.sql](supabase/06-durcissement.sql)) : enlève des droits inutiles et limite
+  la taille des textes. Conseillé, à lancer après le 05.
 - Plusieurs business par compte ([supabase/05-plusieurs-business.sql](supabase/05-plusieurs-business.sql)) :
   chaque vente, vidéo, réglage, voyant et compte relié porte le business auquel il appartient.
 - L'appli lit l'adresse du projet et sa clé publique dans `VITE_SUPABASE_URL` et `VITE_SUPABASE_ANON_KEY`
