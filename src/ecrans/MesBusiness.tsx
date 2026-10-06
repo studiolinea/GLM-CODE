@@ -1,40 +1,52 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ChoixBusiness } from '../App';
 import type { Business } from '../donnees/business';
-import { NOM_MAX } from '../donnees/business';
+import { NOM_MAX, premierBusinessARenommer } from '../donnees/business';
 import { fr } from '../texte';
-import { Feuille } from './Feuille';
+import { avecSouris, Feuille } from './Feuille';
 
 type Message = { type: 'succes' | 'erreur'; texte: string };
+/** Où s'affiche le message d'une action : dans la ligne du business, en haut de la fenêtre, ou sous le champ de création. */
+type Endroit = { ligne: string } | 'haut' | 'creation';
+type MessagePlace = Message & { ou: Endroit };
+
+const dansLigne = (m: MessagePlace | null, id: string) => (m && typeof m.ou === 'object' && m.ou.ligne === id ? m : null);
 
 /** « Mes business » : le tableau de tous les business, pour ouvrir, renommer, supprimer ou en créer un. */
 export function MesBusiness({
   business,
+  exemple = false,
   onEnsemble,
   onFermer,
 }: {
   business: ChoixBusiness;
+  /** Vrai si le business ouvert montre les données d'exemple. */
+  exemple?: boolean;
   onEnsemble: () => void;
   onFermer: () => void;
 }) {
   const [nouveau, setNouveau] = useState('');
   const [occupe, setOccupe] = useState(false);
-  const [message, setMessage] = useState<Message | null>(null);
+  const [message, setMessage] = useState<MessagePlace | null>(null);
 
-  const agir = async (action: () => Promise<void>, succes?: string): Promise<boolean> => {
+  /** Lance une action ; son message (succès ou erreur) s'affiche à l'endroit donné, et s'efface à l'action suivante. */
+  const agir = async (action: () => Promise<void>, ou: Endroit, succes?: { texte: string; ou?: Endroit }): Promise<boolean> => {
     setMessage(null);
     setOccupe(true);
     try {
       await action();
-      if (succes) setMessage({ type: 'succes', texte: succes });
+      if (succes) setMessage({ type: 'succes', texte: succes.texte, ou: succes.ou ?? ou });
       return true;
     } catch (e) {
-      setMessage({ type: 'erreur', texte: e instanceof Error ? e.message : 'Ça n’a pas marché. Réessaie.' });
+      setMessage({ type: 'erreur', texte: e instanceof Error ? e.message : 'Ça n’a pas marché. Réessaie.', ou });
       return false;
     } finally {
       setOccupe(false);
     }
   };
+
+  const enHaut = message?.ou === 'haut' ? message : null;
+  const sousCreation = message?.ou === 'creation' ? message : null;
 
   return (
     <Feuille titre="Mes business" onFermer={onFermer}>
@@ -42,6 +54,16 @@ export function MesBusiness({
         Chaque business a ses ventes, ses vidéos, ses voyants et ses comptes reliés.
         {business.liste.length > 1 && ' Appuie sur « Ouvrir » pour passer de l’un à l’autre.'}
       </p>
+      {premierBusinessARenommer(business.liste, exemple) && (
+        <p className="note alerte-note">
+          C’est ton premier business&nbsp;: donne-lui le nom de ton vrai business (bouton «&nbsp;Renommer&nbsp;»).
+        </p>
+      )}
+      {enHaut && (
+        <p className={enHaut.type} role="status">
+          {fr(enHaut.texte)}
+        </p>
+      )}
       {business.liste.length > 1 && (
         <div className="pied" style={{ justifyContent: 'flex-start' }}>
           <button type="button" className="bouton contour" onClick={onEnsemble}>
@@ -58,12 +80,15 @@ export function MesBusiness({
             ouvert={b.id === business.actuel.id}
             seul={business.liste.length <= 1}
             occupe={occupe}
+            message={dansLigne(message, b.id)}
+            onAction={() => setMessage(null)}
             onOuvrir={() => {
               business.choisir(b.id);
               onFermer();
             }}
-            onRenommer={(nom) => agir(() => business.renommer(b.id, nom), 'Nom enregistré.')}
-            onSupprimer={() => agir(() => business.supprimer(b.id), `« ${b.nom} » est supprimé.`)}
+            onRenommer={(nom) => agir(() => business.renommer(b.id, nom), { ligne: b.id }, { texte: 'Nom enregistré.' })}
+            // La ligne disparaît : le message s'affiche en haut de la fenêtre.
+            onSupprimer={() => agir(() => business.supprimer(b.id), { ligne: b.id }, { texte: `« ${b.nom} » est supprimé.`, ou: 'haut' })}
           />
         ))}
       </ul>
@@ -77,7 +102,7 @@ export function MesBusiness({
             await business.creer(nouveau);
             setNouveau('');
             onFermer();
-          });
+          }, 'creation');
         }}
       >
         <label className="champ">
@@ -91,6 +116,11 @@ export function MesBusiness({
             onChange={(e) => setNouveau(e.target.value)}
           />
         </label>
+        {sousCreation && (
+          <p className={sousCreation.type} role="status">
+            {fr(sousCreation.texte)}
+          </p>
+        )}
         <p className="note">Il commence vide : relie sa boutique et ses comptes dans les réglages.</p>
         <div className="pied" style={{ justifyContent: 'flex-start' }}>
           <button type="submit" className="bouton principal" disabled={occupe || !nouveau.trim()}>
@@ -98,11 +128,6 @@ export function MesBusiness({
           </button>
         </div>
       </form>
-      {message && (
-        <p className={message.type} role="status">
-          {fr(message.texte)}
-        </p>
-      )}
     </Feuille>
   );
 }
@@ -112,6 +137,8 @@ function LigneBusiness({
   ouvert,
   seul,
   occupe,
+  message,
+  onAction,
   onOuvrir,
   onRenommer,
   onSupprimer,
@@ -120,13 +147,27 @@ function LigneBusiness({
   ouvert: boolean;
   seul: boolean;
   occupe: boolean;
+  /** Le message de la dernière action sur cette ligne. */
+  message: Message | null;
+  /** Appelé à chaque bouton : le message de l'action précédente s'efface. */
+  onAction: () => void;
   onOuvrir: () => void;
   onRenommer: (nom: string) => Promise<boolean>;
   onSupprimer: () => Promise<boolean>;
 }) {
   const [mode, setMode] = useState<'voir' | 'renommer' | 'supprimer'>('voir');
   const [nom, setNom] = useState(b.nom);
+  const champ = useRef<HTMLInputElement>(null);
   const inchange = occupe || !nom.trim() || nom.trim() === b.nom;
+  const changerMode = (m: typeof mode) => {
+    onAction();
+    setMode(m);
+  };
+
+  // « Renommer » : avec une souris (Mac), le curseur va dans le champ, le nom déjà sélectionné. Sur téléphone, non.
+  useEffect(() => {
+    if (mode === 'renommer' && avecSouris()) champ.current?.select();
+  }, [mode]);
 
   return (
     <li className={`ligne-business ${ouvert ? 'ouvert' : ''}`}>
@@ -138,7 +179,14 @@ function LigneBusiness({
       {mode === 'voir' && (
         <div className="pied" style={{ justifyContent: 'flex-start' }}>
           {!ouvert && (
-            <button type="button" className="bouton contour" onClick={onOuvrir}>
+            <button
+              type="button"
+              className="bouton contour"
+              onClick={() => {
+                onAction();
+                onOuvrir();
+              }}
+            >
               Ouvrir
             </button>
           )}
@@ -147,14 +195,14 @@ function LigneBusiness({
             className="bouton"
             onClick={() => {
               setNom(b.nom);
-              setMode('renommer');
+              changerMode('renommer');
             }}
           >
             Renommer
           </button>
           {/* Le dernier business ne se supprime pas : pas de bouton. */}
           {!seul && (
-            <button type="button" className="bouton" onClick={() => setMode('supprimer')}>
+            <button type="button" className="bouton" onClick={() => changerMode('supprimer')}>
               Supprimer
             </button>
           )}
@@ -170,13 +218,13 @@ function LigneBusiness({
         >
           <label className="champ">
             <span>Nouveau nom</span>
-            <input maxLength={NOM_MAX} enterKeyHint="done" value={nom} onChange={(e) => setNom(e.target.value)} />
+            <input ref={champ} maxLength={NOM_MAX} enterKeyHint="done" value={nom} onChange={(e) => setNom(e.target.value)} />
           </label>
           <div className="pied" style={{ justifyContent: 'flex-start' }}>
             <button type="submit" className="bouton principal" disabled={inchange}>
               Enregistrer
             </button>
-            <button type="button" className="bouton discret" onClick={() => setMode('voir')}>
+            <button type="button" className="bouton discret" onClick={() => changerMode('voir')}>
               Annuler
             </button>
           </div>
@@ -193,11 +241,17 @@ function LigneBusiness({
             <button type="button" className="bouton danger" disabled={occupe} onClick={() => void onSupprimer()}>
               Oui, supprimer définitivement
             </button>
-            <button type="button" className="bouton discret" onClick={() => setMode('voir')}>
+            <button type="button" className="bouton discret" onClick={() => changerMode('voir')}>
               Annuler
             </button>
           </div>
         </div>
+      )}
+
+      {message && (
+        <p className={message.type} role="status">
+          {fr(message.texte)}
+        </p>
       )}
     </li>
   );

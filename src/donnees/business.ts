@@ -1,6 +1,7 @@
 // Les business du compte connecté : chacun a ses ventes, ses vidéos, ses voyants et ses comptes reliés.
 
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { memeNom } from '../texte';
 
 export interface Business {
   id: string;
@@ -160,6 +161,23 @@ export function oublierCompte(): void {
   } catch {
     // Rien à faire.
   }
+}
+
+/** Le nom du business créé pour un nouveau compte, avec les données d'exemple. */
+export const NOM_PREMIER_BUSINESS = 'Mon premier business';
+
+/** Le business du compte qui porte déjà ce nom (sauf celui qu'on renomme), ou null. */
+export function nomDejaPris(nom: string, liste: Business[], sauf?: string): Business | null {
+  return liste.find((b) => b.id !== sauf && memeNom(b.nom, nom)) ?? null;
+}
+
+export function messageNomPris(b: Business): string {
+  return `Tu as déjà un business qui s’appelle « ${b.nom} ».`;
+}
+
+/** Le compte n'a que son premier business, qui montre encore l'exemple : on l'invite à lui donner son vrai nom. */
+export function premierBusinessARenommer(liste: Business[], exemple: boolean): boolean {
+  return exemple && liste.length === 1 && liste[0]?.nom === NOM_PREMIER_BUSINESS;
 }
 
 /** Le business à ouvrir : celui retenu s'il existe encore, sinon le premier. */

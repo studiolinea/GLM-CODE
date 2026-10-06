@@ -7,6 +7,9 @@ import {
   creerBusiness,
   listerBusiness,
   memoireBusiness,
+  messageNomPris,
+  NOM_PREMIER_BUSINESS,
+  nomDejaPris,
   oublierBusiness,
   oublierCompte,
   renommerBusiness,
@@ -151,6 +154,9 @@ export interface ChoixBusiness {
   supprimer: (id: string) => Promise<void>;
   /** Les ventes et vidéos de tous les business, pour la vue d'ensemble. */
   chargerEnsemble: () => Promise<DonneesBusiness[]>;
+  /** Un message pour l'écran principal (par exemple : le business ouvert vient d'être supprimé). */
+  annonce: string | null;
+  effacerAnnonce: () => void;
 }
 
 function AvecBusiness({
@@ -167,6 +173,7 @@ function AvecBusiness({
   const [erreur, setErreur] = useState<string | null>(null);
   // Vrai quand la liste vient de la copie de l'appareil (la base n'a pas répondu) : on la relit quand le réseau revient.
   const [depuisCopie, setDepuisCopie] = useState(false);
+  const [annonce, setAnnonce] = useState<string | null>(null);
   // Une seule lecture à la fois : sinon un compte tout neuf recevrait deux « Mon premier business ».
   const lecture = useRef<Promise<Business[]> | null>(null);
 
@@ -195,7 +202,7 @@ function AvecBusiness({
       lecture.current ??= (async () => {
         const business = await listerBusiness(client);
         // Nouveau compte : un premier business, avec les données d'exemple.
-        return business.length > 0 ? business : [await creerBusiness(client, userId, 'Mon premier business', true)];
+        return business.length > 0 ? business : [await creerBusiness(client, userId, NOM_PREMIER_BUSINESS, true)];
       })().finally(() => {
         lecture.current = null;
       });
@@ -204,7 +211,7 @@ function AvecBusiness({
     } catch (e) {
       // Le détail technique, pour qui ouvre la console du navigateur (jamais à l'écran).
       console.error(
-        'Lecture des business impossible. Si le problème continue, la base n’est peut-être pas à jour (texte SQL « 05-plusieurs-business.sql »).',
+        'Lecture des business impossible. Si le problème continue, la base n’est peut-être pas à jour (texte SQL « 05-plusieurs-business.sql »).',
         e instanceof Error ? (e.cause ?? e) : e,
       );
       if (ouvrirCopie()) return;
@@ -240,6 +247,8 @@ function AvecBusiness({
 
   const creer = useCallback(
     async (nom: string) => {
+      const pris = nomDejaPris(nom, liste ?? []);
+      if (pris) throw new Error(messageNomPris(pris));
       const nouveau = await creerBusiness(client, userId, nom, false);
       garderListe([...(liste ?? []), nouveau]);
       choisir(nouveau.id);
@@ -249,26 +258,34 @@ function AvecBusiness({
 
   const renommer = useCallback(
     async (id: string, nom: string) => {
+      const pris = nomDejaPris(nom, liste ?? [], id);
+      if (pris) throw new Error(messageNomPris(pris));
       await renommerBusiness(client, id, nom);
       garderListe(await listerBusiness(client));
     },
-    [client, garderListe],
+    [client, liste, garderListe],
   );
 
   const supprimer = useCallback(
     async (id: string) => {
-      if ((liste?.length ?? 0) <= 1) throw new Error('Il te faut au moins un business : crée-en un autre avant de supprimer celui-ci.');
+      if ((liste?.length ?? 0) <= 1) throw new Error('Il te faut au moins un business : crée-en un autre avant de supprimer celui-ci.');
+      const nom = liste?.find((b) => b.id === id)?.nom ?? '';
       await supprimerBusiness(client, id);
       oublierCopie(`${userId}:${id}`);
       const reste = await listerBusiness(client);
       garderListe(reste);
-      // Le business ouvert vient d'être supprimé : on ouvre le premier qui reste.
-      if (id === actuelId && reste[0]) choisir(reste[0].id);
+      // Le business ouvert vient d'être supprimé : on ouvre le premier qui reste, et on le dit sur l'écran principal.
+      // (Le business ouvert n'est pas forcément « retenu » : sans choix gardé, c'est le premier de la liste.)
+      if (id === idOuvert && reste[0]) {
+        setAnnonce(`« ${nom} » est supprimé.`);
+        choisir(reste[0].id);
+      }
     },
-    [client, userId, liste, actuelId, garderListe, choisir],
+    [client, userId, liste, idOuvert, garderListe, choisir],
   );
 
   const lireEnsemble = useCallback(() => chargerEnsemble(client, userId, liste ?? []), [client, userId, liste]);
+  const effacerAnnonce = useCallback(() => setAnnonce(null), []);
 
   const source = useMemo<Source | null>(
     () =>
@@ -313,6 +330,8 @@ function AvecBusiness({
         renommer,
         supprimer,
         chargerEnsemble: lireEnsemble,
+        annonce,
+        effacerAnnonce,
       }}
     />
   );
