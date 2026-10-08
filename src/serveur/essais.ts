@@ -1,3 +1,4 @@
+import { qualifierChiffres } from './qualiteChiffres';
 import { calculerResume, type Periode } from '../calculs/resume';
 import { ajouterJours, dateParis } from '../temps';
 import type { Vente } from '../ventes/modele';
@@ -8,9 +9,10 @@ export function contexteEssaisSynthetiques(periode: Periode, maintenant: Date) {
   const essaisSynthetiques = [
     { etiquette: 'SYNTHÉTIQUE — avant lancement, aucune vente', resume: calculerResume([], periode, maintenant), couvertureVentes: null },
     { etiquette: 'SYNTHÉTIQUE — vente de 20 € avec frais inconnus', resume: calculerResume([vente], periode, maintenant), couvertureVentes: maintenant.toISOString() },
-    { etiquette: 'SYNTHÉTIQUE — remboursement Stripe de 20 €, frais origine 3 €', resume: calculerResume([{ ...vente, rembourse: true, fraisCentimes: 300 }], periode, maintenant), couvertureVentes: maintenant.toISOString() },
-  ];
+    { fraisOrigineCentimes: 300, fraisRetenusApresRemboursementCentimes: null, etiquette: 'SYNTHÉTIQUE — remboursement Stripe de 20 €, frais origine 3 €', resume: calculerResume([{ ...vente, rembourse: true, fraisCentimes: 300 }], periode, maintenant), couvertureVentes: maintenant.toISOString() },
+  ].map((cas, index) => ({ ...cas, qualiteChiffres: qualifierChiffres(cas.resume, cas.couvertureVentes, index === 2) }));
   return {
+    qualiteChiffres: qualifierChiffres(calculerResume([], periode, maintenant), null, false),
     resume: calculerResume([], periode, maintenant), jourParis: dateParis(maintenant),
     resumeJour: { ...calculerResume([], '7j', maintenant), periode: 'jour', debut: dateParis(maintenant), fin: dateParis(maintenant) },
     rythme: { publiees: 0, objectif: null },

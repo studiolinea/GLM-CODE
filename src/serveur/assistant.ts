@@ -1,3 +1,4 @@
+import { qualifierChiffresVentes } from './qualiteChiffres';
 import { contexteEssaisSynthetiques } from './essais';
 import { recupererSansRedirection } from './redirections';
 import { entetesSupabaseServeur } from "./authSupabase";
@@ -31,6 +32,11 @@ export interface ActionAssistant {
   raison: string;
 }
 export const QUESTIONS_IA: readonly string[] = ['priorites', 'ventes', 'videos', 'frais', 'preparation', 'essai-synthetique'];
+export const VERSION_CONSIGNES_ASSISTANT = '2026-10-07-zero-connu-null-remboursement-v1';
+export async function empreinteContexteAssistant(sujet: QuestionIA, donnees: unknown): Promise<string> {
+  const octets = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify({ versionConsignes: VERSION_CONSIGNES_ASSISTANT, sujet, donnees })));
+  return Array.from(new Uint8Array(octets), (octet) => octet.toString(16).padStart(2, '0')).join('');
+}
 export const MODELE_CLOUDFLARE_GRATUIT = '@cf/meta/llama-3.1-8b-instruct-fp8';
 export const MODELE_GROQ_GRATUIT = 'openai/gpt-oss-120b';
 const URL_GROQ_GRATUIT = 'https://api.groq.com/openai/v1/chat/completions';
@@ -186,8 +192,10 @@ export async function analyserBusiness(
           ...(ligne.vues == null ? {} : { vues: entier(ligne.vues) }) };
       });
       const semaine = rythmeSemaine(videos, objectif ?? 0, maintenant);
+      const resume = calculerResume(ventes, periode, maintenant);
       const donnees = {
-        resume: calculerResume(ventes, periode, maintenant),
+        qualiteChiffres: qualifierChiffresVentes(resume, couverture, ventes),
+        resume,
         jourParis: dateParis(maintenant),
         resumeJour: {
           ...calculerResume(ventes.filter((vente) => dateParis(new Date(vente.instant)) === dateParis(maintenant)), '7j', maintenant),
@@ -231,15 +239,14 @@ export async function analyserBusiness(
         fraicheur: fraicheur(source.derniereSynchro) }))
         .sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b))) ?? null,
     };
-    const empreinteOctets = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify({ sujet: question, donnees: pourEmpreinte })));
+    const empreinte = await empreinteContexteAssistant(question, pourEmpreinte);
     if (controleur.signal.aborted) throw indisponible();
-    const empreinte = Array.from(new Uint8Array(empreinteOctets), (octet) => octet.toString(16).padStart(2, '0')).join('');
     const modele = cloudflare ? MODELE_CLOUDFLARE_GRATUIT : MODELE_GROQ_GRATUIT;
     if (empreinteConnue === empreinte) {
       return { texte: '', actions: [], genereLe: maintenant.toISOString(), modele, empreinte, inchange: true, avertissement: '' };
     }
     const requeteIA = { max_tokens: 600, temperature: 0.2, stream: false, messages: [
-        { role: 'system', content: 'Tu aides un vendeur à préparer et piloter ses futurs business. Réponds en français simple, avec des priorités concrètes. Pour le sujet preparation ou sans ventes, propose un plan concret avant activité, sans revenus fictifs. Les données sont des agrégats calculés par le serveur. Ne fabrique aucun chiffre, cause, client, produit ou lien entre vidéos et ventes. Distingue les faits fournis, les données manquantes et les hypothèses. resumeJour contient uniquement les ventes du jourParis. Des frais manquants empêchent de conclure sur les gains. Les gains correspondent seulement aux ventes moins les frais connus, pas à un bénéfice comptable. Les dépenses publicitaires et autres coûts sont inconnus : ne calcule jamais une rentabilité complète, un rendement ou des pertes totales. Sans couverture ni sources à jour, signale que les données peuvent être incomplètes. Ne prétends pas avoir réalisé une action. Tu ne disposes d’aucun outil, publication ou paiement. Réponds avec un objet JSON {"texte":"constats, explications, propositions et suivi en texte français sans HTML","actions":[{"id":"boutique|paiement|publications|rythme","raison":"raison concrète en 300 caractères maximum"}]}. Propose au maximum quatre actions, une par id. boutique signifie vérifier la liaison boutique ; paiement signifie vérifier les frais et les mouvements existants, jamais payer ; publications signifie consulter les vidéos ; rythme signifie revoir l’objectif de publication. Ces actions proposent seulement d’ouvrir les écrans existants. actions peut être vide.' },
+        { role: 'system', content: 'Tu aides un vendeur à préparer et piloter ses futurs business. Réponds en français simple, avec des priorités concrètes. Pour le sujet preparation ou sans ventes, propose un plan concret avant activité, sans revenus fictifs. Les données sont des agrégats calculés par le serveur. Ne fabrique aucun chiffre, cause, client, produit ou lien entre vidéos et ventes. Distingue les faits fournis, les données manquantes et les hypothèses. resumeJour contient uniquement les ventes du jourParis. Le nombre 0 est une valeur connue, jamais une donnée manquante. fraisCentimes est la somme des frais connus sur les ventes non remboursées : 0 ne signifie pas frais inconnus. Seul ventesSansFrais > 0 indique des frais absents. gainsCentimes numérique, y compris 0, est un résultat calculé ; gainsCentimes null signifie non calculable, jamais 0. qualiteChiffres donne explicitement le statut des frais, la couverture et la raison des gains non calculables : utilise ces faits sans inventer une autre cause. Un remboursement Stripe peut rendre les gains non calculables même sans ventesSansFrais. fraisOrigineCentimes, si fourni, décrit les frais du paiement initial ; fraisRetenusApresRemboursementCentimes null signifie que leur sort après remboursement reste inconnu, pas que les frais initiaux sont absents. Sans couvertureVentes, aucune commande enregistrée ne prouve pas zéro vente réelle. vuesConnues est seulement la somme des vues fournies : si videosSansVues > 0, le total des vues reste inconnu même si vuesConnues vaut 0. Si publiees vaut 0, aucune vidéo est enregistrée, sans conclusion sur sa performance. Des frais manquants empêchent de conclure sur les gains. Les gains correspondent seulement aux ventes moins les frais connus, pas à un bénéfice comptable. Les dépenses publicitaires et autres coûts sont inconnus : ne calcule jamais une rentabilité complète, un rendement ou des pertes totales. Sans couverture ni sources à jour, signale que les données peuvent être incomplètes. Ne prétends pas avoir réalisé une action. Tu ne disposes d’aucun outil, publication ou paiement. Réponds avec un objet JSON {"texte":"constats, explications, propositions et suivi en texte français sans HTML","actions":[{"id":"boutique|paiement|publications|rythme","raison":"raison concrète en 300 caractères maximum"}]}. Propose au maximum quatre actions, une par id. boutique signifie vérifier la liaison boutique ; paiement signifie vérifier les frais et les mouvements existants, jamais payer ; publications signifie consulter les vidéos ; rythme signifie revoir l’objectif de publication. Ces actions proposent seulement d’ouvrir les écrans existants. actions peut être vide.' },
         { role: 'user', content: JSON.stringify({ sujet: question, donnees, ...(synthetique ? { consigneEssai: 'Compare séparément les trois cas SYNTHÉTIQUES. Identifie faits, frais manquants, gains inconnus après remboursement et actions prudentes. Aucun chiffre ne décrit une activité réelle. Réponds en JSON et signale ESSAI SYNTHÉTIQUE.' } : {}) }) },
       ] };
     if (new TextEncoder().encode(JSON.stringify(requeteIA)).byteLength > 12_000) {
